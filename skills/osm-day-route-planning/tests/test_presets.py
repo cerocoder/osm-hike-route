@@ -1,5 +1,5 @@
 import pytest
-from presets import load_preset, PresetNotFoundError
+from presets import load_preset, build_weights, PresetNotFoundError
 
 REQUIRED_KEYS = {
     "mode", "routable_highway", "hard_exclude_tags",
@@ -32,3 +32,26 @@ def test_bike_without_style_raises():
 def test_unknown_mode_raises():
     with pytest.raises(PresetNotFoundError):
         load_preset("ski")
+
+
+def test_build_weights_merges_preference_overrides_without_mutating_preset():
+    preset = load_preset("walk")
+    original_prefer_forest = preset["preferences"]["prefer_forest"]
+
+    weights = build_weights(preset, preference_overrides={"prefer_forest": 3.0})
+
+    assert weights["preferences"]["prefer_forest"] == 3.0
+    assert weights["preferences"]["avoid_open_field"] == preset["preferences"]["avoid_open_field"]
+    assert preset["preferences"]["prefer_forest"] == original_prefer_forest  # preset untouched
+
+
+def test_build_weights_defaults_budget_to_none():
+    weights = build_weights(load_preset("walk"))
+    assert weights["max_distance_km"] is None
+    assert weights["max_duration_hours"] is None
+
+
+def test_build_weights_sets_given_budget():
+    weights = build_weights(load_preset("walk"), max_distance_km=10.0)
+    assert weights["max_distance_km"] == 10.0
+    assert weights["max_duration_hours"] is None

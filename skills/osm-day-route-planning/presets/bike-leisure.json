@@ -1,0 +1,20 @@
+{
+  "mode": "bike",
+  "style": "leisure",
+  "routable_highway": ["path", "footway", "track", "cycleway", "residential", "living_street"],
+  "hard_exclude_tags": { "bicycle": ["no", "dismount"], "highway": ["steps"] },
+  "exclude_highway_without_infra": ["trunk", "primary"],
+  "blocking_barrier_tags": ["cycle_barrier", "turnstile"],
+  "buffers_m": { "highway": 60, "water": 30 },
+  "preferences": {
+    "prefer_forest": 1.4,
+    "avoid_open_field": 1.6,
+    "avoid_near_highway": 3.0,
+    "avoid_near_water": 1.8,
+    "avoid_steep_gradient": 2.5
+  },
+  "gradient_threshold_pct": 8,
+  "pace_kmh": 15,
+  "ascent_minutes_per_100m": 10,
+  "duration_warning_hours": 8
+}

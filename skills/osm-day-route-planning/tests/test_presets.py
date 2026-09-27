@@ -1,5 +1,7 @@
+import copy
+
 import pytest
-from presets import load_preset, build_weights, PresetNotFoundError
+from presets import load_preset, build_weights, revise_weights, PresetNotFoundError
 
 REQUIRED_KEYS = {
     "mode", "routable_highway", "hard_exclude_tags",
@@ -55,3 +57,34 @@ def test_build_weights_sets_given_budget():
     weights = build_weights(load_preset("walk"), max_distance_km=10.0)
     assert weights["max_distance_km"] == 10.0
     assert weights["max_duration_hours"] is None
+
+
+def test_revise_weights_changes_only_named_top_level_fields():
+    existing = build_weights(load_preset("bike", style="leisure"), max_distance_km=12.0)
+
+    revised = revise_weights(existing, {"max_distance_km": 18.0})
+
+    assert revised["max_distance_km"] == 18.0
+    assert revised["max_duration_hours"] == existing["max_duration_hours"]
+    assert revised["mode"] == "bike"
+    assert revised["style"] == "leisure"
+    assert revised["preferences"] == existing["preferences"]
+
+
+def test_revise_weights_merges_preferences_key_instead_of_replacing():
+    existing = build_weights(load_preset("walk"))
+
+    revised = revise_weights(existing, {"preferences": {"avoid_near_water": 5.0}})
+
+    assert revised["preferences"]["avoid_near_water"] == 5.0
+    # Untouched preference keys survive the partial preferences update.
+    assert revised["preferences"]["prefer_forest"] == existing["preferences"]["prefer_forest"]
+
+
+def test_revise_weights_does_not_mutate_existing_argument():
+    existing = build_weights(load_preset("walk"))
+    frozen_copy = copy.deepcopy(existing)
+
+    revise_weights(existing, {"max_distance_km": 5.0})
+
+    assert existing == frozen_copy

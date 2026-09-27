@@ -29,3 +29,13 @@ def build_weights(preset: dict, preference_overrides: dict | None = None,
     weights["max_distance_km"] = max_distance_km
     weights["max_duration_hours"] = max_duration_hours
     return weights
+
+
+def revise_weights(existing: dict, changes: dict) -> dict:
+    revised = copy.deepcopy(existing)
+    for key, value in changes.items():
+        if key == "preferences" and isinstance(value, dict):
+            revised["preferences"].update(value)
+        else:
+            revised[key] = value
+    return revised

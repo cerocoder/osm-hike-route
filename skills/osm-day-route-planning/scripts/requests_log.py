@@ -8,6 +8,18 @@ from pathlib import Path
 _ENTRY_MARKER = "<!-- requests_log entry: "
 
 
+def _escape_html_markers(text: str) -> str:
+    """Escape HTML comment markers in visible text to prevent parsing collision.
+
+    The JSON payload (entry dict) preserves the original text; this escaping
+    only affects the human-readable Markdown rendering and prevents fake
+    marker lines from corrupting the parse.
+    """
+    text = text.replace("<!--", "&lt;!--")
+    text = text.replace("-->", "--&gt;")
+    return text
+
+
 def append_request(route_dir: Path, request_text: str, summary: str) -> int:
     route_dir = Path(route_dir)
     route_dir.mkdir(parents=True, exist_ok=True)
@@ -20,10 +32,13 @@ def append_request(route_dir: Path, request_text: str, summary: str) -> int:
         "request": request_text,
         "summary": summary,
     }
+    # Escape HTML markers in visible text to prevent fake marker injection
+    escaped_request = _escape_html_markers(request_text)
+    escaped_summary = _escape_html_markers(summary)
     block = (
         f"\n## Итерация {iteration} ({entry['timestamp']})\n\n"
-        f"> {request_text}\n\n"
-        f"Изменения: {summary}\n\n"
+        f"> {escaped_request}\n\n"
+        f"Изменения: {escaped_summary}\n\n"
         f"{_ENTRY_MARKER}{json.dumps(entry, ensure_ascii=False)} -->\n"
     )
     with path.open("a", encoding="utf-8") as f:
@@ -40,5 +55,9 @@ def read_requests(route_dir: Path) -> list[dict]:
         line = line.strip()
         if line.startswith(_ENTRY_MARKER):
             raw_json = line[len(_ENTRY_MARKER):].rsplit("-->", 1)[0].strip()
-            entries.append(json.loads(raw_json))
+            try:
+                entries.append(json.loads(raw_json))
+            except json.JSONDecodeError:
+                # Skip malformed entries instead of crashing the entire journal
+                continue
     return entries

@@ -30,7 +30,14 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import asdict
 from pathlib import Path
+
+from place_info import PlaceInfoService
+from place_info.providers.wikipedia import WikipediaProvider
+from place_info.providers.wikidata import WikidataProvider
+from place_info.providers.wikimedia_commons import WikimediaCommonsProvider
+from place_info.providers.opentripmap import OpenTripMapProvider
 
 LEAFLET_CSS = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
 LEAFLET_JS = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
@@ -312,69 +319,38 @@ def markdown_to_html(md_text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _wiki_cache_load(path: Path) -> dict:
-    if path.exists():
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
-
-
-def _wiki_cache_key(feature: dict, user_lang: str, local_lang: str | None) -> str:
-    props = feature.get("properties", {})
-    lon, lat = feature["geometry"]["coordinates"]
-    ident = props.get("osm_id") or props.get("wikidata") or props.get("name", "")
-    return f"{ident}|{round(lat, 5)}|{round(lon, 5)}|{user_lang}|{local_lang or ''}"
-
-
-def annotate_wikipedia_links(geojson: dict, user_lang: str, local_lang: str | None,
-                              cache_path: Path | None, timeout: float = 5.0) -> None:
-    """Mutates Point features in place, adding `_wikiUrl` / `_wikiLang` to
-    their properties when a verified match is found. Cached by
-    (identity, coords, languages) in wiki_links.json next to route.geojson,
-    so re-rendering after a route tweak doesn't re-hit the network for
-    every point every time, and so a render without network access still
-    reuses whatever was already resolved."""
-    cache = _wiki_cache_load(cache_path) if cache_path else {}
-
-    def _save():
-        if cache_path:
-            try:
-                cache_path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
-            except Exception:
-                pass
+def annotate_place_info(geojson: dict, user_lang: str, local_lang: str | None,
+                         cache_path: Path | None, opentripmap_api_key: str | None = None,
+                         timeout: float = 5.0) -> None:
+    """Mutates every Point feature in place, adding `_placeInfo`: a list of
+    every plugin's non-empty result (spec §5 — show ALL sources, not the
+    single best one, unlike the old resolve_wikipedia-only behavior)."""
+    import os
+    api_key = opentripmap_api_key or os.environ.get("OSM_DAY_ROUTE_OPENTRIPMAP_KEY")
+    providers = [
+        WikipediaProvider(user_lang, local_lang, timeout),
+        WikidataProvider(user_lang, timeout),
+        WikimediaCommonsProvider(timeout=timeout),
+        OpenTripMapProvider(api_key, timeout=timeout),
+    ]
+    service = PlaceInfoService(providers, cache_path) if cache_path else PlaceInfoService(providers, Path("/dev/null"))
 
     for feature in geojson.get("features", []):
         if feature["geometry"]["type"] != "Point":
             continue
-        key = _wiki_cache_key(feature, user_lang, local_lang)
-        if key in cache:
-            url, lang = cache[key]["url"], cache[key]["lang"]
-        else:
-            try:
-                url, lang = resolve_wikipedia(feature, user_lang, local_lang, timeout)
-            except WikiLookupError as e:
-                # Inconclusive (rate-limited/network failure), not "confirmed
-                # no article" — leave uncached so the next render retries,
-                # rather than permanently poisoning wiki_links.json with a
-                # false negative from a transient failure.
-                name = feature.get("properties", {}).get("name", "?")
-                print(f"warning: wikipedia lookup skipped for '{name}': {e}", file=sys.stderr)
-                continue
-            cache[key] = {"url": url, "lang": lang}
-            # Written after every resolution, not just once at the end: a
-            # multi-point run against a slow/rate-limited API can take
-            # longer than a caller's own timeout and get killed mid-run —
-            # reproduced in testing (a 170s `timeout` wrapper killed a run
-            # doing 2x the requests after the search/geosearch merge, and
-            # an end-of-function-only write lost every resolution from that
-            # run). Frequent small writes cost little against the network
-            # round-trips already happening here.
-            _save()
-        if url:
-            feature["properties"]["_wikiUrl"] = url
-            feature["properties"]["_wikiLang"] = lang
+        props = feature.get("properties", {})
+        coord = feature["geometry"]["coordinates"]
+        lon, lat = coord[0], coord[1]
+        names = props.get("search_names", {}) or {}
+        if props.get("name"):
+            names = {**names, (local_lang or user_lang): props["name"]}
+        identity = props.get("osm_id") or props.get("wikidata") or props.get("name", "")
+
+        results = service.fetch_all(names, lat, lon, props.get("wikidata"), identity)
+        if results:
+            props["_placeInfo"] = [
+                {k: v for k, v in asdict(r).items() if v is not None} for r in results
+            ]
 
 
 # ---------------------------------------------------------------------------
@@ -465,8 +441,8 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
     geojson = json.loads(geojson_path.read_text(encoding="utf-8"))
 
     if resolve_wiki:
-        cache_path = geojson_path.parent / "wiki_links.json"
-        annotate_wikipedia_links(geojson, user_lang, local_lang, cache_path, wiki_timeout)
+        cache_path = geojson_path.parent / "place_info.json"
+        annotate_place_info(geojson, user_lang, local_lang, cache_path)
 
     access_html = ""
     confidence_html = ""

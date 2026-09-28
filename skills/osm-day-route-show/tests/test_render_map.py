@@ -60,3 +60,43 @@ def test_build_gpx_omits_ele_for_2d_legacy_coordinates():
 
     assert "<ele>" not in gpx
     assert '<trkpt lat="55.0" lon="37.0"/>' in gpx or "<trkpt" in gpx
+
+
+from unittest.mock import patch
+from render_map import annotate_place_info
+from place_info.providers.base import PlaceInfoResult
+
+
+def test_annotate_place_info_adds_placeinfo_list_to_point_features(tmp_path):
+    geojson = {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [37.0, 55.0]},
+            "properties": {"name": "Родник", "type": "spring", "osm_id": "node/1"},
+        }],
+    }
+
+    fake_results = [PlaceInfoResult(provider_id="wikidata", summary="источник")]
+    with patch("render_map.PlaceInfoService") as MockService:
+        MockService.return_value.fetch_all.return_value = fake_results
+        annotate_place_info(geojson, user_lang="ru", local_lang=None,
+                             cache_path=tmp_path / "place_info.json")
+
+    point = geojson["features"][0]
+    assert point["properties"]["_placeInfo"] == [{"provider_id": "wikidata", "summary": "источник"}]
+
+
+def test_annotate_place_info_skips_linestring_features(tmp_path):
+    geojson = {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": {"type": "LineString", "coordinates": [[37.0, 55.0], [37.1, 55.1]]},
+            "properties": {"name": "Маршрут"},
+        }],
+    }
+
+    annotate_place_info(geojson, user_lang="ru", local_lang=None, cache_path=tmp_path / "place_info.json")
+
+    assert "_placeInfo" not in geojson["features"][0]["properties"]

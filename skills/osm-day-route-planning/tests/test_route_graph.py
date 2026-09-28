@@ -1,4 +1,5 @@
-from route_graph import build_graph, filter_excluded_ways
+import pytest
+from route_graph import build_graph, filter_excluded_ways, tag_grades, _edge_cost, weighted_shortest_path
 
 
 def _two_node_way(node_a=1, node_b=2, tags=None):
@@ -92,3 +93,41 @@ def test_filter_excluded_ways_keeps_everything_for_walk_with_no_rules():
     kept = filter_excluded_ways(ways, restricted_polygons=[])
 
     assert len(kept) == 2
+
+
+def test_tag_grades_computes_signed_percent_grade():
+    graph = {1: [[2, 100.0, {}]], 2: [[1, 100.0, {}]]}
+    node_coords = {1: (55.0, 37.0), 2: (55.001, 37.0)}
+    elevations = {1: 200.0, 2: 210.0}  # +10m over a 100m edge => +10%
+
+    tag_grades(graph, node_coords, elevations)
+
+    assert graph[1][0][2]["grade_pct"] == pytest.approx(10.0)
+    assert graph[2][0][2]["grade_pct"] == pytest.approx(-10.0)
+
+
+def test_edge_cost_penalizes_uphill_more_than_downhill_above_threshold():
+    preferences = {"avoid_steep_gradient": 2.0, "gradient_threshold_pct": 8}
+
+    uphill_cost = _edge_cost(100.0, {"grade_pct": 15.0}, preferences)
+    downhill_cost = _edge_cost(100.0, {"grade_pct": -15.0}, preferences)
+    flat_cost = _edge_cost(100.0, {"grade_pct": 2.0}, preferences)
+
+    assert uphill_cost > flat_cost
+    assert flat_cost <= downhill_cost < uphill_cost
+
+
+def test_weighted_shortest_path_prefers_gentler_route_when_steep_is_penalized():
+    # Two parallel paths from 1 to 3: a short steep one (1->2->3) and a
+    # longer flat one (1->4->3).
+    graph = {
+        1: [[2, 50.0, {"grade_pct": 20.0}], [4, 60.0, {"grade_pct": 0.0}]],
+        2: [[3, 50.0, {"grade_pct": 20.0}]],
+        4: [[3, 60.0, {"grade_pct": 0.0}]],
+        3: [],
+    }
+    preferences = {"avoid_steep_gradient": 5.0, "gradient_threshold_pct": 8}
+
+    path, cost = weighted_shortest_path(graph, 1, 3, preferences)
+
+    assert path == [1, 4, 3]

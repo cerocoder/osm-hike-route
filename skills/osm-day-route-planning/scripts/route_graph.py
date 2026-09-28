@@ -304,6 +304,22 @@ def tag_edges(graph, node_coords, highway_ways, water_ways, forest_ways, field_w
             edge[2] = {"near_highway": near_highway, "near_water": near_water, "landcover": landcover}
 
 
+def tag_grades(graph, node_coords, elevations):
+    """Mutates graph in place: each directed edge's tags get `grade_pct`,
+    the signed percent grade climbing FROM this edge's origin node TOWARD
+    its neighbor. Missing elevation for either endpoint leaves grade_pct
+    at 0.0 (no penalty) rather than raising — see spec §3.8 point 4."""
+    for node_id, edges in graph.items():
+        for edge in edges:
+            neighbor_id, length_m, tags = edge
+            elev_a = elevations.get(node_id)
+            elev_b = elevations.get(neighbor_id)
+            if elev_a is None or elev_b is None or length_m == 0:
+                tags["grade_pct"] = 0.0
+                continue
+            tags["grade_pct"] = (elev_b - elev_a) / length_m * 100.0
+
+
 def _edge_cost(length_m, tags, preferences):
     cost = length_m
     if tags.get("landcover") == "forest":
@@ -314,6 +330,10 @@ def _edge_cost(length_m, tags, preferences):
         cost *= preferences.get("avoid_near_highway", 1.0)
     if tags.get("near_water"):
         cost *= preferences.get("avoid_near_water", 1.0)
+    grade_pct = tags.get("grade_pct", 0.0)
+    threshold = preferences.get("gradient_threshold_pct", 8)
+    if grade_pct > threshold:
+        cost *= preferences.get("avoid_steep_gradient", 1.0)
     return cost
 
 

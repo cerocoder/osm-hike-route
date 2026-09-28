@@ -486,7 +486,7 @@ across different machines/agents).
 routes/
   .cache/
     elevation.json    # shared across ALL routes, not per-route (spec §3.8) —
-                       # written by elevation.cache.save_entry
+                       # written by elevation.cache.write_cache, once per batch
   <slug>-<date>/
     route.geojson      # geometry + waypoints — COMPUTED OUTPUTS (route_output.build_geojson)
     weights.json        # merged preset + overrides + budget — INPUTS (weights_io.save_weights)
@@ -497,7 +497,7 @@ routes/
 ```
 
 Create `routes/` and `routes/.cache/` on first save if they don't exist
-(`weights_io.save_weights`/`elevation.cache.save_entry` both call
+(`weights_io.save_weights`/`elevation.cache.write_cache` both call
 `mkdir(parents=True, exist_ok=True)`). Before building a new route, check
 whether an existing entry already fits — reuse/adapt rather than recompute
 (pipeline step 2); if the request is actually about an existing archive,

@@ -1,5 +1,9 @@
+from pathlib import Path
 from unittest.mock import patch
+
+import elevation
 from elevation import ElevationService
+from elevation.cache import load_cache, cache_key
 from elevation.providers.base import ElevationProvider
 
 
@@ -122,3 +126,53 @@ def test_respect_rate_limit_tracks_per_provider_id_independently(tmp_path):
         service._respect_rate_limit(provider_a)  # second call for 'a' — must sleep ~1.0s now
     mock_sleep_again.assert_called_once()
     assert abs(mock_sleep_again.call_args[0][0] - 1.0) < 0.1
+
+
+_FIVE_POINTS = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0), (5.0, 5.0)]
+
+
+def test_get_elevations_writes_cache_file_once_per_batch_not_per_point(tmp_path):
+    """Behavioural guard for the O(n) whole-file-rewrite-per-point bug:
+    5 points in batches of 2 -> 3 batches -> 3 disk writes, not 5."""
+    provider = _FakeProvider("p1", max_batch=2,
+                             responses={loc: float(i) for i, loc in enumerate(_FIVE_POINTS)})
+    cache_path = tmp_path / "elevation.json"
+    service = ElevationService([provider], cache_path=cache_path)
+    original_write_text = Path.write_text
+
+    with patch.object(Path, "write_text", autospec=True,
+                      side_effect=original_write_text) as mock_write_text:
+        result = service.get_elevations(_FIVE_POINTS)
+
+    assert result == [0.0, 1.0, 2.0, 3.0, 4.0]
+    cache_writes = [c for c in mock_write_text.call_args_list if Path(c.args[0]) == cache_path]
+    assert len(cache_writes) == 3
+
+
+def test_get_elevations_calls_write_cache_once_per_batch_and_loses_nothing(tmp_path):
+    provider = _FakeProvider("p1", max_batch=2,
+                             responses={loc: float(i) for i, loc in enumerate(_FIVE_POINTS)})
+    cache_path = tmp_path / "elevation.json"
+    service = ElevationService([provider], cache_path=cache_path)
+
+    with patch("elevation.write_cache", wraps=elevation.cache.write_cache) as mock_write:
+        service.get_elevations(_FIVE_POINTS)
+
+    assert mock_write.call_count == 3
+    on_disk = load_cache(cache_path)
+    for i, (lat, lon) in enumerate(_FIVE_POINTS):
+        entry = on_disk[cache_key(lat, lon, "srtm90m")]
+        assert entry["elevation"] == float(i)
+        assert entry["provider_id"] == "p1"
+
+
+def test_get_elevations_does_not_write_cache_for_batch_that_resolved_nothing(tmp_path):
+    service = ElevationService([_FakeProvider("p1", max_batch=2, fail=True)],
+                               cache_path=tmp_path / "elevation.json")
+
+    with patch("elevation.write_cache", wraps=elevation.cache.write_cache) as mock_write:
+        result = service.get_elevations(_FIVE_POINTS)
+
+    assert result == [None] * 5
+    mock_write.assert_not_called()
+    assert not (tmp_path / "elevation.json").exists()

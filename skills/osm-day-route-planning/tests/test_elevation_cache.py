@@ -1,5 +1,5 @@
 import json
-from elevation.cache import cache_key, load_cache, save_entry
+from elevation.cache import cache_key, load_cache, save_entry, update_entry, write_cache
 
 
 def test_cache_key_rounds_coordinates_consistently():
@@ -41,3 +41,36 @@ def test_save_entry_does_not_lose_previously_saved_entries(tmp_path):
 
     final = load_cache(path)
     assert set(final.keys()) == {"key-a", "key-b"}
+
+
+def test_update_entry_mutates_in_memory_only_and_does_not_touch_disk(tmp_path):
+    path = tmp_path / "elevation.json"
+    cache = load_cache(path)
+
+    update_entry(cache, "key-a", 55.0, 37.0, 123.4, "open_topo_data", "srtm90m")
+
+    assert cache["key-a"]["elevation"] == 123.4
+    assert not path.exists()
+
+
+def test_update_entry_does_not_rewrite_existing_file(tmp_path):
+    path = tmp_path / "elevation.json"
+    cache = {}
+    save_entry(path, cache, "key-a", 0.0, 0.0, 1.0, "open_topo_data", "srtm90m")
+    before = path.read_text(encoding="utf-8")
+
+    update_entry(cache, "key-b", 1.0, 1.0, 2.0, "open_topo_data", "srtm90m")
+
+    assert path.read_text(encoding="utf-8") == before
+    assert set(load_cache(path).keys()) == {"key-a"}
+
+
+def test_write_cache_persists_all_pending_updates_in_one_write(tmp_path):
+    path = tmp_path / "sub" / "elevation.json"
+    cache = {}
+    update_entry(cache, "key-a", 0.0, 0.0, 1.0, "open_topo_data", "srtm90m")
+    update_entry(cache, "key-b", 1.0, 1.0, 2.0, "open_meteo", "srtm90m")
+
+    write_cache(path, cache)
+
+    assert load_cache(path) == cache

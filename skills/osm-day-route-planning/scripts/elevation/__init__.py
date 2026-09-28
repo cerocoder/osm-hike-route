@@ -4,7 +4,7 @@ batching, per-provider rate limiting, and failover across providers."""
 import time
 from pathlib import Path
 
-from .cache import cache_key, load_cache, save_entry
+from .cache import cache_key, load_cache, update_entry, write_cache
 
 DEFAULT_DATASET = "srtm90m"
 
@@ -40,6 +40,7 @@ class ElevationService:
                     # Provider failed for whole batch — treat as all None
                     still_pending.extend(batch_indices)
                     continue
+                resolved_any = False
                 for idx, elevation in zip(batch_indices, batch_results):
                     if elevation is None:
                         still_pending.append(idx)
@@ -47,8 +48,14 @@ class ElevationService:
                     results[idx] = elevation
                     lat, lon = locations[idx]
                     key = cache_key(lat, lon, self._dataset)
-                    save_entry(self._cache_path, self._cache, key, lat, lon, elevation,
-                               provider.provider_id, self._dataset)
+                    update_entry(self._cache, key, lat, lon, elevation,
+                                 provider.provider_id, self._dataset)
+                    resolved_any = True
+                # One whole-file write per successful batch (not per point —
+                # that was O(n) rewrites of an ever-growing file), still
+                # frequent enough that a killed run keeps finished batches.
+                if resolved_any:
+                    write_cache(self._cache_path, self._cache)
             pending_indices = still_pending
 
         return results

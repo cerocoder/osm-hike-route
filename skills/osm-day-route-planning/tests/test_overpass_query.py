@@ -17,15 +17,19 @@ def test_build_curated_routes_query_includes_tags_and_radius():
     assert "hiking|foot" in ql
     assert "2000" in ql
     assert "relation" in ql
+    assert "out count" in ql
 
 
-def test_count_curated_routes_counts_relation_elements_only():
-    result = {"elements": [
-        {"type": "relation", "id": 1}, {"type": "relation", "id": 2}, {"type": "way", "id": 3},
-    ]}
-
+def test_count_curated_routes_reads_relations_field_from_count_element():
+    result = {"elements": [{"type": "count", "id": 0, "tags": {
+        "nodes": "0", "ways": "0", "relations": "2", "areas": "0", "total": "2",
+    }}]}
     assert count_curated_routes(result) == 2
 
 
 def test_count_curated_routes_zero_when_no_elements():
     assert count_curated_routes({"elements": []}) == 0
+
+
+def test_count_curated_routes_zero_when_count_element_missing():
+    assert count_curated_routes({"elements": [{"type": "way", "id": 1}]}) == 0

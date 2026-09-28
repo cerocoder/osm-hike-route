@@ -91,7 +91,15 @@ def build_curated_routes_query(lat: float, lon: float, radius_m: int, route_tags
 
 
 def count_curated_routes(result: dict) -> int:
-    return sum(1 for el in result.get("elements", []) if el.get("type") == "relation")
+    """Extract the relations count from an Overpass 'out count;' response.
+    The response contains a single element with type='count' and tags.relations field."""
+    for el in result.get("elements", []):
+        if el.get("type") == "count":
+            try:
+                return int(el.get("tags", {}).get("relations", 0))
+            except (TypeError, ValueError):
+                return 0
+    return 0
 
 
 if __name__ == "__main__":

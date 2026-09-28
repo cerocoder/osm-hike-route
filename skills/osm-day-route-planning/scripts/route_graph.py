@@ -169,17 +169,37 @@ def _direction_allowed(tags: dict, respect_oneway: bool) -> tuple[bool, bool]:
     return True, False
 
 
-def filter_excluded_ways(walkable_ways, restricted_polygons):
-    """Hard-excludes any walkable way whose midpoint falls inside a
-    restricted polygon — the whole way is dropped, not just penalized,
-    per the "don't build a route through it at all" requirement."""
+def _has_hard_excluded_tag(tags: dict, hard_exclude_tags: dict) -> bool:
+    return any(tags.get(key) in values for key, values in hard_exclude_tags.items())
+
+
+def _lacks_required_cycle_infra(tags: dict, exclude_highway_without_infra: list) -> bool:
+    if tags.get("highway") not in exclude_highway_without_infra:
+        return False
+    return "cycleway" not in tags
+
+
+def filter_excluded_ways(walkable_ways, restricted_polygons,
+                          hard_exclude_tags: dict | None = None,
+                          exclude_highway_without_infra: list | None = None):
+    """Hard-excludes a way whose midpoint falls inside a restricted polygon
+    (unchanged from the walk-only version), OR whose tags match this mode's
+    preset-supplied hard-exclusion rules (spec §3.6) — never a weighted
+    penalty, a full drop, same as the restricted-zone case."""
+    hard_exclude_tags = hard_exclude_tags or {}
+    exclude_highway_without_infra = exclude_highway_without_infra or []
     kept = []
     for way in walkable_ways:
         geom = way.get("geometry")
         if not geom:
             continue
+        tags = way.get("tags", {})
+        if _has_hard_excluded_tag(tags, hard_exclude_tags):
+            continue
+        if _lacks_required_cycle_infra(tags, exclude_highway_without_infra):
+            continue
         mid = geom[len(geom) // 2]
-        if any(_point_in_ring(mid["lat"], mid["lon"], ring) for ring in restricted_polygons):
+        if any(point_in_ring(mid["lat"], mid["lon"], ring) for ring in restricted_polygons):
             continue
         kept.append(way)
     return kept
@@ -226,9 +246,10 @@ def build_graph(walkable_ways, barrier_nodes=None, blocking_barrier_tags=None, r
     return graph, node_coords
 
 
-def _point_in_ring(lat, lon, ring):
+def point_in_ring(lat, lon, ring):
     """Ray-casting point-in-polygon. ring: list of (lat, lon). Flat-plane
-    approximation — fine at city/park scale, not for large-area GIS work."""
+    approximation — fine at city/park scale, not for large-area GIS work.
+    Exported (not `_`-prefixed) so waypoints.py can reuse it — see spec §3.4."""
     inside = False
     n = len(ring)
     for i in range(n):
@@ -275,9 +296,9 @@ def tag_edges(graph, node_coords, highway_ways, water_ways, forest_ways, field_w
             near_highway = bool(highway_geoms) and _min_distance_to_lines(mid_lat, mid_lon, highway_geoms) < highway_buffer_m
             near_water = bool(water_geoms) and _min_distance_to_lines(mid_lat, mid_lon, water_geoms) < water_buffer_m
             landcover = None
-            if any(_point_in_ring(mid_lat, mid_lon, ring) for ring in forest_rings):
+            if any(point_in_ring(mid_lat, mid_lon, ring) for ring in forest_rings):
                 landcover = "forest"
-            elif any(_point_in_ring(mid_lat, mid_lon, ring) for ring in field_rings):
+            elif any(point_in_ring(mid_lat, mid_lon, ring) for ring in field_rings):
                 landcover = "field"
 
             edge[2] = {"near_highway": near_highway, "near_water": near_water, "landcover": landcover}

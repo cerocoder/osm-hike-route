@@ -824,6 +824,7 @@ def main():
                          help="per-request timeout in seconds, shared by all four "
                               "place-info plugins")
     parser.add_argument("--tile-provider", default=None,
+                         choices=["esri_street", "esri_satellite", "cyclosm", "ign_es_mtn"],
                          help="force this tile provider as the active map layer "
                               "(esri_street, esri_satellite, cyclosm, ign_es_mtn); "
                               "must be available for the route's location or the "
@@ -846,12 +847,16 @@ def main():
     geojson_preview = json.loads(geojson_path.read_text(encoding="utf-8"))
     title = _route_title(geojson_preview, fallback=route_dir.name)
 
-    html = build_map_html(
-        geojson_path, notes_path if notes_path.exists() else None, title=title,
-        user_lang=args.user_lang, local_lang=args.local_lang,
-        resolve_wiki=not args.no_wikipedia, wiki_timeout=args.wiki_timeout,
-        tile_provider=args.tile_provider, tile_timeout=args.tile_timeout,
-    )
+    try:
+        html = build_map_html(
+            geojson_path, notes_path if notes_path.exists() else None, title=title,
+            user_lang=args.user_lang, local_lang=args.local_lang,
+            resolve_wiki=not args.no_wikipedia, wiki_timeout=args.wiki_timeout,
+            tile_provider=args.tile_provider, tile_timeout=args.tile_timeout,
+        )
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(1)
     output_path.write_text(html, encoding="utf-8")
     abs_path = output_path.resolve()
     print(f"wrote {abs_path}")

@@ -38,7 +38,7 @@ def test_cyclosm_url_template_uses_z_x_y_order():
     this backwards silently loads the wrong tiles."""
     provider = CyclOsmProvider()
     url = provider.tile_url_template.format(z=10, x=503, y=383)
-    assert url == "https://tile-cyclosm.openstreetmap.fr/cyclosm/10/503/383.png"
+    assert url == "https://a.tile-cyclosm.openstreetmap.fr/cyclosm/10/503/383.png"
     assert provider.always_available is False
 
 
@@ -49,6 +49,37 @@ def test_ign_es_mtn_url_template_has_matrix_row_col_params():
     assert "TileRow=383" in url
     assert "TileCol=503" in url
     assert provider.always_available is False
+
+
+def test_ign_es_mtn_covers_returns_false_for_moscow_without_probing():
+    """Critical 2 regression: IGN's MTN layer serves a blank placeholder
+    tile (still HTTP 200, plausible image body) outside Spain. The
+    Spain-only bounding-box pre-check in IgnEsMtnProvider.covers() must
+    reject a clearly-outside-Spain point BEFORE any network probe."""
+    provider = IgnEsMtnProvider()
+    with patch("tile_providers.providers.base.probe_tile") as mock_probe:
+        assert provider.covers([(55.0, 37.0)], timeout=5.0) is False
+    mock_probe.assert_not_called()
+
+
+def test_ign_es_mtn_covers_returns_false_for_paris_without_probing():
+    provider = IgnEsMtnProvider()
+    with patch("tile_providers.providers.base.probe_tile") as mock_probe:
+        assert provider.covers([(48.8566, 2.3522)], timeout=5.0) is False
+    mock_probe.assert_not_called()
+
+
+def test_ign_es_mtn_covers_reaches_probe_for_madrid():
+    """A point inside the Spain bounding box passes the geography
+    pre-check and falls through to the normal probe (defense in depth)."""
+    provider = IgnEsMtnProvider()
+    with patch("tile_providers.providers.base.probe_tile", return_value=True) as mock_probe:
+        assert provider.covers([(40.4168, -3.7038)], timeout=5.0) is True
+    mock_probe.assert_called_once()
+
+    with patch("tile_providers.providers.base.probe_tile", return_value=False) as mock_probe:
+        assert provider.covers([(40.4168, -3.7038)], timeout=5.0) is False
+    mock_probe.assert_called_once()
 
 
 def test_all_four_providers_have_distinct_provider_ids():

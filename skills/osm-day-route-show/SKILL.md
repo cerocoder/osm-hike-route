@@ -298,8 +298,10 @@ the end of the run, same incremental-write reasoning as
 **Picking a layer**: by default the rendered page uses the first
 available provider from `esri_street, ign_es_mtn, cyclosm,
 esri_satellite` (in that priority order) as the active base layer —
-`esri_street` stays the default when it's the only one available,
-preserving this skill's existing behavior. Pass `--tile-provider <id>`
+`esri_street` is always the default active layer unless `--tile-provider`
+is passed, preserving this skill's existing behavior (`esri_satellite` is
+also always available, but sits last in the priority order, so it never
+becomes the default on its own). Pass `--tile-provider <id>`
 to `render_map.py` to force a different active layer; it's an error if
 that id isn't available for the route's location. When more than one
 provider is available, the rendered page also gets an in-browser

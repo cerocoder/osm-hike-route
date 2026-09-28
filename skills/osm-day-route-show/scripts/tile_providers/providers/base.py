@@ -13,10 +13,14 @@ class TileProviderPlugin:
     max_native_zoom: int | None
     always_available: bool = False
 
-    def covers(self, points: list[tuple[float, float]], timeout: float = 5.0) -> bool:
+    def covers(self, points: list[tuple[float, float]], timeout: float = 5.0) -> bool | None:
         """`points` is a list of (lat, lon). True immediately, with no
         network call, when always_available. Otherwise requires every
-        point to succeed a live tile probe at TILE_PROBE_ZOOM. An empty
+        point to succeed a live tile probe at TILE_PROBE_ZOOM, and
+        returns None (inconclusive) if any point's probe itself failed
+        (network/DNS/timeout/HTTP error) rather than confirming True or
+        False — callers (TileProviderService) must not cache a None
+        result as "no coverage": the next render should retry. An empty
         `points` list means "nothing to probe" and resolves to False —
         callers (TileProviderService) are the ones that decide an empty
         list means "skip this provider, offer only always_available
@@ -25,7 +29,10 @@ class TileProviderPlugin:
             return True
         if not points:
             return False
-        return all(
+        results = [
             probe_tile(self.tile_url_template, lat, lon, TILE_PROBE_ZOOM, timeout)
             for lat, lon in points
-        )
+        ]
+        if any(r is None for r in results):
+            return None
+        return all(results)

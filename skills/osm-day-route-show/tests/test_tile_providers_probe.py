@@ -31,21 +31,23 @@ def test_probe_tile_false_on_non_image_content_type():
         assert probe_tile("https://example.org/{z}/{x}/{y}.png", 40.0, -3.0, 15, 5.0) is False
 
 
-def test_probe_tile_false_on_network_error_never_raises():
-    """Review Focus: a timeout/DNS/HTTP error must degrade to False, never propagate."""
+def test_probe_tile_none_on_network_error_never_raises():
+    """Review Focus: a timeout/DNS/HTTP error must degrade to None
+    (inconclusive — never cached as confirmed 'no coverage'), never
+    propagate as an exception."""
     import urllib.error
 
     with patch("tile_providers.probe._fetch", side_effect=urllib.error.URLError("boom")):
-        assert probe_tile("https://example.org/{z}/{x}/{y}.png", 40.0, -3.0, 15, 5.0) is False
+        assert probe_tile("https://example.org/{z}/{x}/{y}.png", 40.0, -3.0, 15, 5.0) is None
 
 
-def test_probe_tile_false_on_incomplete_read_never_raises():
+def test_probe_tile_none_on_incomplete_read_never_raises():
     """Review Focus: truncated tile downloads (http.client.IncompleteRead from flaky
-    connections) must degrade to False, never propagate."""
+    connections) must degrade to None (inconclusive), never propagate."""
     import http.client
 
     with patch("tile_providers.probe._fetch", side_effect=http.client.IncompleteRead(b"x" * 100, 1000)):
-        assert probe_tile("https://example.org/{z}/{x}/{y}.png", 40.0, -3.0, 15, 5.0) is False
+        assert probe_tile("https://example.org/{z}/{x}/{y}.png", 40.0, -3.0, 15, 5.0) is None
 
 
 def test_probe_tile_formats_url_with_z_x_y():

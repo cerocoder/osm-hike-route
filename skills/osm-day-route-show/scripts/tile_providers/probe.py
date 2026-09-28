@@ -33,15 +33,20 @@ def _fetch(url: str, timeout: float) -> tuple[int, str, bytes]:
         return resp.status, resp.headers.get("Content-Type", ""), resp.read()
 
 
-def probe_tile(url_template: str, lat: float, lon: float, zoom: int, timeout: float) -> bool:
-    """One tile fetch at (lat, lon, zoom). True only on HTTP 200, an
-    image/* Content-Type, and a body large enough not to be a placeholder
-    tile. Any exception (timeout, DNS failure, HTTP error status)
-    resolves to False — a coverage probe must never crash the render."""
+def probe_tile(url_template: str, lat: float, lon: float, zoom: int, timeout: float) -> bool | None:
+    """One tile fetch at (lat, lon, zoom). Returns True when the response
+    is confirmed real image content, False when the response is confirmed
+    NOT real coverage (wrong content-type or a too-small/placeholder
+    body), and None when the probe itself failed (network/DNS/timeout/
+    HTTP error) — a None result is inconclusive and callers must not
+    cache it as "no coverage": the next render should retry rather than
+    stay stuck on a transient failure."""
     x, y = latlon_to_tile(lat, lon, zoom)
     url = url_template.format(z=zoom, x=x, y=y)
     try:
         status, content_type, body = _fetch(url, timeout)
     except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException):
-        return False
-    return status == 200 and content_type.startswith("image/") and len(body) >= _MIN_BODY_BYTES
+        return None
+    if status != 200:
+        return None
+    return content_type.startswith("image/") and len(body) >= _MIN_BODY_BYTES

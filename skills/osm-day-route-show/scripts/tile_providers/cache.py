@@ -8,9 +8,13 @@ import json
 from pathlib import Path
 
 
-def cache_key(provider_id: str, points: list[tuple[float, float]]) -> str:
+def cache_key(provider_id: str, points: list[tuple[float, float]], url_template: str) -> str:
+    """Includes the provider's tile URL template so that changing a
+    provider's URL (e.g. fixing a broken hostname) naturally invalidates
+    any stale cached entries for it, instead of leaving a wrong cached
+    True/False around forever."""
     coords = ",".join(f"{round(lat, 5)}:{round(lon, 5)}" for lat, lon in sorted(points))
-    return f"{provider_id}|{coords}"
+    return f"{provider_id}|{url_template}|{coords}"
 
 
 def load_cache(path: Path) -> dict:

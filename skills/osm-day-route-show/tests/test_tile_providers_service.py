@@ -6,6 +6,7 @@ class _FakeProvider(TileProviderPlugin):
     def __init__(self, provider_id, always_available=False, result=True, raises=False):
         self.provider_id = provider_id
         self.always_available = always_available
+        self.tile_url_template = f"https://example.org/{provider_id}/{{z}}/{{x}}/{{y}}"
         self._result = result
         self._raises = raises
         self.call_count = 0
@@ -85,3 +86,42 @@ def test_second_call_reuses_cache_and_does_not_reprobe(tmp_path):
 
     assert [p.provider_id for p in result] == ["cyclosm"]
     assert provider.call_count == 0
+
+
+def test_inconclusive_result_is_not_cached_and_is_retried_next_call(tmp_path):
+    """Important 1: a probe that returns None (inconclusive — network
+    error, DNS failure, etc.) must not be cached as a confirmed 'no
+    coverage'. Unlike a confirmed False result (which IS cached and does
+    NOT retry), an inconclusive result must be retried on the next
+    render."""
+    provider = _FakeProvider("cyclosm", result=None)
+    cache_path = tmp_path / "tile_coverage.json"
+
+    result = TileProviderService([provider], cache_path=cache_path).available_providers(
+        [(40.0, -3.0)]
+    )
+    assert result == []
+    assert provider.call_count == 1
+    assert not cache_path.exists()
+
+    # A second render retries — no cache entry means no short-circuit.
+    second_result = TileProviderService([provider], cache_path=cache_path).available_providers(
+        [(40.0, -3.0)]
+    )
+    assert second_result == []
+    assert provider.call_count == 2
+
+
+def test_raising_provider_result_is_not_cached_either(tmp_path):
+    """An unexpected raise is treated the same as an inconclusive (None)
+    result: not offered, not cached, retried next call — unlike a
+    confirmed False result."""
+    provider = _FakeProvider("broken", raises=True)
+    cache_path = tmp_path / "tile_coverage.json"
+
+    TileProviderService([provider], cache_path=cache_path).available_providers([(40.0, -3.0)])
+    assert provider.call_count == 1
+    assert not cache_path.exists()
+
+    TileProviderService([provider], cache_path=cache_path).available_providers([(40.0, -3.0)])
+    assert provider.call_count == 2

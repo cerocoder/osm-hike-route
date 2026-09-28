@@ -14,7 +14,9 @@ Typical flow:
                             hard_exclude_highway=weights.get('hard_exclude_tags', {}).get('highway', []),
                             exclude_highway_without_infra=weights.get('exclude_highway_without_infra', []))
     restricted = build_restricted_polygons(data['restricted'], data['barrier_ways'])
-    walkable = filter_excluded_ways(data['walkable'], restricted)
+    walkable = filter_excluded_ways(data['walkable'], restricted,
+                                     hard_exclude_tags=weights.get('hard_exclude_tags'),
+                                     exclude_highway_without_infra=weights.get('exclude_highway_without_infra'))
     graph, node_coords = build_graph(walkable, data['barrier_nodes'])
     tag_edges(graph, node_coords, data['highways'], data['water'],
               data['forest'], data['fields'])

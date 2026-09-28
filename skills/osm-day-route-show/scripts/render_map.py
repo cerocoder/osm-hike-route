@@ -35,6 +35,16 @@ from place_info.providers.wikipedia import WikipediaProvider
 from place_info.providers.wikidata import WikidataProvider
 from place_info.providers.wikimedia_commons import WikimediaCommonsProvider
 from place_info.providers.opentripmap import OpenTripMapProvider
+from tile_providers import TileProviderService
+from tile_providers.providers.esri_street import EsriStreetProvider
+from tile_providers.providers.esri_satellite import EsriSatelliteProvider
+from tile_providers.providers.cyclosm import CyclOsmProvider
+from tile_providers.providers.ign_es_mtn import IgnEsMtnProvider
+
+# Default active layer when --tile-provider isn't given: first of these
+# that's actually available for the route (design spec: backward-
+# compatible default stays esri_street).
+TILE_PROVIDER_PRIORITY = ["esri_street", "ign_es_mtn", "cyclosm", "esri_satellite"]
 
 LEAFLET_CSS = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
 LEAFLET_JS = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
@@ -555,7 +565,8 @@ def point_popup_html(properties: dict) -> str:
 
 def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
                     user_lang: str = "en", local_lang: str | None = None,
-                    resolve_wiki: bool = True, wiki_timeout: float = 5.0) -> str:
+                    resolve_wiki: bool = True, wiki_timeout: float = 5.0,
+                    tile_provider: str | None = None, tile_timeout: float = 5.0) -> str:
     geojson = json.loads(geojson_path.read_text(encoding="utf-8"))
     # Valid GeoJSON allows "properties": null or a missing key entirely;
     # normalize every feature's properties to a dict up front so every
@@ -566,6 +577,29 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
     if resolve_wiki:
         cache_path = geojson_path.parent / "place_info.json"
         annotate_place_info(geojson, user_lang, local_lang, cache_path, timeout=wiki_timeout)
+
+    tile_cache_path = geojson_path.parent / "tile_coverage.json"
+    tile_service = TileProviderService(
+        [EsriStreetProvider(), EsriSatelliteProvider(), CyclOsmProvider(), IgnEsMtnProvider()],
+        tile_cache_path,
+    )
+    coverage_points = _tile_coverage_points(geojson)
+    available_tile_providers = tile_service.available_providers(coverage_points, timeout=tile_timeout)
+    available_tile_ids = [p.provider_id for p in available_tile_providers]
+
+    if tile_provider is not None:
+        if tile_provider not in available_tile_ids:
+            raise ValueError(
+                f"tile provider {tile_provider!r} is not available for this route "
+                f"(available: {available_tile_ids})"
+            )
+        active_tile_provider_id = tile_provider
+    else:
+        active_tile_provider_id = next(
+            (pid for pid in TILE_PROVIDER_PRIORITY if pid in available_tile_ids),
+            available_tile_ids[0],
+        )
+    tile_layers_js = build_tile_layers_js(available_tile_providers, active_tile_provider_id)
 
     access_html = ""
     confidence_html = ""
@@ -655,14 +689,12 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
   // the CSS-transform zoom animation. Disabling it trades a bit of polish
   // for tiles that stay put.
   const map = L.map('map', {{ zoomAnimation: false, fadeAnimation: false }});
-  // Esri's public REST tile service (World_Street_Map) allows this kind of
-  // no-key embedded use; OSM's own tile.openstreetmap.org, CARTO's Voyager
-  // basemap, and Wikimedia's osm-intl tiles were all tried first and each
-  // turned out to block or require a key for standalone-app hotlinking.
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{{z}}/{{y}}/{{x}}', {{
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom',
-    maxZoom: 19
-  }}).addTo(map);
+  // Tile provider(s) chosen for this route (design spec
+  // 2026-09-28-osm-day-route-show-tile-providers-design.md): one
+  // L.tileLayer per provider available for this route's location, the
+  // active one added directly, an L.control.layers switcher added only
+  // when more than one provider is available.
+  {tile_layers_js}
 
   // Access-point coloring: single drop-off point -> green. Two distinct
   // points -> start green, end blue. An explicit properties.role
@@ -791,6 +823,15 @@ def main():
     parser.add_argument("--wiki-timeout", type=float, default=5.0,
                          help="per-request timeout in seconds, shared by all four "
                               "place-info plugins")
+    parser.add_argument("--tile-provider", default=None,
+                         help="force this tile provider as the active map layer "
+                              "(esri_street, esri_satellite, cyclosm, ign_es_mtn); "
+                              "must be available for the route's location or the "
+                              "render fails with an error")
+    parser.add_argument("--tile-timeout", type=float, default=5.0,
+                         help="per-request timeout in seconds for tile-provider "
+                              "coverage probes (cyclosm, ign_es_mtn only — the two "
+                              "Esri layers are never probed)")
     args = parser.parse_args()
 
     route_dir = Path(args.route_dir)
@@ -809,6 +850,7 @@ def main():
         geojson_path, notes_path if notes_path.exists() else None, title=title,
         user_lang=args.user_lang, local_lang=args.local_lang,
         resolve_wiki=not args.no_wikipedia, wiki_timeout=args.wiki_timeout,
+        tile_provider=args.tile_provider, tile_timeout=args.tile_timeout,
     )
     output_path.write_text(html, encoding="utf-8")
     abs_path = output_path.resolve()

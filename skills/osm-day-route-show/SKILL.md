@@ -252,6 +252,62 @@ unexpected exception, the other three plugins' results still reach the
 point's popup and the render still completes; a bug in one plugin never
 takes down the others.
 
+## Tile Providers
+
+The map's base layer comes from one of four independent plugins (design
+spec `docs/superpowers/specs/2026-09-28-osm-day-route-show-tile-providers-design.md`),
+behind a shared `TileProviderPlugin` interface
+(`scripts/tile_providers/providers/base.py`), aggregated by
+`TileProviderService` (`scripts/tile_providers/__init__.py`) — the same
+plugin-architecture pattern as **Place Info** above, applied to map
+tiles instead of point enrichment.
+
+1. **`esri_street`** — Esri's public `World_Street_Map` tiles, the
+   layer this skill has always used (see Common Mistakes below for why
+   three other "free" providers were rejected first).
+2. **`esri_satellite`** — Esri's public `World_Imagery` (satellite)
+   tiles, same trusted host as `esri_street`.
+3. **`cyclosm`** — OpenStreetMap-France's CyclOSM style
+   (`tile-cyclosm.openstreetmap.fr`), cycling-oriented.
+4. **`ign_es_mtn`** — IGN España's official `MTN` topographic layer,
+   Spain only.
+
+`esri_street` and `esri_satellite` are **always offered** — both are
+Esri's own worldwide REST tile services, never probed, never written to
+any cache. `cyclosm` and `ign_es_mtn` are **live-probed** per render: one
+tile fetch (`tile_providers/probe.py`) per coverage point at a fixed
+zoom (`TILE_PROBE_ZOOM = 15`), requiring every point to succeed. A
+provider that fails its probe (or raises — `TileProviderService` wraps
+each plugin's probe in its own `try/except`, same fault isolation as
+`PlaceInfoService.fetch_all`) is simply not offered for that route; it
+never breaks the render.
+
+**Coverage points**: access points (`properties.type == "access"`) if
+the route has any, else interest points
+(`properties.type == "interest"`), else no probing at all (only the two
+Esri layers are offered) — `_tile_coverage_points` in `render_map.py`.
+
+**Cache**: probe results are cached in `<route_dir>/tile_coverage.json`
+(separate file from `place_info.json` — different key shape), keyed by
+provider id plus the full sorted set of coverage points, so a repeat
+render of the same route does no network calls for providers already
+resolved. Written after each provider's probe completes, not only at
+the end of the run, same incremental-write reasoning as
+`place_info.json`.
+
+**Picking a layer**: by default the rendered page uses the first
+available provider from `esri_street, ign_es_mtn, cyclosm,
+esri_satellite` (in that priority order) as the active base layer —
+`esri_street` stays the default when it's the only one available,
+preserving this skill's existing behavior. Pass `--tile-provider <id>`
+to `render_map.py` to force a different active layer; it's an error if
+that id isn't available for the route's location. When more than one
+provider is available, the rendered page also gets an in-browser
+Leaflet layer switcher (`L.control.layers`) so the viewer can change
+layers themselves — there's no chat-based "which plugin?" prompt, the
+switcher **is** the picker. `--tile-timeout <seconds>` (default 5.0)
+controls the per-probe timeout for `cyclosm`/`ign_es_mtn`.
+
 ## Configuration
 
 The `opentripmap` plugin is optional and richer than the other three, but
@@ -329,6 +385,8 @@ tiles).
 
 - **Trusting a "free" tile provider without probing it first** — three were tried and rejected in order: `tile.openstreetmap.org` 403s standalone/app usage outright (osm.wiki/Blocked); CARTO's Voyager basemap (`basemaps.cartocdn.com`) now requires an API key (watermarked tiles); Wikimedia's `maps.wikimedia.org/osm-intl` returns "Map tiles are restricted to Wikimedia and affiliated sites only" on any cache-miss tile — CDN-cached tiles from earlier testing kept loading, which made it *look* fine in a quick visual check and only failed once the user panned/zoomed to un-cached tiles. `render_map.py` now uses Esri's public `World_Street_Map` REST tiles (`server.arcgisonline.com`, note the `{z}/{y}/{x}` path order, not `{z}/{x}/{y}`) — verified with direct `curl` across zoom 10–19 plus a 15-request burst, no key, no block, as of 2026-09-27.
 - **Verifying a tile provider by loading the page once and eyeballing it** — not enough, per the Wikimedia case above: cached tiles mask a block. Verify with direct `curl` requests (compute XYZ tile coords, check HTTP status *and* actually read the response body — a 403 can come back with a 200-looking body or an image-shaped error page) across several zoom levels and a burst of requests, before trusting a provider in the shipped page.
+- **Mixing up `{z}/{x}/{y}` vs `{z}/{y}/{x}` in a tile URL template** — the two Esri layers (`esri_street`, `esri_satellite`) use `{z}/{y}/{x}`, but CyclOSM (`cyclosm`) uses the more common `{z}/{x}/{y}` order. Getting this backwards doesn't error — it silently loads the wrong tiles (or a mismatched region). Every `tile_providers/providers/*.py` module documents its own order in a comment; when adding a fifth provider, verify its documented tile scheme rather than assuming the Esri order.
+- **Trusting `ign_es_mtn`'s WMTS KVP query-string parameters from research notes alone** — `tile-providers-research.md`'s parameter names/values were a single manual check, not the burst-request-plus-real-browser verification this project's own Common Mistakes entry above requires before trusting a provider in production. `TileProviderService`'s live probe (one tile fetch per coverage point) catches an outright-broken URL, but a subtly wrong `TileMatrix`/`TileRow`/`TileCol` mapping that still returns a plausible 200 image response for the wrong tile would not be caught by the probe alone — pan/zoom a real rendered map over Spain before trusting this layer, the same way the Wikimedia cache-masked block was only caught by a human looking at the map, not by a status-code check.
 - **Auto-opening the page yourself for `type=local`** — the user opens it; don't invoke a browser automation tool as part of normal operation.
 - **Publishing to `type=claude` without loading `artifact-design` first** — required by the Artifact tool's own contract.
 - **Assuming `notes.md` sections use exact headings** — `extract_md_section` matches against `SECTION_ALIASES`, a list of known headings per concept across several languages, case-insensitively, with trailing text after the heading tolerated. If `osm-day-route-planning`'s template adds a genuinely new heading (not just a new language's translation of an existing one), add it to `SECTION_ALIASES` rather than hardcoding one expected string.

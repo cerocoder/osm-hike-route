@@ -404,3 +404,73 @@ def test_build_tile_layers_js_includes_max_native_zoom_when_present():
     js = build_tile_layers_js([provider], active_id="esri_satellite")
 
     assert '"maxNativeZoom": 20' in js
+
+
+from unittest.mock import patch
+
+
+def _geojson_route_in_spain():
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {"type": "Feature",
+             "geometry": {"type": "LineString", "coordinates": [[-3.56, 40.25], [-3.559, 40.251]]},
+             "properties": {"name": "Ruta"}},
+            {"type": "Feature",
+             "geometry": {"type": "Point", "coordinates": [-3.56, 40.25]},
+             "properties": {"type": "access", "name": "Inicio"}},
+        ],
+    }
+
+
+def test_build_map_html_includes_esri_layers_and_control_when_no_forced_provider(tmp_path):
+    """cyclosm/ign_es_mtn's probe is forced to fail (patched, no real
+    network call) so this test is deterministic offline — esri_street and
+    esri_satellite alone are already two always_available providers, so
+    the layer control must still appear regardless of CyclOSM/IGN."""
+    route_dir = tmp_path / "route"
+    route_dir.mkdir()
+    geojson_path = route_dir / "route.geojson"
+    geojson_path.write_text(json.dumps(_geojson_route_in_spain()), encoding="utf-8")
+
+    with patch("tile_providers.providers.base.probe_tile", return_value=False):
+        html = build_map_html(geojson_path, None, title="Test Route", resolve_wiki=False)
+
+    assert "World_Street_Map" in html
+    assert "World_Imagery" in html
+    assert "L.control.layers(" in html
+
+
+def test_build_map_html_forced_tile_provider_becomes_active_layer(tmp_path):
+    route_dir = tmp_path / "route"
+    route_dir.mkdir()
+    geojson_path = route_dir / "route.geojson"
+    geojson_path.write_text(json.dumps(_geojson_route_in_spain()), encoding="utf-8")
+
+    with patch("tile_providers.providers.base.probe_tile", return_value=False):
+        html = build_map_html(geojson_path, None, title="Test Route", resolve_wiki=False,
+                               tile_provider="esri_satellite")
+
+    lines = html.splitlines()
+    sat_line = next(l for l in lines if "World_Imagery" in l and "L.tileLayer(" in l)
+    var_name = sat_line.split("=")[0].strip().split()[-1]
+    assert f"{var_name}.addTo(map)" in html
+
+
+def test_build_map_html_raises_on_unavailable_forced_provider(tmp_path):
+    """Review Focus: --tile-provider naming something not available for
+    this route must fail loudly, not silently substitute another layer.
+    probe_tile is forced to fail so 'cyclosm' is deterministically
+    unavailable here, independent of real network access."""
+    route_dir = tmp_path / "route"
+    route_dir.mkdir()
+    geojson_path = route_dir / "route.geojson"
+    geojson_path.write_text(json.dumps(_geojson_route_in_spain()), encoding="utf-8")
+
+    with patch("tile_providers.providers.base.probe_tile", return_value=False):
+        try:
+            build_map_html(geojson_path, None, title="Test Route", resolve_wiki=False,
+                            tile_provider="cyclosm")
+            assert False, "expected ValueError"
+        except ValueError as e:
+            assert "cyclosm" in str(e)

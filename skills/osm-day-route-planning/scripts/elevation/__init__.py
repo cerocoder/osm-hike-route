@@ -34,7 +34,12 @@ class ElevationService:
             for batch_indices in self._chunk(pending_indices, provider.max_batch):
                 batch_locations = [locations[i] for i in batch_indices]
                 self._respect_rate_limit(provider)
-                batch_results = provider.fetch(batch_locations)
+                try:
+                    batch_results = provider.fetch(batch_locations)
+                except Exception:
+                    # Provider failed for whole batch — treat as all None
+                    still_pending.extend(batch_indices)
+                    continue
                 for idx, elevation in zip(batch_indices, batch_results):
                     if elevation is None:
                         still_pending.append(idx)

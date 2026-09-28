@@ -42,3 +42,32 @@ def test_fetch_returns_none_per_point_on_http_error():
         result = provider.fetch([(55.0, 37.0), (55.1, 37.1)])
 
     assert result == [None, None]
+
+
+def test_fetch_returns_none_per_point_on_missing_results():
+    """Valid JSON response but no/incomplete results list should return [None] * len(locations)."""
+    # Test with missing "results" key
+    payload = {"status": "OK"}
+    provider = OpenTopoDataProvider()
+
+    with patch("urllib.request.urlopen", return_value=_mock_response(payload)):
+        result = provider.fetch([(55.0, 37.0), (55.1, 37.1)])
+
+    assert result == [None, None]
+
+
+def test_fetch_returns_none_per_point_on_incomplete_results():
+    """Valid JSON response with fewer results than locations should return [None] * len(locations)."""
+    # Test with "results" shorter than input
+    payload = {
+        "status": "OK",
+        "results": [
+            {"elevation": 100.0, "location": {"lat": 55.0, "lng": 37.0}},
+        ],
+    }
+    provider = OpenTopoDataProvider()
+
+    with patch("urllib.request.urlopen", return_value=_mock_response(payload)):
+        result = provider.fetch([(55.0, 37.0), (55.1, 37.1)])
+
+    assert result == [None, None]

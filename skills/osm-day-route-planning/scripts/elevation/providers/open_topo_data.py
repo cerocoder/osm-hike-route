@@ -20,6 +20,9 @@ class OpenTopoDataProvider(ElevationProvider):
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, json.JSONDecodeError):
+        except (urllib.error.URLError, OSError, json.JSONDecodeError, UnicodeDecodeError):
             return [None] * len(locations)
-        return [r.get("elevation") for r in data.get("results", [])]
+        results = data.get("results", [])
+        if len(results) != len(locations):
+            return [None] * len(locations)
+        return [r.get("elevation") for r in results]

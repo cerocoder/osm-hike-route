@@ -137,3 +137,40 @@ def test_route_stats_html_shows_warning_text_when_present():
     props = {"mode": "walk", "duration_warning": "маршрут может не влезть в световой день"}
     html = route_stats_html(props, user_lang="ru")
     assert "маршрут может не влезть в световой день" in html
+
+
+from render_map import point_popup_html
+
+
+def test_point_popup_includes_opening_hours_and_access_notes_for_access_point():
+    props = {
+        "name": "Станция Бажуково", "type": "access", "role": "start",
+        "opening_hours": "Mo-Su 06:00-23:00", "access_notes": "Билеты у кондуктора.",
+    }
+
+    html = point_popup_html(props)
+
+    assert "Mo-Su 06:00-23:00" in html
+    assert "Билеты у кондуктора." in html
+
+
+def test_point_popup_includes_all_place_info_entries():
+    props = {
+        "name": "Родник", "type": "spring",
+        "_placeInfo": [
+            {"provider_id": "wikidata", "summary": "источник питьевой воды"},
+            {"provider_id": "wikimedia_commons", "image_url": "https://commons.wikimedia.org/wiki/File:X.jpg"},
+        ],
+    }
+
+    html = point_popup_html(props)
+
+    assert "источник питьевой воды" in html
+    assert "https://commons.wikimedia.org/wiki/File:X.jpg" in html
+    assert "wikidata" in html
+    assert "wikimedia_commons" in html
+
+
+def test_point_popup_omits_placeinfo_block_when_nothing_found():
+    html = point_popup_html({"name": "Точка", "type": "waypoint"})
+    assert "_placeInfo" not in html

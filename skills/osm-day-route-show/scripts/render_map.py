@@ -473,6 +473,29 @@ def _route_title(geojson: dict, fallback: str) -> str:
     return fallback
 
 
+def point_popup_html(properties: dict) -> str:
+    """Server-side-rendered popup body — the parts of it that depend only
+    on route.geojson properties (not on the client-side tier/type label
+    lookup tables, which stay in the page's own JS since they're
+    language-dependent, see build_map_html)."""
+    parts = []
+    if properties.get("opening_hours"):
+        parts.append(f"<p>{_xml_escape(properties['opening_hours'])}</p>")
+    if properties.get("access_notes"):
+        parts.append(f"<p>{_xml_escape(properties['access_notes'])}</p>")
+    for entry in properties.get("_placeInfo", []):
+        provider_id = entry.get("provider_id", "")
+        bits = [f"<b>{_xml_escape(provider_id)}</b>"]
+        if entry.get("summary"):
+            bits.append(_xml_escape(entry["summary"]))
+        if entry.get("url"):
+            bits.append(f'<a href="{entry["url"]}" target="_blank" rel="noopener">{entry["url"]}</a>')
+        if entry.get("image_url"):
+            bits.append(f'<a href="{entry["image_url"]}" target="_blank" rel="noopener">{entry["image_url"]}</a>')
+        parts.append(f"<p>{' — '.join(bits)}</p>")
+    return "".join(parts)
+
+
 def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
                     user_lang: str = "en", local_lang: str | None = None,
                     resolve_wiki: bool = True, wiki_timeout: float = 5.0) -> str:
@@ -495,6 +518,10 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
 
     line_feature = next((f for f in geojson.get("features", []) if f["geometry"]["type"] == "LineString"), None)
     stats_html = f"<h3>Route</h3>{route_stats_html(line_feature['properties'], user_lang)}" if line_feature else ""
+
+    for feature in geojson.get("features", []):
+        if feature["geometry"]["type"] == "Point":
+            feature["properties"]["_popupExtra"] = point_popup_html(feature["properties"])
 
     geojson_json = json.dumps(geojson)
 
@@ -617,10 +644,7 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
       if (props.type) popup += `<br>${{TYPE_LABELS[props.type] || props.type}}`;
       if (props.note) popup += `<br>${{props.note}}`;
       if (props.source) popup += `<br><i>${{props.source}}</i>`;
-      if (props._wikiUrl) {{
-        const langNote = props._wikiLang && props._wikiLang !== "{user_lang}" ? ` (${{props._wikiLang}})` : '';
-        popup += `<br><a href="${{props._wikiUrl}}" target="_blank" rel="noopener">${{WIKIPEDIA_LABEL}}${{langNote}}</a>`;
-      }}
+      if (props._popupExtra) popup += props._popupExtra;
       marker.bindPopup(popup);
       return marker;
     }}

@@ -70,3 +70,9 @@ def test_access_point_keeps_opening_hours_and_access_notes_when_present():
     assert point["properties"]["opening_hours"] == "Mo-Su 06:00-23:00"
     assert point["properties"]["access_notes"] == "Билеты у кондуктора."
     assert point["geometry"]["coordinates"] == [37.0, 55.0]  # no ele known for this point
+
+
+def test_linestring_coerces_none_elevation_to_zero():
+    result = _sample_call(path_coords=[(37.0, 55.0, 100.0), (37.001, 55.001, None)])
+    line = next(f for f in result["features"] if f["geometry"]["type"] == "LineString")
+    assert line["geometry"]["coordinates"] == [[37.0, 55.0, 100.0], [37.001, 55.001, 0.0]]

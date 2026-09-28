@@ -30,7 +30,7 @@ def build_geojson(path_coords, route_name, mode, style, distance_km, elevation_g
         "type": "Feature",
         "geometry": {
             "type": "LineString",
-            "coordinates": [[lon, lat, ele] for lon, lat, ele in path_coords],
+            "coordinates": [[lon, lat, ele if ele is not None else 0.0] for lon, lat, ele in path_coords],
         },
         "properties": {
             "name": route_name,

@@ -41,3 +41,13 @@ def test_interpolate_at_distances_is_linear_between_samples():
 def test_interpolate_clamps_targets_outside_sample_range():
     result = interpolate_at_distances([0.0, 100.0], [5.0, 15.0], [-10.0, 110.0])
     assert result == pytest.approx([5.0, 15.0])
+
+
+def test_sample_positions_handles_single_point_path_without_crashing():
+    samples = sample_positions([(55.0, 37.0)], interval_m=150.0)
+    assert samples == [(55.0, 37.0, 0.0)]
+
+
+def test_sample_positions_handles_zero_length_path_without_crashing():
+    samples = sample_positions([(55.0, 37.0), (55.0, 37.0)], interval_m=150.0)
+    assert samples == [(55.0, 37.0, 0.0)]

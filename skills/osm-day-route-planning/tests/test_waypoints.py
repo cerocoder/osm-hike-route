@@ -104,6 +104,35 @@ def test_select_optional_points_prefers_tag_backed_on_tied_cost():
 
     # Budget only fits one 0.2km round-trip detour; tag-backed wins the tie.
     assert [c["name"] for c in included] == ["OSM-точка"]
+    assert skipped == ["Веб-точка"]
+
+
+def test_select_optional_points_handles_duplicate_names_with_reachable_and_unreachable():
+    """Two candidates share the same name "Родник" (common for unnamed OSM springs).
+    One is reachable (node 4 off node 2), one is unreachable (node 7 isolated).
+    The reachable one should be included, the unreachable one should be in skipped,
+    and both should appear in returned lists (no name-based deduplication bug)."""
+    graph = _linear_graph()
+    # Add isolated node 7 with no connections (unreachable)
+    graph[7] = []
+
+    candidates = [
+        {"node_id": 4, "name": "Родник", "tier": "tag-backed"},     # reachable
+        {"node_id": 7, "name": "Родник", "tier": "tag-backed"},     # unreachable
+    ]
+
+    included, skipped = select_optional_points(
+        graph, mandatory_path=[1, 2, 3], mandatory_cost_km=2.0,
+        candidates=candidates, preferences={}, max_distance_km=2.5,
+    )
+
+    # The reachable one fits the budget and should be included
+    assert len(included) == 1
+    assert included[0]["node_id"] == 4
+    # The unreachable one should be tracked in skipped by name
+    assert "Родник" in skipped
+    # Verify the unreachable candidate is explicitly tracked (not silently dropped)
+    assert skipped.count("Родник") == 1  # only one "Родник" in skipped (the unreachable one)
 
 
 def test_select_optional_points_handles_single_node_mandatory_path():

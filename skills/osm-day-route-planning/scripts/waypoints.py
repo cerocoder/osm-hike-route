@@ -76,19 +76,20 @@ def select_optional_points(graph, mandatory_path: list[int], mandatory_cost_km: 
         remaining_budget = max_distance_km - mandatory_cost_km
 
     scored = []
+    skipped = []
     for candidate in candidates:
         cost_km = _cheapest_insertion_cost_km(graph, mandatory_path, candidate["node_id"], preferences)
-        if cost_km is not None:
+        if cost_km is None:
+            skipped.append(candidate["name"])
+        else:
             scored.append((cost_km, _TIER_RANK.get(candidate.get("tier"), 99), candidate))
     scored.sort(key=lambda item: (item[0], item[1]))
 
-    included, skipped = [], []
+    included = []
     for cost_km, _rank, candidate in scored:
         if cost_km <= remaining_budget:
             included.append(candidate)
             remaining_budget -= cost_km
         else:
             skipped.append(candidate["name"])
-    unreachable = {c["name"] for c in candidates} - {c["name"] for c in included} - set(skipped)
-    skipped.extend(sorted(unreachable))
     return included, skipped

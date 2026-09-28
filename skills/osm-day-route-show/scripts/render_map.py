@@ -317,18 +317,87 @@ def _inline_markdown(s: str) -> str:
 
 _LIST_MARKER = re.compile(r"^(?:-\s+|\d+\.\s+)")
 
+# A GFM delimiter row: cells of 3+ dashes (optionally `:`-aligned), pipe-
+# separated, optional leading/trailing pipe — e.g. "|---|---|" or
+# ":--- | ---:". Detecting a table requires this row right after a
+# pipe-containing line (see markdown_to_html) — a bare "|" appearing in
+# ordinary prose is not, by itself, enough to switch modes.
+_TABLE_SEPARATOR_ROW = re.compile(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$")
+
+
+def _split_table_row(line: str) -> list[str]:
+    """GFM pipe-row -> cell texts, tolerating an optional leading/trailing
+    pipe (both "| a | b |" and "a | b" are valid GFM rows)."""
+    line = line.strip()
+    if line.startswith("|"):
+        line = line[1:]
+    if line.endswith("|"):
+        line = line[:-1]
+    return [cell.strip() for cell in line.split("|")]
+
+
+def _render_table(rows: list[str]) -> str:
+    """rows[0] is the header, rows[1] the (already-validated, discarded)
+    delimiter row, rows[2:] the data rows. Column alignment (`:---:` etc.)
+    isn't rendered — no notes.md content seen so far has used it, and a
+    plain left-aligned table is a fine default for the sidebar's width."""
+    header_cells = [_inline_markdown(_xml_escape(c)) for c in _split_table_row(rows[0])]
+    header_html = "".join(f"<th>{c}</th>" for c in header_cells)
+    body_rows = []
+    for data_row in rows[2:]:
+        cells = [_inline_markdown(_xml_escape(c)) for c in _split_table_row(data_row)]
+        body_rows.append("<tr>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>")
+    return (
+        '<div class="table-wrap"><table><thead><tr>' + header_html + "</tr></thead><tbody>"
+        + "".join(body_rows) + "</tbody></table></div>"
+    )
+
 
 def markdown_to_html(md_text: str) -> str:
-    """Minimal markdown->HTML for notes.md sections: '- ' or '1. ' list
-    items (with hard-wrapped continuation lines joined back together) plus
-    inline links/bold/code. Not a general markdown parser — just what
-    osm-hike-route-planning's notes.md template actually produces. Without
-    the numbered-list branch, a "1. ... 2. ... 3. ..." list (seen in a real
-    notes.md) collapses into one giant run-on bullet."""
+    """Minimal markdown->HTML for notes.md sections: '- '/'1. ' list items
+    (with hard-wrapped continuation lines joined back together), GFM pipe
+    tables, plus inline links/bold/code. Not a general markdown parser —
+    just what osm-hike-route-planning's notes.md template actually
+    produces. Without the numbered-list branch, a "1. ... 2. ... 3. ..."
+    list (seen in a real notes.md) collapses into one giant run-on bullet.
+
+    Without the table branch, a markdown table (seen in a real notes.md's
+    "Точки интереса" section, despite reference.md's own template using a
+    bullet list for that section) is caught by the paragraph-continuation
+    branch below like any other non-blank, non-list line: every row gets
+    glued onto the previous one (no blank lines between table rows), so the
+    whole table collapses into a single run-on `<li>` of bare
+    pipes-and-dashes text — exactly the malformed output a user reported
+    seeing in the sidebar."""
+    lines = md_text.split("\n")
+    fragments = []
     items = []
     current = None
-    for raw_line in md_text.split("\n"):
-        line = raw_line.strip()
+    i = 0
+
+    def flush_list():
+        nonlocal current
+        if current is not None:
+            items.append(current)
+            current = None
+        if items:
+            escaped_items = [_inline_markdown(_xml_escape(item)) for item in items]
+            fragments.append("<ul>" + "".join(f"<li>{item}</li>" for item in escaped_items) + "</ul>")
+            items.clear()
+
+    while i < len(lines):
+        line = lines[i].strip()
+
+        if "|" in line and i + 1 < len(lines) and _TABLE_SEPARATOR_ROW.match(lines[i + 1].strip()):
+            flush_list()
+            table_rows = [line, lines[i + 1].strip()]
+            i += 2
+            while i < len(lines) and lines[i].strip() and "|" in lines[i]:
+                table_rows.append(lines[i].strip())
+                i += 1
+            fragments.append(_render_table(table_rows))
+            continue
+
         marker = _LIST_MARKER.match(line)
         if marker:
             if current is not None:
@@ -340,11 +409,10 @@ def markdown_to_html(md_text: str) -> str:
                 current = None
         else:
             current = f"{current} {line}" if current is not None else line
-    if current is not None:
-        items.append(current)
+        i += 1
 
-    escaped_items = [_inline_markdown(_xml_escape(item)) for item in items]
-    return "<ul>" + "".join(f"<li>{item}</li>" for item in escaped_items) + "</ul>"
+    flush_list()
+    return "".join(fragments)
 
 
 # ---------------------------------------------------------------------------
@@ -664,6 +732,10 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
   #sidebar ul {{ margin: 0; padding-left: 18px; }}
   #sidebar li {{ margin-bottom: 6px; }}
   #sidebar a {{ color: #2563eb; }}
+  #sidebar .table-wrap {{ overflow-x: auto; margin: 4px 0 8px; }}
+  #sidebar table {{ border-collapse: collapse; width: 100%; font-size: 12px; }}
+  #sidebar th, #sidebar td {{ border: 1px solid #d1d5db; padding: 3px 6px; text-align: left; vertical-align: top; }}
+  #sidebar th {{ background: #f3f4f6; white-space: nowrap; }}
   #sidebar .links-section a {{ display: inline-block; margin: 2px 0; }}
   .route-arrow div {{ color: #2563eb; font-size: 16px; line-height: 16px; text-align: center; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }}
   @media (max-width: 480px) {{

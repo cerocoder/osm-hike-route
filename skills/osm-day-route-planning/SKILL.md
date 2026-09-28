@@ -190,9 +190,36 @@ new preset, no code changes).
     `route_output.build_geojson(...)` (this is where **computed outputs**
     live — distance, duration, elevation gain/loss, warnings, skipped
     points; never re-store an input here), and `notes.md` (see
-    reference.md's template). Then present a summary to the user: distance,
-    duration (with warning if any), access recommendation, route rationale,
-    confidence caveats, and which optional points were skipped for budget.
+    reference.md's template). **Write `route.geojson` by serializing exactly
+    what `build_geojson(...)` returned — never hand-construct or hand-edit
+    the JSON.** `build_geojson`'s parameters (`mode`, `distance_km`,
+    `elevation_gain_m`, `elevation_loss_m`, `duration_estimate_hours`, etc.)
+    have no defaults specifically so a value cannot be silently left out —
+    if you don't have a real number for one of them, that means an earlier
+    pipeline step (11–16) wasn't actually run, and the fix is to go back and
+    run it, not to invent a placeholder or skip the parameter.
+18. **Validate the archive before presenting anything to the user**:
+    `python3 scripts/archive_validate.py <route_dir>` (or
+    `from archive_validate import validate_archive; validate_archive(route_dir)`
+    as a library call). This is not optional and not a formality — it is the
+    one hard gate against silently shipping an incomplete archive. It exists
+    because this exact failure happened for real: a route was once saved
+    with `route.geojson`'s `LineString` in 2D (no elevation), none of the
+    computed `LineString` properties (`mode`/`distance_km`/
+    `elevation_gain_m`/`elevation_loss_m`/`duration_estimate_hours`/…), and
+    no `weights.json`/`requests.md` — because the archive had been written
+    by hand instead of through `build_geojson`/`save_weights`/
+    `append_request`, skipping pipeline steps 12 (elevation) and 15
+    (duration) entirely along the way, with only a one-line note in
+    `notes.md` ("elevation wasn't queried") to show for it. If
+    `validate_archive` raises `ArchiveIncompleteError`, the route is **not
+    done**: read what it lists, go back and actually run the missing
+    pipeline step(s) (re-fetch elevation, recompute distance/duration,
+    whatever it names), and re-save — never hand-patch `route.geojson`'s
+    JSON to make the validator stop complaining. Only once it passes
+    silently, present the summary to the user: distance, duration (with
+    warning if any), access recommendation, route rationale, confidence
+    caveats, and which optional points were skipped for budget.
 
 ## Revising an Existing Route
 
@@ -238,7 +265,11 @@ of the same archive folder (spec §4):
    around it — no need to re-fetch access points if they weren't touched).
 6. Overwrite `route.geojson`/`notes.md`/`weights.json` in the same archive
    folder — no separate versioned subfolder, the iteration history already
-   lives in `requests.md`.
+   lives in `requests.md`. **Run `archive_validate.validate_archive(route_dir)`
+   after overwriting, same as pipeline step 18 for a fresh build** — a
+   revision that only touches part of the route still regenerates the whole
+   `route.geojson` via `build_geojson`, so it's just as capable of silently
+   losing elevation/duration/distance as a first build would be.
 
 ## Interest-Layer Confidence Tiers
 
@@ -528,6 +559,15 @@ follow **Revising an Existing Route** instead of starting over.
 distance, duration, elevation gain/loss, warnings, skipped points. If
 you're about to write the same number to both files, one of them is wrong.
 
+**An archive is not saved until `archive_validate.validate_archive(route_dir)`
+passes** (pipeline step 18) — it checks that all four files exist, that
+`route.geojson`'s `LineString` coordinates are 3D and carry every computed
+property (`mode`, `distance_km`, `elevation_gain_m`, `elevation_loss_m`,
+`duration_estimate_hours`, etc.), and that `weights.json` has a `mode` key.
+This is the enforcement mechanism for everything this section says about
+inputs/outputs/never-hand-editing — see `scripts/archive_validate.py`'s own
+module docstring for the real incident that made this necessary.
+
 **Presets are read-only reference data.** `presets/*.json` is never
 modified by a run — `presets.build_weights`/`presets.revise_weights` both
 return a fresh dict; the caller writes that to the route's own
@@ -624,6 +664,19 @@ Full query templates (with the header workaround Overpass needs) are in
 
 ## Common Mistakes
 
+- **Hand-writing or hand-editing `route.geojson`'s JSON instead of calling
+  `build_geojson`, or skipping pipeline step 18's validation** — this is how
+  an archive silently ends up with 2D `LineString` coordinates (no
+  elevation) and missing `distance_km`/`elevation_gain_m`/
+  `elevation_loss_m`/`duration_estimate_hours` while still looking like a
+  finished route: a real route was shipped this way, with elevation and
+  duration simply never computed, and nothing caught it until a user asked
+  why the map had no elevation data. `build_geojson`'s parameters have no
+  defaults for exactly this reason — if a value is missing, that's a signal
+  to go rerun the pipeline step that produces it, not to work around the
+  function. Always finish with `archive_validate.validate_archive(route_dir)`
+  (pipeline step 18) and treat a raised `ArchiveIncompleteError` as blocking,
+  not advisory.
 - **Treating shortest path as best** — always apply preference weights
   (Core Pattern), even when the user's example constraint sounds minor.
 - **Silently defaulting mode/style, loop-vs-point-to-point, or the budget**

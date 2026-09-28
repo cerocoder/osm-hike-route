@@ -356,6 +356,21 @@ def test_relation_single_closed_outer_member_and_inner_member_ignored():
     assert set(polygons[0]) == {_SW, _SE, _NE, _NW}
 
 
+def test_relation_members_with_empty_or_missing_role_count_as_outer():
+    """Older simple multipolygons often leave the outer ring's role blank
+    ("" in Overpass output) — treat that like "outer", not as ignorable."""
+    no_role_member = {"type": "way", "ref": 2, "geometry": _pts(_SW, _NW, _NE)}
+    relation = _relation([
+        _member([_SW, _SE, _NE], role="", ref=1),
+        no_role_member,
+    ])
+
+    polygons = build_restricted_polygons([relation], [])
+
+    assert len(polygons) == 1
+    assert is_point_restricted(*_INSIDE, polygons) is True
+
+
 def test_relation_with_unclosed_outer_members_produces_no_polygon():
     # Incomplete/malformed relation: three sides only, never closes.
     relation = _relation([

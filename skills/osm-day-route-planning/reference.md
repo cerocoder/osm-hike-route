@@ -147,8 +147,9 @@ themselves**: with `out geom`, a `type: "relation"` element has no
 top-level `geometry` — each entry in `members` carries its own
 `geometry`, and a large zone's `outer` boundary is usually split across
 several member ways. `build_restricted_polygons` stitches the `outer`
-members end-to-end (either direction) into closed rings and ignores
-`inner` members; outer segments that never close (incomplete relation
+members end-to-end (either direction) into closed rings — a member with a
+blank/missing role counts as outer (older simple multipolygons) — and
+ignores `inner` members; outer segments that never close (incomplete relation
 download) produce no polygon rather than a wrong one. A plain restricted
 *way* only becomes a polygon if it is actually closed (first point ==
 last point) — an open `access=private` way such as a driveway is a line,

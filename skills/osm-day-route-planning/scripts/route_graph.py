@@ -230,9 +230,13 @@ def _stitch_rings(segments, epsilon=1e-7):
 
 
 def _relation_outer_rings(relation):
+    """Outer rings of a relation. A blank/missing role is treated as outer:
+    older simple multipolygons often leave the single outer ring unroled.
+    (If a blank-role member is actually a hole, it is fully inside an outer
+    ring anyway, so the extra ring can't widen the excluded area.)"""
     segments = []
     for member in relation.get("members", []):
-        if member.get("role") != "outer":
+        if member.get("role", "") not in ("outer", ""):
             continue
         geom = member.get("geometry")
         if geom and len(geom) >= 2:

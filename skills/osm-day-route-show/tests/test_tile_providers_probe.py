@@ -39,6 +39,15 @@ def test_probe_tile_false_on_network_error_never_raises():
         assert probe_tile("https://example.org/{z}/{x}/{y}.png", 40.0, -3.0, 15, 5.0) is False
 
 
+def test_probe_tile_false_on_incomplete_read_never_raises():
+    """Review Focus: truncated tile downloads (http.client.IncompleteRead from flaky
+    connections) must degrade to False, never propagate."""
+    import http.client
+
+    with patch("tile_providers.probe._fetch", side_effect=http.client.IncompleteRead(b"x" * 100, 1000)):
+        assert probe_tile("https://example.org/{z}/{x}/{y}.png", 40.0, -3.0, 15, 5.0) is False
+
+
 def test_probe_tile_formats_url_with_z_x_y():
     captured = {}
 

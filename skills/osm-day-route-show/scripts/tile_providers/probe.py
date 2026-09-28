@@ -3,6 +3,7 @@ TileProviderPlugin.covers() (see providers/base.py). Lightweight
 liveness/coverage check, not a replacement for the more rigorous
 multi-zoom hash-comparison research in tile-providers-research.md — see
 design spec 2026-09-28-osm-day-route-show-tile-providers-design.md."""
+import http.client
 import math
 import urllib.error
 import urllib.request
@@ -41,6 +42,6 @@ def probe_tile(url_template: str, lat: float, lon: float, zoom: int, timeout: fl
     url = url_template.format(z=zoom, x=x, y=y)
     try:
         status, content_type, body = _fetch(url, timeout)
-    except (urllib.error.URLError, OSError, ValueError):
+    except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException):
         return False
     return status == 200 and content_type.startswith("image/") and len(body) >= _MIN_BODY_BYTES

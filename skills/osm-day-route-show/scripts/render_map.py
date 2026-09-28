@@ -707,28 +707,36 @@ def annotate_wikipedia_links(geojson: dict, user_lang: str, local_lang: str | No
 
 def build_gpx(geojson: dict, title: str) -> str:
     """GPX 1.1 — the format both Wikiloc and Garmin devices/BaseCamp/Connect
-    import natively (verified against Wikiloc's own upload docs, 2026-09-27).
-    One <trk> from the route LineString, one <wpt> per Point feature."""
+    import natively. One <trk> from the route LineString, one <wpt> per
+    Point feature. Coordinates may be [lon, lat] (older archives) or
+    [lon, lat, ele] (spec §3.11) — ele is emitted only when present."""
     features = geojson.get("features", [])
     line = next((f for f in features if f["geometry"]["type"] == "LineString"), None)
     points = [f for f in features if f["geometry"]["type"] == "Point"]
 
+    def _ele_tag(coord) -> str:
+        return f"<ele>{coord[2]}</ele>" if len(coord) > 2 else ""
+
     wpts = []
     for f in points:
-        lon, lat = f["geometry"]["coordinates"]
+        coord = f["geometry"]["coordinates"]
+        lon, lat = coord[0], coord[1]
         props = f.get("properties", {})
         name = _xml_escape(props.get("name", "Point"))
         desc = _xml_escape(props.get("type", ""))
-        wpts.append(f'  <wpt lat="{lat}" lon="{lon}"><name>{name}</name><desc>{desc}</desc></wpt>')
+        wpts.append(
+            f'  <wpt lat="{lat}" lon="{lon}">{_ele_tag(coord)}<name>{name}</name><desc>{desc}</desc></wpt>'
+        )
 
     trkpts = []
     if line:
-        for lon, lat in line["geometry"]["coordinates"]:
-            trkpts.append(f'      <trkpt lat="{lat}" lon="{lon}"/>')
+        for coord in line["geometry"]["coordinates"]:
+            lon, lat = coord[0], coord[1]
+            trkpts.append(f'      <trkpt lat="{lat}" lon="{lon}">{_ele_tag(coord)}</trkpt>')
 
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<gpx version="1.1" creator="osm-hike-route-show" '
+        '<gpx version="1.1" creator="osm-day-route-show" '
         'xmlns="http://www.topografix.com/GPX/1/1">\n'
         f"  <metadata><name>{_xml_escape(title)}</name></metadata>\n"
         + "\n".join(wpts) + ("\n" if wpts else "")

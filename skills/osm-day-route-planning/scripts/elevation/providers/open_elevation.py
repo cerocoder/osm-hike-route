@@ -27,9 +27,9 @@ class OpenElevationProvider(ElevationProvider):
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, json.JSONDecodeError, UnicodeDecodeError, ValueError):
+            results = data.get("results", [])
+            if len(results) != len(locations):
+                return [None] * len(locations)
+            return [r.get("elevation") for r in results]
+        except (urllib.error.URLError, OSError, ValueError, AttributeError, TypeError, KeyError, IndexError):
             return [None] * len(locations)
-        results = data.get("results", [])
-        if len(results) != len(locations):
-            return [None] * len(locations)
-        return [r.get("elevation") for r in results]

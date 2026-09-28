@@ -21,9 +21,9 @@ class OpenMeteoProvider(ElevationProvider):
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, json.JSONDecodeError, UnicodeDecodeError, ValueError):
+            result = list(data.get("elevation", [None] * len(locations)))
+            if len(result) != len(locations):
+                return [None] * len(locations)
+            return result
+        except (urllib.error.URLError, OSError, ValueError, AttributeError, TypeError, KeyError, IndexError):
             return [None] * len(locations)
-        result = list(data.get("elevation", [None] * len(locations)))
-        if len(result) != len(locations):
-            return [None] * len(locations)
-        return result

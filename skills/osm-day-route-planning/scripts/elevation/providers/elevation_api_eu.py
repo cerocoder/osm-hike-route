@@ -21,9 +21,11 @@ class ElevationApiEuProvider(ElevationProvider):
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, json.JSONDecodeError, UnicodeDecodeError, ValueError):
+            if not isinstance(data, list):
+                return [None] * len(locations)
+            result = list(data)
+            if len(result) != len(locations):
+                return [None] * len(locations)
+            return result
+        except (urllib.error.URLError, OSError, ValueError, AttributeError, TypeError, KeyError, IndexError):
             return [None] * len(locations)
-        result = list(data)
-        if len(result) != len(locations):
-            return [None] * len(locations)
-        return result

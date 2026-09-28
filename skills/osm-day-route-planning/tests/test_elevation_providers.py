@@ -142,3 +142,63 @@ def test_open_elevation_fetch_returns_none_per_point_on_incomplete_results():
         result = provider.fetch([(55.0, 37.0), (55.1, 37.1)])
 
     assert result == [None, None]
+
+
+def test_open_topo_data_fetch_returns_none_per_point_on_wrong_shape():
+    """Valid JSON response but wrong shape (top-level list) should return [None] * len(locations)."""
+    payload = [100.0, 120.5]  # Top-level list instead of {"results": [...]}
+    provider = OpenTopoDataProvider()
+
+    with patch("urllib.request.urlopen", return_value=_mock_response(payload)):
+        result = provider.fetch([(55.0, 37.0), (55.1, 37.1)])
+
+    assert result == [None, None]
+
+
+def test_open_meteo_fetch_returns_none_per_point_on_wrong_shape():
+    """Valid JSON response but wrong shape (top-level list) should return [None] * len(locations)."""
+    payload = [38.0, 41.5]  # Top-level list instead of {"elevation": [...]}
+    provider = OpenMeteoProvider()
+
+    with patch("urllib.request.urlopen", return_value=_mock_response(payload)):
+        result = provider.fetch([(52.5, 13.4), (48.85, 2.35)])
+
+    assert result == [None, None]
+
+
+def test_open_meteo_fetch_returns_none_per_point_on_null_elevation():
+    """Valid JSON response but null elevation field should return [None] * len(locations)."""
+    payload = {"elevation": None}  # elevation is null instead of a list
+    provider = OpenMeteoProvider()
+
+    with patch("urllib.request.urlopen", return_value=_mock_response(payload)):
+        result = provider.fetch([(52.5, 13.4), (48.85, 2.35)])
+
+    assert result == [None, None]
+
+
+def test_elevation_api_eu_fetch_returns_none_per_point_on_wrong_shape():
+    """Valid JSON response but wrong shape (dict instead of array) should return [None] * len(locations).
+
+    This is the critical test: without the isinstance check, list({"error": "x"}) would return ["error"],
+    which has length 1 and would match len(locations) == 1, so it would silently return a string value
+    instead of None, breaking the type contract. The explicit isinstance check prevents this.
+    """
+    payload = {"error": "Something went wrong"}  # Dict instead of array
+    provider = ElevationApiEuProvider()
+
+    with patch("urllib.request.urlopen", return_value=_mock_response(payload)):
+        result = provider.fetch([(55.0, 37.0)])
+
+    assert result == [None]
+
+
+def test_open_elevation_fetch_returns_none_per_point_on_wrong_shape():
+    """Valid JSON response but wrong shape (top-level list) should return [None] * len(locations)."""
+    payload = [{"elevation": 300.0}, {"elevation": 305.5}]  # Top-level list instead of {"results": [...]}
+    provider = OpenElevationProvider()
+
+    with patch("urllib.request.urlopen", return_value=_mock_response(payload)):
+        result = provider.fetch([(55.0, 37.0), (55.1, 37.1)])
+
+    assert result == [None, None]

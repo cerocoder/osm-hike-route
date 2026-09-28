@@ -152,22 +152,88 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
     return buckets
 
 
+def _closed_way_ring(w):
+    """A way's own geometry as a ring, only if it's actually closed (first
+    and last points coincide) — an open way (e.g. a private driveway) is
+    not a polygon and must not be treated as one."""
+    geom = w.get("geometry")
+    if not geom or len(geom) < 3:
+        return None
+    first, last = geom[0], geom[-1]
+    if abs(first["lat"] - last["lat"]) > 1e-7 or abs(first["lon"] - last["lon"]) > 1e-7:
+        return None
+    return [(p["lat"], p["lon"]) for p in geom]
+
+
+def _stitch_rings(segments, epsilon=1e-7):
+    """Assemble point-list segments (each a list of (lat, lon), possibly
+    given in either direction) into closed rings by matching shared
+    endpoints. A relation's outer boundary is often split across several
+    way-members that each cover only part of the perimeter. Segments that
+    never close into a ring are dropped — they can't form a hard-exclusion
+    polygon on their own."""
+    remaining = [list(seg) for seg in segments if len(seg) >= 2]
+    rings = []
+
+    def close(a, b):
+        return abs(a[0] - b[0]) < epsilon and abs(a[1] - b[1]) < epsilon
+
+    while remaining:
+        ring = remaining.pop(0)
+        extended = True
+        while extended and not close(ring[0], ring[-1]):
+            extended = False
+            for i, seg in enumerate(remaining):
+                if close(ring[-1], seg[0]):
+                    ring.extend(seg[1:])
+                elif close(ring[-1], seg[-1]):
+                    ring.extend(list(reversed(seg))[1:])
+                elif close(ring[0], seg[-1]):
+                    ring[0:0] = seg[:-1]
+                elif close(ring[0], seg[0]):
+                    ring[0:0] = list(reversed(seg))[:-1]
+                else:
+                    continue
+                remaining.pop(i)
+                extended = True
+                break
+        if len(ring) >= 4 and close(ring[0], ring[-1]):
+            rings.append(ring[:-1])  # drop the duplicated closing point
+    return rings
+
+
+def _relation_outer_rings(relation):
+    segments = []
+    for member in relation.get("members", []):
+        if member.get("role") != "outer":
+            continue
+        geom = member.get("geometry")
+        if geom and len(geom) >= 2:
+            segments.append([(p["lat"], p["lon"]) for p in geom])
+    return _stitch_rings(segments)
+
+
 def build_restricted_polygons(restricted_ways, barrier_ways):
     """Polygon rings (list of (lat, lon)) to hard-exclude from the walkable
-    graph: explicit access=private/no/military or landuse=military areas,
-    plus any closed-loop fence/wall (a full ring of fence around something
-    is treated as an enclosed private zone even with no access tag)."""
+    graph: explicit access=private/no/military or landuse=military areas
+    (way or relation), plus any closed-loop fence/wall (a full ring of
+    fence around something is treated as an enclosed private zone even
+    with no access tag). Relations (common for large military zones) are
+    reassembled from their `outer`-role member way segments — a single
+    relation's boundary is often split across several ways that only
+    close into a ring when joined end-to-end."""
     polygons = []
     for w in restricted_ways:
-        geom = w.get("geometry")
-        if geom and len(geom) >= 3:
-            polygons.append([(p["lat"], p["lon"]) for p in geom])
+        if w.get("type") == "relation":
+            polygons.extend(_relation_outer_rings(w))
+        else:
+            ring = _closed_way_ring(w)
+            if ring:
+                polygons.append(ring)
     for w in barrier_ways:
-        geom = w.get("geometry")
-        if geom and len(geom) >= 3:
-            first, last = geom[0], geom[-1]
-            if abs(first["lat"] - last["lat"]) < 1e-7 and abs(first["lon"] - last["lon"]) < 1e-7:
-                polygons.append([(p["lat"], p["lon"]) for p in geom])
+        ring = _closed_way_ring(w)
+        if ring:
+            polygons.append(ring)
     return polygons
 
 

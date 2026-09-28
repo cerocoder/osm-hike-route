@@ -4,9 +4,10 @@ from unittest.mock import patch
 import pytest
 import route_graph
 from route_graph import (
-    build_graph, fetch_area_data, filter_excluded_ways, tag_grades,
-    _edge_cost, weighted_shortest_path, DEFAULT_ROUTABLE_HIGHWAY,
+    build_graph, build_restricted_polygons, fetch_area_data, filter_excluded_ways,
+    tag_grades, _edge_cost, weighted_shortest_path, DEFAULT_ROUTABLE_HIGHWAY,
 )
+from waypoints import is_point_restricted
 
 
 def _two_node_way(node_a=1, node_b=2, tags=None):
@@ -266,3 +267,143 @@ def test_fetch_area_data_reaches_walkable_bucket_for_hard_exclude_and_infra_cand
     walkable_ids = [w["id"] for w in buckets["walkable"]]
     assert 1 in walkable_ids
     assert 2 in walkable_ids
+
+
+# --- build_restricted_polygons: relations, ring stitching, closure -------
+
+def _pts(*coords):
+    return [{"lat": lat, "lon": lon} for lat, lon in coords]
+
+
+# A square around (55.001, 37.0) — the midpoint _way_with_tags's 2-point
+# geometry resolves to in filter_excluded_ways (geom[len // 2] == geom[1]).
+_SW, _SE, _NE, _NW = (55.0005, 36.9995), (55.0005, 37.0005), (55.0015, 37.0005), (55.0015, 36.9995)
+_INSIDE = (55.001, 37.0)
+_OUTSIDE = (55.01, 37.01)
+
+
+def _relation(members, tags=None):
+    return {"type": "relation", "id": 900, "tags": tags or {"landuse": "military"},
+            "members": members}
+
+
+def _member(coords, role="outer", ref=1):
+    return {"type": "way", "ref": ref, "role": role, "geometry": _pts(*coords)}
+
+
+def test_relation_with_two_outer_members_is_stitched_into_one_polygon():
+    # Two halves of the perimeter sharing endpoints; the second one is given
+    # in reverse direction so the stitcher's reversal branch has to run.
+    relation = _relation([
+        _member([_SW, _SE, _NE], ref=1),
+        _member([_SW, _NW, _NE], ref=2),  # reversed w.r.t. ring direction
+    ])
+
+    polygons = build_restricted_polygons([relation], [])
+
+    assert len(polygons) == 1
+    assert len(polygons[0]) == 4
+    assert set(polygons[0]) == {_SW, _SE, _NE, _NW}
+    assert is_point_restricted(*_INSIDE, polygons) is True
+    assert is_point_restricted(*_OUTSIDE, polygons) is False
+
+
+def test_relation_split_into_four_shuffled_segments_is_stitched():
+    # No single member can form a polygon on its own — only correct
+    # end-to-end stitching (with mixed directions, out of order) closes it.
+    relation = _relation([
+        _member([_NE, _NW], ref=3),
+        _member([_SE, _SW], ref=1),   # reversed
+        _member([_NW, _SW], ref=4),
+        _member([_NE, _SE], ref=2),   # reversed
+    ])
+
+    polygons = build_restricted_polygons([relation], [])
+
+    assert len(polygons) == 1
+    assert set(polygons[0]) == {_SW, _SE, _NE, _NW}
+    assert is_point_restricted(*_INSIDE, polygons) is True
+
+
+def test_relation_restricted_area_excludes_walkable_way_inside_it():
+    relation = _relation([
+        _member([_SW, _SE, _NE], ref=1),
+        _member([_NE, _NW, _SW], ref=2),
+    ])
+    polygons = build_restricted_polygons([relation], [])
+    inside_way = _way_with_tags({"highway": "path"}, way_id=1)  # midpoint == _INSIDE
+    outside_way = {"id": 2, "nodes": [3, 4], "tags": {"highway": "path"},
+                   "geometry": _pts(_OUTSIDE, (_OUTSIDE[0] + 0.001, _OUTSIDE[1]))}
+
+    kept = filter_excluded_ways([inside_way, outside_way], polygons)
+
+    assert [w["id"] for w in kept] == [2]
+
+
+def test_relation_single_closed_outer_member_and_inner_member_ignored():
+    relation = _relation([
+        _member([_SW, _SE, _NE, _NW, _SW], ref=1),
+        # inner ring (a hole) — not part of the hard-exclusion outline
+        _member([(55.0009, 36.9999), (55.0009, 37.0001), (55.0011, 37.0001),
+                 (55.0011, 36.9999), (55.0009, 36.9999)], role="inner", ref=2),
+    ])
+
+    polygons = build_restricted_polygons([relation], [])
+
+    assert len(polygons) == 1
+    assert set(polygons[0]) == {_SW, _SE, _NE, _NW}
+
+
+def test_relation_with_unclosed_outer_members_produces_no_polygon():
+    # Incomplete/malformed relation: three sides only, never closes.
+    relation = _relation([
+        _member([_SW, _SE], ref=1),
+        _member([_SE, _NE], ref=2),
+        _member([_NE, _NW], ref=3),
+    ])
+
+    polygons = build_restricted_polygons([relation], [])
+
+    assert polygons == []
+
+
+def test_relation_with_no_members_or_geometry_does_not_raise():
+    polygons = build_restricted_polygons(
+        [_relation([]), {"type": "relation", "id": 1, "tags": {}},
+         _relation([{"type": "way", "ref": 1, "role": "outer"}])],
+        [],
+    )
+
+    assert polygons == []
+
+
+def test_open_access_private_way_is_not_treated_as_polygon():
+    # e.g. a private driveway: a linear way, not an area — must not become
+    # a (spurious triangle-ish) hard-exclusion polygon.
+    driveway = {"type": "way", "id": 5, "tags": {"highway": "service", "access": "private"},
+                "geometry": _pts(_SW, _SE, _NE)}
+
+    polygons = build_restricted_polygons([driveway], [])
+
+    assert polygons == []
+
+
+def test_closed_access_private_way_is_still_a_polygon():
+    area = {"type": "way", "id": 6, "tags": {"access": "private"},
+            "geometry": _pts(_SW, _SE, _NE, _NW, _SW)}
+
+    polygons = build_restricted_polygons([area], [])
+
+    assert len(polygons) == 1
+    assert is_point_restricted(*_INSIDE, polygons) is True
+
+
+def test_barrier_ways_only_closed_rings_become_polygons():
+    closed_fence = {"type": "way", "id": 7, "tags": {"barrier": "fence"},
+                    "geometry": _pts(_SW, _SE, _NE, _NW, _SW)}
+    open_fence = {"type": "way", "id": 8, "tags": {"barrier": "fence"},
+                  "geometry": _pts(_SW, _SE, _NE)}
+
+    polygons = build_restricted_polygons([], [closed_fence, open_fence])
+
+    assert len(polygons) == 1

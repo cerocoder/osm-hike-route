@@ -138,6 +138,18 @@ route through one failed for some other reason):
 out geom;
 ```
 
+**Restricted relations carry geometry on their members, not on
+themselves**: with `out geom`, a `type: "relation"` element has no
+top-level `geometry` — each entry in `members` carries its own
+`geometry`, and a large zone's `outer` boundary is usually split across
+several member ways. `build_restricted_polygons` stitches the `outer`
+members end-to-end (either direction) into closed rings and ignores
+`inner` members; outer segments that never close (incomplete relation
+download) produce no polygon rather than a wrong one. A plain restricted
+*way* only becomes a polygon if it is actually closed (first point ==
+last point) — an open `access=private` way such as a driveway is a line,
+not an area, and does not exclude anything around it.
+
 **Bike-mode routable ways are fetched via preset arguments, not the
 hardcoded default** (fixed after being a known gap): pass
 `weights["routable_highway"]`, `weights["hard_exclude_tags"].get("highway",

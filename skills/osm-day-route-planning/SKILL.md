@@ -256,7 +256,11 @@ all in `scripts/route_graph.py`:
    this in mind before assuming a rejected point must be something
    sinister), **and any closed-loop `barrier=fence|wall` way** — a full
    ring of fence around something is treated as an enclosed private zone
-   even with no explicit access tag. `filter_excluded_ways` drops any
+   even with no explicit access tag. Relation-mapped zones (the usual form
+   for large military areas and reserves) are reassembled from their
+   `outer` member ways; a restricted *way* only counts if it is actually
+   closed — an open `access=private` driveway is a line, not a zone (see
+   reference.md). `filter_excluded_ways` drops any
    walkable way whose midpoint falls inside one of these polygons, and
    `waypoints.is_point_restricted`/`validate_user_waypoint` run the same
    point-in-polygon check against individual waypoints before the graph is

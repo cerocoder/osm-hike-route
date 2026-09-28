@@ -1,5 +1,12 @@
+import re
+from unittest.mock import patch
+
 import pytest
-from route_graph import build_graph, filter_excluded_ways, tag_grades, _edge_cost, weighted_shortest_path
+import route_graph
+from route_graph import (
+    build_graph, fetch_area_data, filter_excluded_ways, tag_grades,
+    _edge_cost, weighted_shortest_path, DEFAULT_ROUTABLE_HIGHWAY,
+)
 
 
 def _two_node_way(node_a=1, node_b=2, tags=None):
@@ -131,3 +138,92 @@ def test_weighted_shortest_path_prefers_gentler_route_when_steep_is_penalized():
     path, cost = weighted_shortest_path(graph, 1, 3, preferences)
 
     assert path == [1, 4, 3]
+
+
+def _capture_ql(captured):
+    def _fake_query_overpass(ql, *args, **kwargs):
+        captured.append(ql)
+        return {"elements": []}
+    return _fake_query_overpass
+
+
+def _walkable_clause_values(ql: str) -> set:
+    """Extract the highway tag-value set from the FIRST way["highway"~"..."]
+    clause (the .walkable set) in a fetch_area_data query string. Scoping to
+    this specific clause (rather than substring-searching the whole query)
+    avoids false positives from the fixed .highways avoidance clause, which
+    always contains motorway|trunk|primary|secondary regardless of what
+    fetch_area_data was actually asked to fetch as walkable."""
+    match = re.search(r'way\["highway"~"([^"]+)"\]', ql)
+    assert match, f"no walkable highway clause found in query: {ql!r}"
+    return set(match.group(1).split("|"))
+
+
+def test_fetch_area_data_no_args_uses_walk_default_tags_in_query():
+    captured = []
+    with patch.object(route_graph, "query_overpass", side_effect=_capture_ql(captured)):
+        fetch_area_data(55.0, 37.0)
+
+    # Set-equal to the old hardcoded default, not byte-identical: the new
+    # implementation sorts the tag values alphabetically before joining,
+    # so the substring order differs from the old literal
+    # "path|footway|track|residential|living_street", but Overpass matches
+    # on the same regex alternation regardless of order.
+    assert _walkable_clause_values(captured[0]) == set(DEFAULT_ROUTABLE_HIGHWAY)
+
+
+def test_fetch_area_data_preset_args_included_in_query():
+    captured = []
+    with patch.object(route_graph, "query_overpass", side_effect=_capture_ql(captured)):
+        fetch_area_data(
+            55.0, 37.0,
+            routable_highway=["path", "cycleway", "secondary"],
+            hard_exclude_highway=["steps"],
+            exclude_highway_without_infra=["trunk", "primary"],
+        )
+
+    assert _walkable_clause_values(captured[0]) == {
+        "path", "cycleway", "secondary", "steps", "trunk", "primary",
+    }
+
+
+def test_fetch_area_data_buckets_secondary_as_walkable_when_routable():
+    ways = [{"type": "way", "id": 1, "tags": {"highway": "secondary"}}]
+    with patch.object(route_graph, "query_overpass", return_value={"elements": ways}):
+        buckets = fetch_area_data(55.0, 37.0, routable_highway=["path", "secondary"])
+
+    assert [w["id"] for w in buckets["walkable"]] == [1]
+    assert buckets["highways"] == []
+
+
+def test_fetch_area_data_buckets_secondary_as_highway_under_walk_defaults():
+    ways = [{"type": "way", "id": 1, "tags": {"highway": "secondary"}}]
+    with patch.object(route_graph, "query_overpass", return_value={"elements": ways}):
+        buckets = fetch_area_data(55.0, 37.0)
+
+    assert buckets["walkable"] == []
+    assert [w["id"] for w in buckets["highways"]] == [1]
+
+
+def test_fetch_area_data_reaches_walkable_bucket_for_hard_exclude_and_infra_candidates():
+    ways = [
+        {"type": "way", "id": 1, "tags": {"highway": "steps"}},
+        {"type": "way", "id": 2, "tags": {"highway": "trunk"}},
+    ]
+    with patch.object(route_graph, "query_overpass", return_value={"elements": ways}):
+        buckets = fetch_area_data(
+            55.0, 37.0,
+            hard_exclude_highway=["steps"],
+            exclude_highway_without_infra=["trunk"],
+        )
+
+    # Not asserting buckets["highways"] here: trunk overlaps the fixed
+    # AVOIDANCE_HIGHWAY set too, and whether a trunk way used for bike's
+    # infra-exclusion check should ALSO still land in the highways
+    # avoidance-buffer bucket is a separate design question the task spec
+    # doesn't settle (see task-21-report.md Concerns) — this test only
+    # proves the way reaches filter_excluded_ways instead of being
+    # silently dropped by the fetch itself.
+    walkable_ids = [w["id"] for w in buckets["walkable"]]
+    assert 1 in walkable_ids
+    assert 2 in walkable_ids

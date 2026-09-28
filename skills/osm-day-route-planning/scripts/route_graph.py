@@ -30,18 +30,43 @@ from overpass_query import query_overpass, haversine
 
 RESTRICTED_ACCESS = ("private", "no", "military")
 
+DEFAULT_ROUTABLE_HIGHWAY = ("path", "footway", "track", "residential", "living_street")
+AVOIDANCE_HIGHWAY = ("motorway", "trunk", "primary", "secondary")
 
-def fetch_area_data(lat: float, lon: float, radius_m: int = 2000) -> dict:
+
+def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
+                     routable_highway=None, hard_exclude_highway=None,
+                     exclude_highway_without_infra=None) -> dict:
     """One combined Overpass query for everything build_graph/tag_edges/
     exclusion need: walkable ways, highways (for avoidance), water,
     forest, fields, plus access-restricted ways, military land, barrier
     ways (fence/wall — used to detect enclosed private zones), and
     barrier nodes (gates etc. sitting on a path).
-    Radius-limited on purpose — see reference.md on Overpass timeouts."""
+    Radius-limited on purpose — see reference.md on Overpass timeouts.
+
+    routable_highway/hard_exclude_highway/exclude_highway_without_infra
+    come from the active preset (spec §3.6) — a mode's own routable_highway
+    list (e.g. bike's cycleway/secondary) must be fetched HERE, not just
+    handled later by filter_excluded_ways, or those ways never reach the
+    graph at all. hard_exclude_highway/exclude_highway_without_infra values
+    are ALSO fetched into the walkable candidate set (not excluded from the
+    query) — filter_excluded_ways needs to see a way in order to drop it;
+    leaving those tag values out of the query here would make those preset
+    exclusion rules silently do nothing, since the way they're meant to
+    exclude would never arrive at all. Defaults to walk's original fixed
+    tag list when no preset arguments are given, so an existing no-args
+    call keeps behaving exactly as before."""
+    routable_highway = tuple(routable_highway) if routable_highway else DEFAULT_ROUTABLE_HIGHWAY
+    hard_exclude_highway = tuple(hard_exclude_highway or ())
+    exclude_highway_without_infra = tuple(exclude_highway_without_infra or ())
+    walkable_highway_values = sorted(
+        set(routable_highway) | set(hard_exclude_highway) | set(exclude_highway_without_infra)
+    )
+    walkable_pattern = "|".join(walkable_highway_values)
     ql = f"""
     [out:json][timeout:80];
     (
-      way["highway"~"path|footway|track|residential|living_street"](around:{radius_m},{lat},{lon});
+      way["highway"~"{walkable_pattern}"](around:{radius_m},{lat},{lon});
     )->.walkable;
     (
       way["highway"~"motorway|trunk|primary|secondary"](around:{radius_m},{lat},{lon});
@@ -89,6 +114,7 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000) -> dict:
     """
     result = query_overpass(ql)
     elements = result.get("elements", [])
+    walkable_set = set(walkable_highway_values)
     # Overpass doesn't tag which named set an element came from in this
     # output form, so re-derive category from the element's own tags.
     buckets = {
@@ -108,9 +134,9 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000) -> dict:
         if tags.get("barrier") in ("fence", "wall"):
             buckets["barrier_ways"].append(el)
             continue
-        if tags.get("highway") in ("path", "footway", "track", "residential", "living_street"):
+        if tags.get("highway") in walkable_set:
             buckets["walkable"].append(el)
-        elif tags.get("highway") in ("motorway", "trunk", "primary", "secondary"):
+        elif tags.get("highway") in AVOIDANCE_HIGHWAY:
             buckets["highways"].append(el)
         elif tags.get("natural") == "water" or "waterway" in tags:
             buckets["water"].append(el)

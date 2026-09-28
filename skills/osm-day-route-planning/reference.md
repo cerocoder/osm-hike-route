@@ -91,12 +91,21 @@ own OSM tags are the cheapest source for this.
 
 **Walkable ways + highways + water + forest + fields + access
 restrictions** (graph building): already implemented as
-`route_graph.fetch_area_data(lat, lon, radius_m)`. It fetches all these
+`route_graph.fetch_area_data(lat, lon, radius_m, routable_highway,
+hard_exclude_highway, exclude_highway_without_infra)`. The last three
+arguments come straight from the active preset (spec §3.6) —
+`weights["routable_highway"]`, `weights["hard_exclude_tags"].get("highway",
+[])`, and `weights["exclude_highway_without_infra"]` respectively — and
+control what actually gets fetched into the walkable candidate set;
+omitting them defaults to walk's original fixed tag list
+(`path|footway|track|residential|living_street`). It fetches all these
 categories (including relation-based forest/water multipolygons, and
 everything needed for hard access exclusion — see SKILL.md's Access
 Exclusion section) in one query and buckets them by tag. Use it directly
 rather than re-writing this query by hand; the standalone form below is
-for reference/debugging only, and documents the **restricted-zone** tag
+for reference/debugging only (it also doesn't vary by preset — swap in
+your mode's routable_highway/hard_exclude/infra tag values by hand if
+using it directly for bike), and documents the **restricted-zone** tag
 set completely (`fetch_area_data`'s own restricted bucket also excludes
 `leisure=nature_reserve` and `boundary=protected_area`, not just
 military/private — a broader hard-exclusion than "restricted" might
@@ -129,17 +138,32 @@ route through one failed for some other reason):
 out geom;
 ```
 
-**Known current gap for bike mode**: `fetch_area_data`'s walkable-ways
-filter above (`highway~"path|footway|track|residential|living_street"`) is
-hardcoded and does **not** vary by preset — it does not add `cycleway` ways,
-and does not add `secondary` for `bike-sport` even though both presets'
-`routable_highway` list says they should be routable. In practice this
-means a dedicated cycle path (`highway=cycleway`) or a `bike-sport` route
-along a `secondary` road currently won't appear in the fetched data at all,
-regardless of what the preset says. Until `fetch_area_data` is
-parameterized by `weights["routable_highway"]`, treat `routable_highway` in
-a preset as a statement of intent, not a guarantee — see SKILL.md Common
-Mistakes.
+**Bike-mode routable ways are fetched via preset arguments, not the
+hardcoded default** (fixed after being a known gap): pass
+`weights["routable_highway"]`, `weights["hard_exclude_tags"].get("highway",
+[])`, and `weights["exclude_highway_without_infra"]` to `fetch_area_data`'s
+`routable_highway`/`hard_exclude_highway`/`exclude_highway_without_infra`
+arguments (SKILL.md's pipeline example does this). Skipping these
+arguments silently falls back to walk's fixed tag list — a dedicated cycle
+path (`highway=cycleway`) or a `bike-sport` route along a `secondary` road
+then won't appear in the fetched data at all, regardless of what the
+preset says, so `routable_highway` in a preset is only a guarantee when
+these arguments are actually passed through.
+
+**Side effect worth knowing about**: `hard_exclude_highway` and
+`exclude_highway_without_infra` values are fetched into the *walkable*
+candidate bucket (so `filter_excluded_ways` can see and drop them), which
+takes precedence over the fixed avoidance-highway bucket for any
+overlapping tag value. For bike presets this includes `trunk` and
+`primary` (bike's `exclude_highway_without_infra`) — a `trunk`/`primary`
+way now lands in `walkable` (then gets hard-dropped by
+`filter_excluded_ways` unless it carries a `cycleway` tag) instead of in
+`highways`. That means such a way is **not** available to `tag_edges`'s
+`avoid_near_highway` proximity buffer, so a nearby parallel path currently
+gets no highway-avoidance penalty for running alongside an infra-less
+trunk/primary road that a bike route was excluded from. This is a
+consequence of the fetch/bucket precedence rule as specified, not a bug in
+this fix — flagging it here in case it needs its own follow-up.
 
 **Bike-specific tags used elsewhere in the pipeline** (hard exclusion,
 oneway, and blocking barriers — applied by `filter_excluded_ways`/

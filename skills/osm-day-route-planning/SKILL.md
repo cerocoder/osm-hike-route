@@ -90,12 +90,18 @@ new preset, no code changes).
    for a tier label — every claim shown to the user still goes through the
    Interest-Layer Confidence Tiers below (spec §3.4).
 7. **Fetch area data via Overpass**: `route_graph.fetch_area_data(lat, lon,
-   radius_m)` returns walkable ways, highways (for avoidance), water,
-   forest, fields, plus everything needed for hard exclusion — restricted
-   ways/areas, barrier ways, and barrier nodes — in one query, bucketed by
-   tag. Always fetched, not optional. Pick a radius that covers every
-   access point and interest point you plan to validate next, not just the
-   anchor location.
+   radius_m, routable_highway=weights["routable_highway"],
+   hard_exclude_highway=weights["hard_exclude_tags"].get("highway", []),
+   exclude_highway_without_infra=weights["exclude_highway_without_infra"])`
+   returns walkable ways, highways (for avoidance), water, forest, fields,
+   plus everything needed for hard exclusion — restricted ways/areas,
+   barrier ways, and barrier nodes — in one query, bucketed by tag. The
+   three preset-driven arguments matter: without them, a mode's own
+   routable ways (e.g. bike's `cycleway`) are never fetched at all, and
+   `filter_excluded_ways`'s hard-exclusion/infra rules for highway values
+   have nothing to act on (see reference.md). Always fetched, not
+   optional. Pick a radius that covers every access point and interest
+   point you plan to validate next, not just the anchor location.
 8. **Build restricted polygons**:
    `route_graph.build_restricted_polygons(data["restricted"],
    data["barrier_ways"])`. This must happen **before** waypoint validation
@@ -312,7 +318,12 @@ from route_output import build_geojson
 preset = load_preset(mode, style)                 # e.g. load_preset("bike", "leisure")
 weights = build_weights(preset, preference_overrides, max_distance_km, max_duration_hours)
 
-data = fetch_area_data(lat, lon, radius_m=1500)
+data = fetch_area_data(
+    lat, lon, radius_m=1500,
+    routable_highway=weights["routable_highway"],
+    hard_exclude_highway=weights["hard_exclude_tags"].get("highway", []),
+    exclude_highway_without_infra=weights["exclude_highway_without_infra"],
+)
 restricted = build_restricted_polygons(data["restricted"], data["barrier_ways"])
 walkable = filter_excluded_ways(
     data["walkable"], restricted,
@@ -549,7 +560,7 @@ discard a field already in hand," not an extra query.
 | Constraint | Overpass filter / preset field |
 |---|---|
 | Walkable paths (`walk`) | `highway=path\|footway\|track\|residential\|living_street` |
-| Routable ways (`bike`) | preset's `routable_highway` — adds `cycleway`, and `secondary` for `bike-sport` — **see reference.md's "Known current gap for bike mode": `fetch_area_data` does not yet fetch these itself** |
+| Routable ways (`bike`) | preset's `routable_highway` — adds `cycleway`, and `secondary` for `bike-sport` — passed to `fetch_area_data`'s `routable_highway` argument, or those ways are never fetched at all |
 | Bike hard-exclude | `bicycle=no\|dismount`, `highway=steps` — preset `hard_exclude_tags` |
 | Highway needs cycle infra (bike) | `trunk\|primary` with no `cycleway` tag — preset `exclude_highway_without_infra` |
 | Oneway respected (bike only) | `oneway=yes`, reopened by `oneway:bicycle=no` or `cycleway=opposite*` |

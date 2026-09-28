@@ -442,7 +442,7 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
 
     if resolve_wiki:
         cache_path = geojson_path.parent / "place_info.json"
-        annotate_place_info(geojson, user_lang, local_lang, cache_path)
+        annotate_place_info(geojson, user_lang, local_lang, cache_path, timeout=wiki_timeout)
 
     access_html = ""
     confidence_html = ""

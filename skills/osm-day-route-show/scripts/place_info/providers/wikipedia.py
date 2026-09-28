@@ -101,7 +101,7 @@ class WikiLookupError(Exception):
     """A request to Wikipedia/Wikidata failed or was rate-limited — distinct
     from a clean "no matching article" result. Callers must NOT cache a
     null result on this exception: doing so would permanently poison
-    wiki_links.json with false negatives from a transient rate limit,
+    place_info.json with false negatives from a transient rate limit,
     rather than retrying on the next render (see MIN_REQUEST_INTERVAL —
     this was reproduced in testing: a burst of requests during development
     tripped "You are making too many requests to the API", which is plain

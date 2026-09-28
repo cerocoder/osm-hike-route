@@ -1,4 +1,3 @@
-import json
 from unittest.mock import patch
 
 from place_info.providers.wikidata import WikidataProvider

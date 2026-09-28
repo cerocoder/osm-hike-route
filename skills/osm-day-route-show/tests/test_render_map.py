@@ -1,4 +1,6 @@
-from render_map import lang_priority, t, build_gpx
+import json
+
+from render_map import lang_priority, t, build_gpx, build_map_html
 
 
 def test_lang_priority_orders_user_local_english_deduplicated():
@@ -85,6 +87,39 @@ def test_annotate_place_info_adds_placeinfo_list_to_point_features(tmp_path):
 
     point = geojson["features"][0]
     assert point["properties"]["_placeInfo"] == [{"provider_id": "wikidata", "summary": "источник"}]
+
+
+def test_annotate_place_info_never_constructs_opentripmap_without_key(tmp_path, monkeypatch):
+    """Final-review Fix 1: OpenTripMapProvider must not even be instantiated
+    (let alone queried) when no key is configured — otherwise
+    PlaceInfoService.fetch_all would cache its None result as a permanent
+    negative in place_info.json before a key is ever set, and a later
+    render (once a key IS configured) would stay poisoned by that stale
+    cache entry."""
+    monkeypatch.delenv("OSM_DAY_ROUTE_OPENTRIPMAP_KEY", raising=False)
+    geojson = {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [37.0, 55.0]},
+            "properties": {"name": "Родник", "type": "spring", "osm_id": "node/1"},
+        }],
+    }
+
+    # Mock PlaceInfoService itself too (same pattern as the other
+    # annotate_place_info tests) so the *other* three providers' real
+    # fetch() methods never make live network calls in this suite —
+    # only what's actually under test here (whether OpenTripMapProvider
+    # gets constructed at all) should run for real.
+    with patch("render_map.OpenTripMapProvider") as MockOpenTripMap, \
+         patch("render_map.PlaceInfoService") as MockService:
+        MockService.return_value.fetch_all.return_value = []
+        annotate_place_info(geojson, user_lang="ru", local_lang=None,
+                             cache_path=tmp_path / "place_info.json")
+
+    MockOpenTripMap.assert_not_called()
+    providers_passed = MockService.call_args[0][0]
+    assert len(providers_passed) == 3  # wikipedia, wikidata, wikimedia_commons only
 
 
 def test_annotate_place_info_skips_linestring_features(tmp_path):
@@ -174,3 +209,83 @@ def test_point_popup_includes_all_place_info_entries():
 def test_point_popup_omits_placeinfo_block_when_nothing_found():
     html = point_popup_html({"name": "Точка", "type": "waypoint"})
     assert "_placeInfo" not in html
+
+
+def test_build_map_html_renders_3d_archive_without_crashing(tmp_path):
+    """spec §7: a render-level smoke test, not just per-function unit tests
+    — a full current-schema archive (3D coords, full LineString stats,
+    an interest point, and an access point carrying opening_hours/
+    wikidata/search_names) must render end to end without raising.
+    resolve_wiki=False avoids any live network call, per this project's
+    "no live network access in the automated suite" convention."""
+    geojson = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {"type": "LineString", "coordinates": [
+                    [37.0, 55.0, 100.0], [37.001, 55.001, 110.0], [37.002, 55.002, 105.0],
+                ]},
+                "properties": {
+                    "name": "Тестовый маршрут", "mode": "walk", "style": "leisure",
+                    "distance_km": 8.4, "elevation_gain_m": 220.0, "elevation_loss_m": 210.0,
+                    "duration_estimate_hours": 3.2, "curated_routes_count": 2,
+                    "duration_warning": "может не влезть в световой день",
+                    "skipped_interest_points": ["Дальняя точка"], "is_loop": False,
+                },
+            },
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [37.0005, 55.0005, 105.0]},
+                "properties": {
+                    "name": "Родник", "type": "spring", "tier": "tag-backed",
+                    "note": "рядом брод", "source": "OSM", "osm_id": "node/1",
+                },
+            },
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [37.0, 55.0, 100.0]},
+                "properties": {
+                    "name": "Станция Бажуково", "type": "access", "role": "start",
+                    "opening_hours": "Mo-Su 06:00-23:00", "access_notes": "Билеты у кондуктора.",
+                    "wikidata": "Q3070795", "search_names": {"en": "Bazhukovo Station"},
+                },
+            },
+        ],
+    }
+    geojson_path = tmp_path / "route.geojson"
+    geojson_path.write_text(json.dumps(geojson, ensure_ascii=False), encoding="utf-8")
+
+    html = build_map_html(geojson_path, notes_path=None, title="Test",
+                           user_lang="ru", local_lang=None, resolve_wiki=False)
+
+    assert isinstance(html, str) and html.strip()
+
+
+def test_build_map_html_renders_2d_legacy_archive_without_crashing(tmp_path):
+    """spec §7 render-level smoke test: a minimal pre-this-round archive
+    (2D coordinates only, a LineString with only `name`, a Point with only
+    `name`/`type`) must render without raising, same as the 3D/full-schema
+    case above."""
+    geojson = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {"type": "LineString", "coordinates": [[37.0, 55.0], [37.001, 55.001]]},
+                "properties": {"name": "Старый маршрут"},
+            },
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [37.0005, 55.0005]},
+                "properties": {"name": "Точка", "type": "waypoint"},
+            },
+        ],
+    }
+    geojson_path = tmp_path / "route.geojson"
+    geojson_path.write_text(json.dumps(geojson, ensure_ascii=False), encoding="utf-8")
+
+    html = build_map_html(geojson_path, notes_path=None, title="Test",
+                           user_lang="ru", local_lang=None, resolve_wiki=False)
+
+    assert isinstance(html, str) and html.strip()

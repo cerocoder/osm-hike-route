@@ -1,4 +1,3 @@
-import json
 from unittest.mock import patch
 
 from place_info.providers.wikimedia_commons import WikimediaCommonsProvider

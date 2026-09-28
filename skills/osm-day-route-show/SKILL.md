@@ -144,7 +144,25 @@ Two independent language concerns, handled differently — see `UI_STRINGS`,
   back to English — never left blank. `<html lang="...">` is set to
   `--user-lang` regardless of whether a translation exists for it. Route
   mode labels (`route_stats_html`'s "walking"/"на велосипеде" etc.) follow
-  the same fallback-to-English rule.
+  the same fallback-to-English rule, but only for `en`/`ru` — see the
+  known limitation below.
+  - **Known limitation — the route-stats block is not fully localized**:
+    unlike `UI_STRINGS`' full `en`/`ru`/`es`/`fr`/`de`/`pt`/`it` coverage,
+    `_MODE_LABELS` (the mode name itself, "walking"/"пешком") only has
+    `en` and `ru` entries — any other `--user-lang` falls back to the
+    *English* mode label ("walking"/"cycling"), not a translation (a raw
+    enum value like `"walk"` only surfaces for a mode this table doesn't
+    know at all). Worse, the stats block's own `<h3>Route</h3>` heading
+    and several of `route_stats_html`'s units/phrases are hardcoded
+    English regardless of `--user-lang`: `"Route"`, `"km"`, `"h"`,
+    `"curated routes nearby"`, and `"Not included (over budget)"` — unlike
+    the sidebar's other headings (Getting there, Points of interest,
+    Export & open elsewhere), which do go through `UI_STRINGS`. A user
+    writing in, say, French or Portuguese sees a stats block that mixes
+    their language (most sidebar headings) with English (the stats
+    block's own heading, units, and phrases). This is a known gap, not
+    something to "fix" as part of routine maintenance — flagged here so
+    it isn't mistaken for an oversight.
 - **notes.md section headings**: matched against `SECTION_ALIASES`, a list
   of known headings across several languages *for each concept*
   (`access`, `confidence`) — every alias is tried regardless of
@@ -237,14 +255,22 @@ takes down the others.
 ## Configuration
 
 The `opentripmap` plugin is optional and richer than the other three, but
-needs a free API key. Set it once via the `OSM_DAY_ROUTE_OPENTRIPMAP_KEY`
+needs a free API key. Register for a free key at OpenTripMap's own site
+(opentripmap.io). Set it once via the `OSM_DAY_ROUTE_OPENTRIPMAP_KEY`
 environment variable, or pass it straight through
 `annotate_place_info(..., opentripmap_api_key=...)` when calling the
 renderer as a library rather than via the CLI. **Its absence is not an
 error**: `OpenTripMapProvider.fetch` returns `None` immediately when no
 key is configured (and also degrades to `None`, never an exception, on an
 HTTP 401/403 from a rejected key) — the other three plugins keep running
-and the render completes normally either way.
+and the render completes normally either way. `annotate_place_info` only
+constructs `OpenTripMapProvider` at all when a key is present — without
+one, it's never queried and no `opentripmap|...` entry is ever written to
+`place_info.json`, so configuring a key later and re-rendering queries it
+fresh rather than staying poisoned by a stale cached "no result".
+**The free-tier daily rate limit was not confirmed during development** —
+verify it yourself before relying on this plugin in production use, per
+the design spec's own caveat.
 
 ## Expected GeoJSON Property Schema
 
@@ -323,3 +349,4 @@ tiles).
 - **Letting one broken `place_info` plugin take down the others, or the whole render** — `PlaceInfoService.fetch_all` calls each plugin's `fetch()` inside its own `try/except Exception`, so one plugin's bug (or an `opentripmap` key rejected with HTTP 401/403) degrades to that plugin contributing nothing, not an exception that stops the render or hides the other three plugins' results.
 - **Treating an unresolved Wikidata QID as a match** — a stub or malformed Wikidata item (no sitelinks, or no description in any language this run cares about) must degrade to "no result" inside `wikidata.py`/`wikipedia.py` themselves, not propagate a `KeyError`/`IndexError` up through `PlaceInfoService` and abort the whole point's enrichment.
 - **Writing four separate cache files, one per plugin** — `place_info.json` is the one shared cache for all four plugins and for both interest points and access points; don't reintroduce the old per-source-file pattern (`wiki_links.json`) when adding a fifth plugin later.
+- **Assuming `wikidata`'s/`opentripmap`'s coordinate-only "nearby" match is name-verified like the Wikipedia plugin's** — it is not. `WikidataProvider`, when a point has no `wikidata` QID, falls back to a SPARQL `wikibase:around` search within 0.3 km; `OpenTripMapProvider` *always* (it never receives or caches a QID/xid from a prior lookup) queries its `/radius` endpoint within 300m for whatever the API returns first. Neither checks that the result's name actually matches the point's own name — unlike `resolve_wikipedia`'s fuzzy-title-match-plus-coordinate-verification discipline. This can return a genuinely different nearby feature than the point itself (e.g. a village's own Wikidata entry instead of a spring located within it). `WikidataProvider`'s SPARQL query does order by distance (`ORDER BY ?dist`), so it deterministically picks the *closest* entity within the radius rather than an arbitrary one — a cheap, safe improvement, but still not name verification. `OpenTripMapProvider`'s `/radius` call requests no ordering at all (just `limit=1`), so its result is whatever the API lists first within 300m, not necessarily the closest either. Not a bug to fix reflexively; a known trade-off from the design, flagged here as a follow-up candidate rather than something to silently "improve" mid-task.

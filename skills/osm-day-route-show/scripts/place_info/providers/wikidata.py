@@ -55,9 +55,10 @@ class WikidataProvider(PlaceInfoProvider):
             "SELECT ?item ?itemLabel WHERE { "
             f"SERVICE wikibase:around {{ ?item wdt:P625 ?location . "
             f'bd:serviceParam wikibase:center "Point({lon} {lat})"^^geo:wktLiteral . '
-            'bd:serviceParam wikibase:radius "0.3" . } '
+            'bd:serviceParam wikibase:radius "0.3" . '
+            'bd:serviceParam wikibase:distance ?dist . } '
             f'SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{self.user_lang},en" . }} '
-            "} LIMIT 1"
+            "} ORDER BY ?dist LIMIT 1"
         )
         url = _SPARQL_URL + "?" + urllib.parse.urlencode({"query": query, "format": "json"})
         try:

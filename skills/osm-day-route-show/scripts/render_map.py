@@ -12,24 +12,21 @@ the access-point / confidence-tier sidebar). Default output is
 <route_dir>/map.html.
 
 --user-lang is the language the person is writing in (drives all UI
-chrome text and is first in the Wikipedia-language priority list).
---local-lang is the place's local/official language (second priority,
-and the language geosearch/name-matching runs in by default). English
-is always the final fallback for both UI text and Wikipedia links.
-Point names are NEVER translated for display — only used, verbatim or
-via an optional per-point `search_names` override, to search a given
+chrome text and is first in the place-info language priority list used
+by the Wikipedia/Wikidata plugins). --local-lang is the place's
+local/official language (second priority, and the language
+geosearch/name-matching runs in by default). English is always the
+final fallback for both UI text and place-info results. Point names
+are NEVER translated for display — only used, verbatim or via an
+optional per-point `search_names` override, to search a given
 Wikipedia language edition.
 """
 import argparse
-import difflib
 import json
 import math
 import re
 import sys
-import unicodedata
-import urllib.error
 import urllib.parse
-import urllib.request
 from dataclasses import asdict
 from pathlib import Path
 
@@ -341,19 +338,13 @@ def markdown_to_html(md_text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Wikipedia link resolution
-#
-# Never guess from a bare name search + nearest-hit: inside a park, the
-# nearest article to almost any point is the park's own article. A candidate
-# is only accepted if its title actually matches the point's name (fuzzy,
-# accent/case/quote-insensitive). Preferred source order:
-#   1. `wikidata` property on the point (OSM-curated QID) -> sitelinks.
-#   2. `wikipedia` property ("lang:Title", OSM-curated) -> langlinks.
-#   3. Coordinate + name search (CirrusSearch nearcoord) in the local
-#      language edition, verified by name match, then langlinks from there.
-# Display names are never translated; `search_names` (optional, per-point,
-# {lang: translated-name}) is the only place a translation may be used, and
-# only to query a specific-language Wikipedia edition.
+# Place-info enrichment (spec §5): queries every configured plugin
+# (Wikipedia, Wikidata, Wikimedia Commons, OpenTripMap — see
+# scripts/place_info/providers/) for every point and attaches every
+# non-empty result. The Wikipedia-specific name-match/coordinate-
+# verification discipline ("never guess from a bare name search +
+# nearest-hit") now lives in providers/wikipedia.py's own docstring and
+# resolve_wikipedia(), not here.
 # ---------------------------------------------------------------------------
 
 
@@ -369,8 +360,14 @@ def annotate_place_info(geojson: dict, user_lang: str, local_lang: str | None,
         WikipediaProvider(user_lang, local_lang, timeout),
         WikidataProvider(user_lang, timeout),
         WikimediaCommonsProvider(timeout=timeout),
-        OpenTripMapProvider(api_key, timeout=timeout),
     ]
+    if api_key:
+        # Only constructed/queried once a key is configured — otherwise
+        # PlaceInfoService.fetch_all would cache OpenTripMapProvider's
+        # `None` as a permanent negative in place_info.json before the key
+        # ever exists, permanently disabling it even after one is added
+        # later (see final-review Fix 1).
+        providers.append(OpenTripMapProvider(api_key, timeout=timeout))
     service = PlaceInfoService(providers, cache_path) if cache_path else PlaceInfoService(providers, Path("/dev/null"))
 
     for feature in geojson.get("features", []):
@@ -467,7 +464,10 @@ def _route_title(geojson: dict, fallback: str) -> str:
     transliterated slug."""
     for f in geojson.get("features", []):
         if f["geometry"]["type"] == "LineString":
-            name = f.get("properties", {}).get("name")
+            # `properties` may be null (valid GeoJSON) as well as missing —
+            # `.get("properties", {})` alone only covers the missing case,
+            # since a present-but-null value isn't replaced by the default.
+            name = (f.get("properties") or {}).get("name")
             if name:
                 return name
     return fallback
@@ -489,9 +489,9 @@ def point_popup_html(properties: dict) -> str:
         if entry.get("summary"):
             bits.append(_xml_escape(entry["summary"]))
         if entry.get("url"):
-            bits.append(f'<a href="{entry["url"]}" target="_blank" rel="noopener">{entry["url"]}</a>')
+            bits.append(f'<a href="{entry["url"]}" target="_blank" rel="noopener">link</a>')
         if entry.get("image_url"):
-            bits.append(f'<a href="{entry["image_url"]}" target="_blank" rel="noopener">{entry["image_url"]}</a>')
+            bits.append(f'<a href="{entry["image_url"]}" target="_blank" rel="noopener">photo</a>')
         parts.append(f"<p>{' — '.join(bits)}</p>")
     return "".join(parts)
 
@@ -500,6 +500,11 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
                     user_lang: str = "en", local_lang: str | None = None,
                     resolve_wiki: bool = True, wiki_timeout: float = 5.0) -> str:
     geojson = json.loads(geojson_path.read_text(encoding="utf-8"))
+    # Valid GeoJSON allows "properties": null or a missing key entirely;
+    # normalize every feature's properties to a dict up front so every
+    # downstream `.get()`/indexing on `properties` sees a dict, never None.
+    for f in geojson.get("features", []):
+        f["properties"] = f.get("properties") or {}
 
     if resolve_wiki:
         cache_path = geojson_path.parent / "place_info.json"
@@ -523,7 +528,11 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
         if feature["geometry"]["type"] == "Point":
             feature["properties"]["_popupExtra"] = point_popup_html(feature["properties"])
 
-    geojson_json = json.dumps(geojson)
+    # Escape "</" so a provider's free-text summary containing a literal
+    # "</script>" can't end this inline <script> tag early and break the
+    # whole page's JS (map, arrows, popups). \/ and / are equivalent in a
+    # JSON string, so this doesn't change the parsed meaning.
+    geojson_json = json.dumps(geojson).replace("</", "<\\/")
 
     gpx_content = build_gpx(geojson, title)
     gpx_data_uri = "data:application/gpx+xml;charset=utf-8," + urllib.parse.quote(gpx_content)
@@ -539,7 +548,6 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
         f'<a href="{osm_url}" target="_blank" rel="noopener">{t("open_osm", user_lang)}</a>'
         "</div>"
     )
-    wikipedia_label_js = json.dumps(t("wikipedia", user_lang))
     type_labels, tier_labels = _localized_label_maps(user_lang)
     type_labels_js = json.dumps(type_labels, ensure_ascii=False)
     tier_labels_js = json.dumps(tier_labels, ensure_ascii=False)
@@ -584,7 +592,6 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
 <script src="{LEAFLET_JS}"></script>
 <script>
   const data = {geojson_json};
-  const WIKIPEDIA_LABEL = {wikipedia_label_js};
   const TYPE_LABELS = {type_labels_js};
   const TIER_LABELS = {tier_labels_js};
   // Known Leaflet/Chromium-on-Linux issue: tiles can flash/disappear during
@@ -722,9 +729,11 @@ def main():
     parser.add_argument("--local-lang", default=None,
                          help="ISO 639-1 code of the route location's local/official language")
     parser.add_argument("--no-wikipedia", action="store_true",
-                         help="skip Wikipedia link resolution (offline / faster)")
+                         help="skip all place-info enrichment (Wikipedia, Wikidata, "
+                              "Wikimedia Commons, OpenTripMap) for offline / faster renders")
     parser.add_argument("--wiki-timeout", type=float, default=5.0,
-                         help="per-request timeout in seconds for Wikipedia/Wikidata lookups")
+                         help="per-request timeout in seconds, shared by all four "
+                              "place-info plugins")
     args = parser.parse_args()
 
     route_dir = Path(args.route_dir)

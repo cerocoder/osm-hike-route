@@ -1,0 +1,19 @@
+{
+  "mode": "walk",
+  "routable_highway": ["path", "footway", "track", "residential", "living_street"],
+  "hard_exclude_tags": { "foot": ["no"] },
+  "exclude_highway_without_infra": [],
+  "blocking_barrier_tags": [],
+  "buffers_m": { "highway": 50, "water": 30 },
+  "preferences": {
+    "prefer_forest": 1.5,
+    "avoid_open_field": 2.0,
+    "avoid_near_highway": 3.0,
+    "avoid_near_water": 2.0,
+    "avoid_steep_gradient": 2.0
+  },
+  "gradient_threshold_pct": 12,
+  "pace_kmh": 4.5,
+  "ascent_minutes_per_100m": 12,
+  "duration_warning_hours": 10
+}

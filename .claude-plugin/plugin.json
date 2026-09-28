@@ -1,0 +1,5 @@
+{
+  "name": "osm-day-route",
+  "description": "Plan and visualize one-day walking/cycling routes using OpenStreetMap data.",
+  "version": "0.1.0"
+}

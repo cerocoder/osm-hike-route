@@ -78,6 +78,22 @@ def route_length_m(elements) -> float:
     return total
 
 
+def build_curated_routes_query(lat: float, lon: float, radius_m: int, route_tags: list[str]) -> str:
+    """spec §3.10 — walk passes route_tags=['hiking','foot'], bike passes
+    ['bicycle','mtb']. Geometry is never used, only the count, so this
+    query only asks Overpass to count, not to return full geometry."""
+    tags_pattern = "|".join(route_tags)
+    return f"""
+    [out:json][timeout:25];
+    relation["route"~"{tags_pattern}"](around:{radius_m},{lat},{lon});
+    out count;
+    """
+
+
+def count_curated_routes(result: dict) -> int:
+    return sum(1 for el in result.get("elements", []) if el.get("type") == "relation")
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python3 overpass_query.py '<overpass QL query>'", file=sys.stderr)

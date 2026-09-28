@@ -20,7 +20,7 @@ for Wikiloc/Garmin import) and links to open the same area in Google
 Maps and OpenStreetMap.
 
 **Languages:** the page's own chrome text (sidebar headings, export
-labels, the "Wikipedia" link word) is localized to the language the
+labels, route mode labels) is localized to the language the
 person is writing in, falling back to English for any language not in
 the small built-in translation table — see **Languages & Localization**.
 Point names are shown exactly as given in `route.geojson`, never
@@ -133,9 +133,13 @@ Two independent language concerns, handled differently — see `UI_STRINGS`,
 `SECTION_ALIASES`, and the `place_info` plugins in `render_map.py` /
 `scripts/place_info/`:
 
-- **Page chrome** (`--user-lang`): sidebar headings, export-section link
-  text, and the "Wikipedia" popup label are looked up in a small built-in
-  table (`UI_STRINGS`) covering `en`/`ru`/`es`/`fr`/`de`/`pt`/`it`. Any
+- **Page chrome** (`--user-lang`): sidebar headings and export-section
+  link text are looked up in a small built-in
+  table (`UI_STRINGS`) covering `en`/`ru`/`es`/`fr`/`de`/`pt`/`it`. Point
+  popups' place-info entries are labeled with their raw plugin/provider id
+  (`"wikipedia"`, `"wikidata"`, `"wikimedia_commons"`, `"opentripmap"`) —
+  not localized — since a point can show multiple sources at once and
+  per-source localized labels aren't implemented for this round. Any
   other language, or any individual key missing for a listed one, falls
   back to English — never left blank. `<html lang="...">` is set to
   `--user-lang` regardless of whether a translation exists for it. Route
@@ -182,18 +186,19 @@ shared `PlaceInfoProvider`/`PlaceInfoResult` interface
    1. **`wikidata` property** (a QID copied from OSM) → Wikidata's
       sitelinks → the first of `[user_lang, local_lang, en]` that has
       one. Trusted without further verification — it's a curated
-      cross-reference, not a guess.
-   2. **`wikipedia` property** (OSM's own `"lang:Title"` tag) → that
-      article's langlinks → same priority order. Also trusted as-is.
-   3. **Coordinate + name search**, only when neither tag is present:
+      cross-reference, not a guess. This is currently the only curated
+      (tag-based) path the plugin actually reaches — see the Common
+      Mistakes note about the `wikipedia` tag below.
+   2. **Coordinate + name search**, when no `wikidata` QID is present:
       search the local-language Wikipedia (CirrusSearch `nearcoord:`,
-      then plain `geosearch` as a fallback) using the point's name (or
-      its `search_names` override for that language), then **require
-      both** a fuzzy title match against the query name and the
+      then plain `geosearch` as a fallback) using the point's name, then
+      **require both** a fuzzy title match against the query name and the
       candidate article's own `prop=coordinates` landing within 5 km of
       the point, and reject disambiguation pages. If nothing verifies in
       the local language, the same check is tried once more directly
-      against English Wikipedia before giving up.
+      against English Wikipedia before giving up. A `search_names`
+      override for the *primary* search language (`local_lang` or
+      `user_lang`) is not currently honored — see Common Mistakes.
 2. **`wikidata`** (`providers/wikidata.py`) — a short description in
    `user_lang` (falling back to English) for the point's own `wikidata`
    QID when present, or a SPARQL `wikibase:around` nearby-entity search
@@ -214,8 +219,14 @@ cached. Written incrementally, after each new result, not only at the
 end of the run — a multi-point run against a slow/rate-limited API can
 run long enough to be killed by the caller's own timeout, and an
 end-of-function-only write would lose every resolution from that run,
-not just the unfinished one. Pass `--no-wikipedia` to skip all plugins
-(offline, or when the existing cache is good enough).
+not just the unfinished one. `--no-wikipedia` skips place-info enrichment
+entirely — `annotate_place_info` is never called, so no plugin runs, the
+cache file is never even read, and no point gets a `_placeInfo` list —
+useful for a fully offline render or when you don't want any enrichment
+at all. It is **not** the way to "reuse an existing cache": running
+*without* the flag already does that automatically (a cached entry means
+zero network calls but `_placeInfo` still gets populated from
+`place_info.json`).
 
 **Fault isolation**: `PlaceInfoService.fetch_all` wraps each plugin's
 `fetch()` call in its own `try/except` — if exactly one plugin raises an
@@ -250,9 +261,9 @@ Point features render richer popups when they carry:
 | `access_notes` (access points) | Shown verbatim in the popup, when present, via `point_popup_html` — right below `opening_hours` |
 | `source` | Shown in italics (citation for web-sourced claims) |
 | `osm_id` | Stable identity for the place-info cache key (`"node/12345"` etc.) — without it, the cache keys off name+coordinates, which shifts if either is edited later |
-| `wikidata` | A QID (`"Q3070795"`) copied from the source OSM element's own `wikidata` tag, when present — the most reliable source for both the `wikipedia` and `wikidata` plugins; see **Place Info** |
-| `wikipedia` | An OSM-style `"lang:Title"` string copied from the source element's own `wikipedia` tag, when present and no `wikidata` tag exists |
-| `search_names` | `{lang: name}` — only needed when the point's given `name` isn't in the language you'd want to search a *specific* Wikipedia edition in (e.g. a Russian-language point name for a landmark whose home wiki is French). The display name is never affected; this is search-only. Most points won't need this. |
+| `wikidata` | A QID (`"Q3070795"`) copied from the source OSM element's own `wikidata` tag, when present — the curated, most reliable source for both the `wikipedia` and `wikidata` plugins; see **Place Info** |
+| `wikipedia` | An OSM-style `"lang:Title"` string copied from the source element's own `wikipedia` tag, when present. **Not currently consulted** by the `wikipedia` plugin (see Common Mistakes) — kept on the schema for forward compatibility and because `osm-day-route-planning` still writes it when available. |
+| `search_names` | `{lang: name}` — only needed when the point's given `name` isn't in the language you'd want to search a *specific* Wikipedia edition in (e.g. a Russian-language point name for a landmark whose home wiki is French). The display name is never affected; this is search-only. An override for the *primary* search language (`local_lang` or `user_lang`) is not currently honored — see Common Mistakes. Most points won't need this. |
 
 The `LineString` (route) feature's own `properties` drive the sidebar's
 route-stats block (`route_stats_html`) — all optional, all degrading
@@ -299,12 +310,14 @@ tiles).
 - **Rendering notes.md text raw** — dumping the extracted section straight into `<pre>` shows literal `[text](url)`/`**bold**` syntax instead of a clickable link/bold text; always go through `markdown_to_html`.
 - **Converting markdown before HTML-escaping the source text** — do it in that order (`markdown_to_html` escapes first, then layers on real tags): escaping after conversion would mangle the `<a>`/`<b>`/`<code>` tags you just created.
 - **Only handling `- ` bullets in notes.md** — a `1. `/`2. `/`3. ` numbered list collapses into one giant run-on `<li>` if the parser only recognizes dash bullets; `markdown_to_html` matches `_LIST_MARKER` (`-\s+` or `\d+\.\s+`) for exactly this reason, reproduced with this skill's own generated notes.md.
-- **Trusting a Wikipedia name match without verifying coordinates** — reproduced twice in testing: a disambiguation page ("Пирамида") matched a point named exactly "Пирамида" because the title equality check alone doesn't know it's a disambig page; a same-named rock 48 km away ("Дыроватый Камень") matched via `nearcoord:`-filtered search, which turned out to boost proximity rather than strictly enforce it. Always confirm via `prop=coordinates` (within ~5 km) and reject disambiguation pages (`pageprops.disambiguation`) before accepting a search-based match — see `_verified_by_coords` in `providers/wikipedia.py`. `wikidata`/`wikipedia`-tag-sourced links skip this check because they're OSM-curated, not name-guessed.
+- **Trusting a Wikipedia name match without verifying coordinates** — reproduced twice in testing: a disambiguation page ("Пирамида") matched a point named exactly "Пирамида" because the title equality check alone doesn't know it's a disambig page; a same-named rock 48 km away ("Дыроватый Камень") matched via `nearcoord:`-filtered search, which turned out to boost proximity rather than strictly enforce it. Always confirm via `prop=coordinates` (within ~5 km) and reject disambiguation pages (`pageprops.disambiguation`) before accepting a search-based match — see `_verified_by_coords` in `providers/wikipedia.py`. A `wikidata`-tag-sourced link skips this check because it's OSM-curated, not name-guessed.
 - **Caching a rate-limited/failed Wikipedia lookup as "no article exists"** — a plain `except Exception: return []` around the API call turns a 429 or a non-JSON error body into an indistinguishable empty result, and caching that permanently loses the point's real link. `resolve_wikipedia` distinguishes this case by raising `WikiLookupError` rather than returning `(None, None)` for a genuine failure — but note that `WikipediaProvider.fetch` currently catches `WikiLookupError` and returns `None` just like a confirmed "no article", and `PlaceInfoService.fetch_all` then caches that `None` in `place_info.json` the same as any other empty result. In practice this means a rate-limited/offline run **does** get permanently cached as "no result" today, the same failure mode the original design set out to avoid — the fix, if revisited, is for `PlaceInfoService` to only cache a provider's `None` when it's a confirmed empty result, not an error; until then, delete the affected `place_info.json` entries (or the whole file) after an offline/rate-limited run to force a retry.
 - **Hand-building a `file://` URL from a path** — `f"file://{path}"` doesn't percent-encode spaces or non-ASCII (e.g. Cyrillic archive slugs); use `Path(...).resolve().as_uri()`.
 - **Writing the place-info cache only once at the end of a run** — a multi-point run against a slow/rate-limited API can run long enough to be killed by the caller's own timeout (reproduced: a 170s wrapper killed a run doing the merged search+geosearch calls), and an end-of-function-only write loses every resolution from that run, not just the unfinished one. `place_info.cache.save_entry` writes `place_info.json` after each new resolution instead.
 - **Gating the token-subset name-match by character-length ratio, same as the plain substring check** — a real disambiguated title can be much longer than the query purely because its qualifier is a multi-word region name ("Свердловская область"), which fails a length-ratio gate despite being a correct match with few *extra tokens*. Gate the token-subset path by extra-token count instead (`max_extra_tokens`), not character length — reproduced with "Большой Провал" failing to match "Большой карстовый провал (Свердловская область)" under a length-ratio-only gate.
-- **A river/lake/long linear feature's own Wikipedia coordinate is usually its mouth, source, or some other single reference point** — `_verified_by_coords`'s 5 km radius will legitimately reject the correct article for a point sampled somewhere along its middle course. Known limitation, not a bug to chase: a `wikidata`/`wikipedia` tag on the source OSM way (bypasses the coordinate check entirely) is the real fix, not a wider radius.
+- **A river/lake/long linear feature's own Wikipedia coordinate is usually its mouth, source, or some other single reference point** — `_verified_by_coords`'s 5 km radius will legitimately reject the correct article for a point sampled somewhere along its middle course. Known limitation, not a bug to chase: a `wikidata` tag on the source OSM way (bypasses the coordinate check entirely) is the real fix, not a wider radius.
+- **An OSM `wikipedia=lang:Title` tag on a point is NOT currently consulted by the Wikipedia plugin** — only a `wikidata` QID is. `WikipediaProvider.fetch` builds a synthetic feature containing just `name`/`wikidata`/`search_names`; the `wikipedia` tag never reaches it, even though the underlying `resolve_wikipedia` function still contains logic for it. A known limitation, not something to rely on — if a point only has a `wikipedia` tag and no `wikidata` QID, it falls through to the coordinate+name search path instead.
+- **`search_names` overrides for the primary search language (`local_lang` or `user_lang`) are silently ignored** — `annotate_place_info` unconditionally overwrites that language's entry with the point's plain display name (`names = {**names, (local_lang or user_lang): props["name"]}`) before any plugin sees it, so an override supplied for that specific language never reaches `WikipediaProvider.fetch`. Overrides for *other* languages (e.g. an English-only override when the primary search language is Russian) do still work. A known gap, not a bug to work around by expecting the primary-language override to take effect.
 - **Unpacking `route.geojson` coordinates as a fixed 2-tuple** — the current schema (spec §3.11) allows a 3D `[lon, lat, ele]` array; `for lon, lat in coords` raises `ValueError: too many values to unpack` the first time a 3D archive is rendered. `build_gpx`, `bbox_center_zoom`, and the point-rendering code all destructure only the first two elements (`lon, lat = coord[0], coord[1]`) and read a possible third element separately, so both 2D and 3D archives render without exceptions.
 - **Assuming a pre-this-round archive (2D coordinates, no `mode`/`style`/place-info-eligible properties) will crash the renderer** — it must not. `route_stats_html` treats every stat property as optional (missing `mode` renders as `"walk"`), `build_gpx` treats the third coordinate as optional, and a Point with no `wikidata`/`wikipedia`/`osm_id` still gets a cache key derived from its name and coordinates — verify this by hand against a hand-crafted minimal fixture before considering a render "done" for an old archive.
 - **Letting one broken `place_info` plugin take down the others, or the whole render** — `PlaceInfoService.fetch_all` calls each plugin's `fetch()` inside its own `try/except Exception`, so one plugin's bug (or an `opentripmap` key rejected with HTTP 401/403) degrades to that plugin contributing nothing, not an exception that stops the render or hides the other three plugins' results.

@@ -12,6 +12,7 @@ class TileProviderPlugin:
     max_zoom: int
     max_native_zoom: int | None
     always_available: bool = False
+    min_body_bytes: int = 256  # match probe.py's _MIN_BODY_BYTES; override per-provider when needed
 
     def covers(self, points: list[tuple[float, float]], timeout: float = 5.0) -> bool | None:
         """`points` is a list of (lat, lon). True immediately, with no
@@ -30,7 +31,8 @@ class TileProviderPlugin:
         if not points:
             return False
         results = [
-            probe_tile(self.tile_url_template, lat, lon, TILE_PROBE_ZOOM, timeout)
+            probe_tile(self.tile_url_template, lat, lon, TILE_PROBE_ZOOM, timeout,
+                       min_body_bytes=self.min_body_bytes)
             for lat, lon in points
         ]
         if any(r is None for r in results):

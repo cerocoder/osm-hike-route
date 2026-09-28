@@ -50,6 +50,16 @@ def test_probe_tile_none_on_incomplete_read_never_raises():
         assert probe_tile("https://example.org/{z}/{x}/{y}.png", 40.0, -3.0, 15, 5.0) is None
 
 
+def test_probe_tile_min_body_bytes_is_overridable_per_call():
+    """Pins the exact behavior IGN's raised threshold depends on: a
+    2000-byte body (IGN's observed placeholder size range) passes the
+    default 256B floor but must fail once a caller raises the bar."""
+    with patch("tile_providers.probe._fetch", return_value=(200, "image/jpeg", b"x" * 2000)):
+        assert probe_tile("https://example.org/{z}/{x}/{y}.png", 40.0, -3.0, 15, 5.0) is True
+        assert probe_tile("https://example.org/{z}/{x}/{y}.png", 40.0, -3.0, 15, 5.0,
+                           min_body_bytes=5000) is False
+
+
 def test_probe_tile_formats_url_with_z_x_y():
     captured = {}
 

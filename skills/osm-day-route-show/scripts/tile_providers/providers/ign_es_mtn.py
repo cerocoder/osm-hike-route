@@ -21,31 +21,30 @@ class IgnEsMtnProvider(TileProviderPlugin):
     max_zoom = 19
     max_native_zoom = 19
     always_available = False
+    # IGN's own placeholder ("no data") response for a point outside Spain
+    # can be nearly 2KB (observed: Lisbon 1920B, Toulouse 1672B) — well
+    # above the generic 256B floor other providers use. A real MTN tile is
+    # ~19KB+. This provider-specific threshold is the actual precision
+    # check; the bbox below is only a cheap pre-filter to skip a network
+    # call for points nowhere near Western Europe.
+    min_body_bytes = 5000
 
-    # Rough bounding boxes (lat_min, lon_min, lat_max, lon_max): mainland
-    # Spain + Balearics + Ceuta/Melilla, and separately the Canary Islands.
-    # IGN's MTN layer has no real data outside Spain and serves a blank
-    # beige placeholder tile there that still returns HTTP 200 with a
-    # plausible image/jpeg body — a live final-review check caught this
-    # (Moscow/Paris/Lisbon all falsely "covered" before this pre-check
-    # existed). This geography check avoids a network round-trip for the
-    # common case AND fixes the false-positive the generic body-size
-    # threshold in probe.py could not reliably catch.
-    _SPAIN_BBOXES = [
-        (35.0, -9.5, 44.0, 4.5),
-        (27.0, -18.5, 29.5, -13.0),
-    ]
+    # Generous "roughly Western Europe / North Africa" pre-filter — wide
+    # enough to include Portugal and southern France on purpose (a
+    # rectangle cannot cleanly separate Spain from Portugal, whose border
+    # is irregular; the min_body_bytes threshold above is what actually
+    # distinguishes real Spain coverage from a placeholder within this
+    # region), narrow enough to skip a pointless network call for a point
+    # nowhere close (Moscow, most of the world).
+    _WESTERN_EUROPE_BBOX = (27.0, -19.0, 44.5, 5.0)  # (lat_min, lon_min, lat_max, lon_max)
+    # Canary Islands (roughly lat 27.6-29.5, lon -18.2 to -13.4) fall
+    # within the box above, so a single box suffices here — unlike the
+    # previous, tighter Spain-only version which needed two.
 
     def covers(self, points, timeout=5.0):
         if not points:
             return False
-        if not all(self._in_spain(lat, lon) for lat, lon in points):
+        lat_min, lon_min, lat_max, lon_max = self._WESTERN_EUROPE_BBOX
+        if not all(lat_min <= lat <= lat_max and lon_min <= lon <= lon_max for lat, lon in points):
             return False
         return super().covers(points, timeout)
-
-    @classmethod
-    def _in_spain(cls, lat, lon):
-        return any(
-            lat_min <= lat <= lat_max and lon_min <= lon <= lon_max
-            for lat_min, lon_min, lat_max, lon_max in cls._SPAIN_BBOXES
-        )

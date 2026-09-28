@@ -33,14 +33,21 @@ def _fetch(url: str, timeout: float) -> tuple[int, str, bytes]:
         return resp.status, resp.headers.get("Content-Type", ""), resp.read()
 
 
-def probe_tile(url_template: str, lat: float, lon: float, zoom: int, timeout: float) -> bool | None:
+def probe_tile(url_template: str, lat: float, lon: float, zoom: int, timeout: float,
+                min_body_bytes: int = _MIN_BODY_BYTES) -> bool | None:
     """One tile fetch at (lat, lon, zoom). Returns True when the response
     is confirmed real image content, False when the response is confirmed
     NOT real coverage (wrong content-type or a too-small/placeholder
     body), and None when the probe itself failed (network/DNS/timeout/
     HTTP error) — a None result is inconclusive and callers must not
     cache it as "no coverage": the next render should retry rather than
-    stay stuck on a transient failure."""
+    stay stuck on a transient failure.
+
+    min_body_bytes is provider-overridable — most providers use the
+    module default, but a provider whose "no data" placeholder response
+    is unusually large (IGN España's placeholder can be nearly 2KB)
+    needs a higher threshold to reliably distinguish it from real
+    coverage."""
     x, y = latlon_to_tile(lat, lon, zoom)
     url = url_template.format(z=zoom, x=x, y=y)
     try:
@@ -49,4 +56,4 @@ def probe_tile(url_template: str, lat: float, lon: float, zoom: int, timeout: fl
         return None
     if status != 200:
         return None
-    return content_type.startswith("image/") and len(body) >= _MIN_BODY_BYTES
+    return content_type.startswith("image/") and len(body) >= min_body_bytes

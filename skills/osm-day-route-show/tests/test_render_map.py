@@ -289,3 +289,57 @@ def test_build_map_html_renders_2d_legacy_archive_without_crashing(tmp_path):
                            user_lang="ru", local_lang=None, resolve_wiki=False)
 
     assert isinstance(html, str) and html.strip()
+
+
+from render_map import _tile_coverage_points
+
+
+def _geojson_with_access_and_interest_points():
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {"type": "Feature",
+             "geometry": {"type": "LineString", "coordinates": [[37.0, 55.0], [37.001, 55.001]]},
+             "properties": {"name": "Route"}},
+            {"type": "Feature",
+             "geometry": {"type": "Point", "coordinates": [37.0, 55.0]},
+             "properties": {"type": "access", "name": "Start"}},
+            {"type": "Feature",
+             "geometry": {"type": "Point", "coordinates": [37.001, 55.001]},
+             "properties": {"type": "access", "name": "End"}},
+            {"type": "Feature",
+             "geometry": {"type": "Point", "coordinates": [37.0005, 55.0005]},
+             "properties": {"type": "interest", "name": "Spring"}},
+        ],
+    }
+
+
+def test_tile_coverage_points_prefers_access_points():
+    points = _tile_coverage_points(_geojson_with_access_and_interest_points())
+    assert set(points) == {(55.0, 37.0), (55.001, 37.001)}
+
+
+def test_tile_coverage_points_falls_back_to_interest_points_when_no_access():
+    geojson = _geojson_with_access_and_interest_points()
+    for f in geojson["features"]:
+        if f["geometry"]["type"] == "Point" and f["properties"]["type"] == "access":
+            f["properties"]["type"] = "waypoint"  # neither access nor interest
+
+    points = _tile_coverage_points(geojson)
+
+    assert points == [(55.0005, 37.0005)]
+
+
+def test_tile_coverage_points_empty_when_no_access_or_interest_points():
+    """Review Focus: a legacy LineString-only archive must not crash —
+    empty result means 'skip probing', handled by TileProviderService."""
+    geojson = {
+        "type": "FeatureCollection",
+        "features": [
+            {"type": "Feature",
+             "geometry": {"type": "LineString", "coordinates": [[37.0, 55.0], [37.001, 55.001]]},
+             "properties": {"name": "Old route"}},
+        ],
+    }
+
+    assert _tile_coverage_points(geojson) == []

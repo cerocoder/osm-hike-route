@@ -437,6 +437,29 @@ def build_gpx(geojson: dict, title: str) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# Tile providers
+# ---------------------------------------------------------------------------
+
+def _tile_coverage_points(geojson: dict) -> list[tuple[float, float]]:
+    """(lat, lon) points used to probe tile-provider coverage: access
+    points if any exist, else interest points, else empty (design spec:
+    Coverage point selection — an empty result means TileProviderService
+    skips probing entirely and offers only always_available providers)."""
+    access, interest = [], []
+    for f in geojson.get("features", []):
+        if f["geometry"]["type"] != "Point":
+            continue
+        coord = f["geometry"]["coordinates"]
+        lat, lon = coord[1], coord[0]
+        ptype = (f.get("properties") or {}).get("type")
+        if ptype == "access":
+            access.append((lat, lon))
+        elif ptype == "interest":
+            interest.append((lat, lon))
+    return access or interest
+
+
 def bbox_center_zoom(geojson: dict) -> tuple[float, float, int]:
     """Rough center + zoom for external map links (Google/OSM) — an
     approximation for landing roughly on the right area, not a precise

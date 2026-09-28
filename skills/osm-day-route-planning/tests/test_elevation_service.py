@@ -104,25 +104,21 @@ def test_get_elevations_does_not_crash_when_last_provider_raises(tmp_path):
     assert result == [None]
 
 
-def test_get_elevations_rate_limits_per_provider(tmp_path):
-    """Rate limiting is per-provider: different providers have independent rate limits."""
-    # Provider p1 with very low rate limit (1 call per second)
-    # Provider p2 with very high rate limit (100 calls per second)
-    p1 = _FakeProvider("p1", rate_limit_per_sec=1.0, responses={(1.0, 1.0): 100.0})
-    p2 = _FakeProvider("p2", rate_limit_per_sec=100.0, responses={(2.0, 2.0): 200.0})
-    service = ElevationService([p1, p2], cache_path=tmp_path / "elevation.json")
+def test_respect_rate_limit_tracks_per_provider_id_independently(tmp_path):
+    """Two different providers, each called once, must not rate-limit each
+    other — only repeat calls to the SAME provider_id should trigger a
+    sleep. This is the one behavior that distinguishes correct per-provider
+    scoping from an (incorrect) single global rate limiter."""
+    service = ElevationService([], cache_path=tmp_path / "elevation.json")
+    provider_a = _FakeProvider("a", rate_limit_per_sec=1.0)
+    provider_b = _FakeProvider("b", rate_limit_per_sec=1.0)
 
-    with patch("elevation.time.sleep") as mock_sleep:
-        # Call p1 twice in quick succession (should sleep ~1 sec between)
-        service.get_elevations([(1.0, 1.0)])
-        service.get_elevations([(1.0, 1.0)])
-        # Call p2 twice in quick succession (should NOT sleep, high rate limit)
-        service.get_elevations([(2.0, 2.0)])
-        service.get_elevations([(2.0, 2.0)])
+    with patch("time.sleep") as mock_sleep:
+        service._respect_rate_limit(provider_a)  # first call ever for 'a'
+        service._respect_rate_limit(provider_b)  # first call ever for 'b' — different id, must not sleep
+    mock_sleep.assert_not_called()
 
-        # p1 should have slept once (between two calls) with ~1.0 second interval
-        # p2 should have not slept (high rate limit)
-        sleep_calls = mock_sleep.call_args_list
-        # Filter to calls that look like rate-limit sleeps (roughly 1.0 second)
-        p1_sleeps = [call for call in sleep_calls if abs(call[0][0] - 1.0) < 0.1]
-        assert len(p1_sleeps) >= 1, f"Expected p1 to sleep ~1.0 sec, but sleep calls were: {sleep_calls}"
+    with patch("time.sleep") as mock_sleep_again:
+        service._respect_rate_limit(provider_a)  # second call for 'a' — must sleep ~1.0s now
+    mock_sleep_again.assert_called_once()
+    assert abs(mock_sleep_again.call_args[0][0] - 1.0) < 0.1

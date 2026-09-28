@@ -215,6 +215,20 @@ of the same archive folder (spec §4):
    silently drop the other one. Everything you don't mention in `changes` —
    mode, style, untouched preferences, budget — stays exactly as it was
    (Review Focus #4).
+   **A change of `mode` or `style` must NOT go through `revise_weights`**
+   (e.g. "переделай в вело-маршрут"): `revise_weights(existing, {"mode":
+   "bike"})` changes only the `mode` key and silently keeps walk's
+   `routable_highway`, `hard_exclude_tags`, `pace_kmh`, buffers etc.
+   Instead rebuild from the new preset —
+   `presets.build_weights(presets.load_preset(new_mode, new_style),
+   preference_overrides, existing["max_distance_km"],
+   existing["max_duration_hours"])` — carrying over the budget and any
+   preference overrides the user had set before (recover those by diffing
+   `existing["preferences"]` against the old preset's own `preferences` —
+   `load_preset(existing["mode"], existing.get("style"))`, since `walk`
+   has no `style` key — and ask if a carried-over override no longer makes sense for the new
+   mode). Use `revise_weights` only for changes that leave `mode`/`style`
+   themselves untouched.
 4. Any point being replaced or added goes through the **same** mandatory
    checks as a first build — restricted-zone validation (pipeline step 9)
    and budget re-check (pipeline steps 13-14). A revision gets no immunity
@@ -643,6 +657,11 @@ Full query templates (with the header workaround Overpass needs) are in
   dict for any other key (e.g. just one `buffers_m` entry) replaces that
   whole key, not just the given sub-field. Pass the full dict when only
   changing part of it (Review Focus #4, spec §4 step 3).
+- **Switching mode/style with `revise_weights(existing, {"mode": ...})`** —
+  only the `mode` key changes; tag rules, pace and buffers stay those of the
+  old preset, so a "bike" route is still routed and timed as a walk. Rebuild
+  with `load_preset(new_mode, new_style)` + `build_weights` instead,
+  carrying over budget and overrides (**Revising an Existing Route**, step 3).
 - **Letting the switch to a directed graph make a plain two-way segment
   one-way by accident** — a way with no `oneway` tag must still get both a
   forward and a reverse edge for **both** `walk` and `bike`; only an

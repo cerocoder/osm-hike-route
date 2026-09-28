@@ -227,13 +227,16 @@ def test_fetch_area_data_preset_args_included_in_query():
     }
 
 
-def test_fetch_area_data_buckets_secondary_as_walkable_when_routable():
+def test_fetch_area_data_buckets_routable_secondary_as_both_walkable_and_highway():
+    """Walkable and highway-avoidance membership are independent: a routable
+    secondary (bike-sport) must still feed tag_edges's near_highway buffer,
+    or avoid_near_highway silently stops reacting to it."""
     ways = [{"type": "way", "id": 1, "tags": {"highway": "secondary"}}]
     with patch.object(route_graph, "query_overpass", return_value={"elements": ways}):
         buckets = fetch_area_data(55.0, 37.0, routable_highway=["path", "secondary"])
 
     assert [w["id"] for w in buckets["walkable"]] == [1]
-    assert buckets["highways"] == []
+    assert [w["id"] for w in buckets["highways"]] == [1]
 
 
 def test_fetch_area_data_buckets_secondary_as_highway_under_walk_defaults():
@@ -257,16 +260,15 @@ def test_fetch_area_data_reaches_walkable_bucket_for_hard_exclude_and_infra_cand
             exclude_highway_without_infra=["trunk"],
         )
 
-    # Not asserting buckets["highways"] here: trunk overlaps the fixed
-    # AVOIDANCE_HIGHWAY set too, and whether a trunk way used for bike's
-    # infra-exclusion check should ALSO still land in the highways
-    # avoidance-buffer bucket is a separate design question the task spec
-    # doesn't settle (see task-21-report.md Concerns) — this test only
-    # proves the way reaches filter_excluded_ways instead of being
-    # silently dropped by the fetch itself.
+    # The way must reach filter_excluded_ways (walkable) instead of being
+    # silently dropped by the fetch itself — AND the trunk must also stay in
+    # the highways avoidance bucket, so nearby paths still get the
+    # near_highway penalty even though the trunk itself is later
+    # hard-excluded from the routable graph.
     walkable_ids = [w["id"] for w in buckets["walkable"]]
     assert 1 in walkable_ids
     assert 2 in walkable_ids
+    assert [w["id"] for w in buckets["highways"]] == [2]
 
 
 # --- build_restricted_polygons: relations, ring stitching, closure -------
@@ -436,3 +438,37 @@ def test_fetch_area_data_plain_access_private_is_still_restricted():
 
     assert [w["id"] for w in buckets["restricted"]] == [1, 2]
     assert buckets["walkable"] == []
+
+
+def test_fetch_area_data_non_highway_features_bucket_unchanged():
+    ways = [
+        {"type": "way", "id": 1, "tags": {"natural": "water"}},
+        {"type": "way", "id": 2, "tags": {"landuse": "forest"}},
+        {"type": "way", "id": 3, "tags": {"landuse": "meadow"}},
+    ]
+    with patch.object(route_graph, "query_overpass", return_value={"elements": ways}):
+        buckets = fetch_area_data(55.0, 37.0)
+
+    assert [w["id"] for w in buckets["water"]] == [1]
+    assert [w["id"] for w in buckets["forest"]] == [2]
+    assert [w["id"] for w in buckets["fields"]] == [3]
+    assert buckets["walkable"] == [] and buckets["highways"] == []
+
+
+def test_highway_avoidance_reaches_path_next_to_routable_secondary():
+    """End-to-end for the bug: a path running alongside a (bike-sport
+    routable) secondary gets near_highway=True from tag_edges."""
+    # Mid node included: tag_edges measures distance to line vertices only.
+    secondary = {"type": "way", "id": 10, "nodes": [10, 12, 11], "tags": {"highway": "secondary"},
+                 "geometry": _pts((55.0, 37.0), (55.0005, 37.0), (55.001, 37.0))}
+    path = {"type": "way", "id": 20, "nodes": [20, 21], "tags": {"highway": "path"},
+            "geometry": _pts((55.0, 37.0002), (55.001, 37.0002))}  # ~13 m away
+    with patch.object(route_graph, "query_overpass",
+                      return_value={"elements": [secondary, path]}):
+        data = fetch_area_data(55.0, 37.0, routable_highway=["path", "secondary"])
+    graph, coords = build_graph([path])
+
+    route_graph.tag_edges(graph, coords, data["highways"], data["water"],
+                          data["forest"], data["fields"])
+
+    assert graph[20][0][2]["near_highway"] is True

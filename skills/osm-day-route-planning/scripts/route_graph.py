@@ -148,16 +148,22 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
         if tags.get("barrier") in ("fence", "wall"):
             buckets["barrier_ways"].append(el)
             continue
-        if tags.get("highway") in walkable_set:
+        # Walkable and highway-avoidance membership are independent: a
+        # routable (bike-sport secondary) or later hard-excluded (bike's
+        # infra-less trunk/primary) road must still feed tag_edges's
+        # near_highway buffer for the paths running alongside it.
+        highway = tags.get("highway")
+        if highway in walkable_set:
             buckets["walkable"].append(el)
-        elif tags.get("highway") in AVOIDANCE_HIGHWAY:
+        if highway in AVOIDANCE_HIGHWAY:
             buckets["highways"].append(el)
-        elif tags.get("natural") == "water" or "waterway" in tags:
-            buckets["water"].append(el)
-        elif tags.get("landuse") == "forest" or tags.get("natural") == "wood" or tags.get("leisure") == "park":
-            buckets["forest"].append(el)
-        elif tags.get("landuse") in ("farmland", "meadow"):
-            buckets["fields"].append(el)
+        if highway is None:
+            if tags.get("natural") == "water" or "waterway" in tags:
+                buckets["water"].append(el)
+            elif tags.get("landuse") == "forest" or tags.get("natural") == "wood" or tags.get("leisure") == "park":
+                buckets["forest"].append(el)
+            elif tags.get("landuse") in ("farmland", "meadow"):
+                buckets["fields"].append(el)
     return buckets
 
 

@@ -44,3 +44,13 @@ def test_oneway_bicycle_no_reopens_reverse_direction():
 
     assert 2 in [edge[0] for edge in graph.get(1, [])]
     assert 1 in [edge[0] for edge in graph.get(2, [])]
+
+
+def test_two_way_segment_is_traversable_in_both_directions_for_bike_mode():
+    """Review Focus #5, bike-mode half: an untagged segment must stay
+    bidirectional under respect_oneway=True too — only an explicit
+    oneway=yes tag should restrict direction."""
+    graph, _ = build_graph(_two_node_way(), respect_oneway=True)
+
+    assert 2 in [edge[0] for edge in graph.get(1, [])]
+    assert 1 in [edge[0] for edge in graph.get(2, [])]

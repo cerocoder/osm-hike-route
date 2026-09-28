@@ -460,6 +460,40 @@ def _tile_coverage_points(geojson: dict) -> list[tuple[float, float]]:
     return access or interest
 
 
+def build_tile_layers_js(providers: list, active_id: str | None) -> str:
+    """Pure JS-snippet builder — no network calls. One L.tileLayer(...)
+    const per available provider, plus, when more than one provider is
+    available, an L.control.layers(...) switcher (design spec: hybrid
+    UX — default active layer + in-browser switcher, no chat prompt).
+    `providers` must be non-empty. `active_id` selects which provider is
+    added to the map directly; falls back to providers[0] when None or
+    not found among `providers`."""
+    active = next((p for p in providers if p.provider_id == active_id), providers[0])
+
+    lines = []
+    control_entries = []
+    for i, p in enumerate(providers):
+        var = f"tileLayer{i}"
+        options = {"attribution": p.attribution, "maxZoom": p.max_zoom}
+        if p.max_native_zoom is not None:
+            options["maxNativeZoom"] = p.max_native_zoom
+        lines.append(
+            f"const {var} = L.tileLayer({json.dumps(p.tile_url_template)}, "
+            f"{json.dumps(options, ensure_ascii=False)});"
+        )
+        control_entries.append((p.display_name, var))
+        if p is active:
+            lines.append(f"{var}.addTo(map);")
+
+    if len(providers) > 1:
+        pairs = ", ".join(
+            f"{json.dumps(name, ensure_ascii=False)}: {var}" for name, var in control_entries
+        )
+        lines.append(f"L.control.layers({{{pairs}}}).addTo(map);")
+
+    return "\n  ".join(lines)
+
+
 def bbox_center_zoom(geojson: dict) -> tuple[float, float, int]:
     """Rough center + zoom for external map links (Google/OSM) — an
     approximation for landing roughly on the right area, not a precise

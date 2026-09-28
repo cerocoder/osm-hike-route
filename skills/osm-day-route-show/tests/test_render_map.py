@@ -343,3 +343,64 @@ def test_tile_coverage_points_empty_when_no_access_or_interest_points():
     }
 
     assert _tile_coverage_points(geojson) == []
+
+
+from render_map import build_tile_layers_js
+
+
+class _FakeTileProvider:
+    def __init__(self, provider_id, display_name="Test Layer", max_native_zoom=19):
+        self.provider_id = provider_id
+        self.display_name = display_name
+        self.tile_url_template = f"https://example.org/{provider_id}/{{z}}/{{x}}/{{y}}.png"
+        self.attribution = f"Attribution for {provider_id}"
+        self.max_zoom = 19
+        self.max_native_zoom = max_native_zoom
+
+
+def test_build_tile_layers_js_single_provider_has_no_layer_control():
+    provider = _FakeTileProvider("esri_street")
+    js = build_tile_layers_js([provider], active_id="esri_street")
+
+    assert "L.tileLayer(" in js
+    assert ".addTo(map)" in js
+    assert "L.control.layers(" not in js
+
+
+def test_build_tile_layers_js_multi_provider_adds_layer_control():
+    providers = [_FakeTileProvider("esri_street"), _FakeTileProvider("cyclosm")]
+    js = build_tile_layers_js(providers, active_id="esri_street")
+
+    assert js.count("L.tileLayer(") == 2
+    assert "L.control.layers(" in js
+    assert "Test Layer" in js  # display_name present as a key in the control
+
+
+def test_build_tile_layers_js_active_provider_is_added_to_map():
+    providers = [_FakeTileProvider("esri_street"), _FakeTileProvider("cyclosm")]
+    js = build_tile_layers_js(providers, active_id="cyclosm")
+
+    lines = js.splitlines()
+    cyclosm_var_line = next(l for l in lines if "cyclosm" in l and "L.tileLayer(" in l)
+    var_name = cyclosm_var_line.split("=")[0].strip().split()[-1]
+    assert f"{var_name}.addTo(map)" in js
+    # esri_street's own var must NOT get .addTo(map)
+    esri_var_line = next(l for l in lines if "esri_street" in l and "L.tileLayer(" in l)
+    esri_var_name = esri_var_line.split("=")[0].strip().split()[-1]
+    assert f"{esri_var_name}.addTo(map)" not in js
+
+
+def test_build_tile_layers_js_defaults_to_first_provider_when_active_id_not_found():
+    providers = [_FakeTileProvider("esri_street"), _FakeTileProvider("cyclosm")]
+    js = build_tile_layers_js(providers, active_id="does_not_exist")
+
+    esri_var_line = next(l for l in js.splitlines() if "esri_street" in l and "L.tileLayer(" in l)
+    var_name = esri_var_line.split("=")[0].strip().split()[-1]
+    assert f"{var_name}.addTo(map)" in js
+
+
+def test_build_tile_layers_js_includes_max_native_zoom_when_present():
+    provider = _FakeTileProvider("esri_satellite", max_native_zoom=20)
+    js = build_tile_layers_js([provider], active_id="esri_satellite")
+
+    assert '"maxNativeZoom": 20' in js

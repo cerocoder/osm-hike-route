@@ -208,6 +208,44 @@ TIER_LABELS = {
     "it": {"tag-backed": "da OSM", "web-sourced": "fonte web", "derived": "stimato", "no-data": "nessun dato"},
 }
 
+_MODE_LABELS = {
+    "en": {"walk": "walking", "bike": "cycling"},
+    "ru": {"walk": "пешком", "bike": "на велосипеде"},
+}
+
+
+def route_stats_html(line_properties: dict, user_lang: str) -> str:
+    """Built from computed LineString properties (spec §3.11), never from
+    weights.json — this function never sees weights.json at all. A
+    pre-this-round archive with none of these properties still renders a
+    walk-labeled, mostly-empty block instead of raising."""
+    mode = line_properties.get("mode", "walk")
+    mode_label = _MODE_LABELS.get(user_lang, _MODE_LABELS["en"]).get(mode, mode)
+    parts = [f"<p>{mode_label}"]
+    if line_properties.get("style"):
+        parts[-1] += f" ({line_properties['style']})"
+    parts[-1] += "</p>"
+
+    if line_properties.get("distance_km") is not None:
+        parts.append(f"<p>{line_properties['distance_km']:.1f} km</p>")
+    if line_properties.get("elevation_gain_m") is not None:
+        parts.append(
+            f"<p>+{line_properties['elevation_gain_m']:.0f}m / "
+            f"-{line_properties.get('elevation_loss_m', 0.0):.0f}m</p>"
+        )
+    if line_properties.get("duration_estimate_hours") is not None:
+        parts.append(f"<p>~{line_properties['duration_estimate_hours']:.1f} h</p>")
+    if line_properties.get("curated_routes_count"):
+        parts.append(f"<p>{line_properties['curated_routes_count']} curated routes nearby</p>")
+    if line_properties.get("duration_warning"):
+        parts.append(f'<p class="duration-warning">{_xml_escape(line_properties["duration_warning"])}</p>')
+    skipped = line_properties.get("skipped_interest_points") or []
+    if skipped:
+        skipped_list = ", ".join(_xml_escape(name) for name in skipped)
+        parts.append(f"<p>Not included (over budget): {skipped_list}</p>")
+
+    return "".join(parts)
+
 
 def _localized_label_maps(lang: str) -> tuple[dict, dict]:
     """(type_labels, tier_labels) for `lang`, each value pre-falling-back to
@@ -455,6 +493,9 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
         if confidence:
             confidence_html = f"<h3>{t('interest_layers', user_lang)}</h3>{markdown_to_html(confidence)}"
 
+    line_feature = next((f for f in geojson.get("features", []) if f["geometry"]["type"] == "LineString"), None)
+    stats_html = f"<h3>Route</h3>{route_stats_html(line_feature['properties'], user_lang)}" if line_feature else ""
+
     geojson_json = json.dumps(geojson)
 
     gpx_content = build_gpx(geojson, title)
@@ -508,6 +549,7 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
 <div id="map"></div>
 <div id="sidebar">
   <h3 style="margin-top:0">{title_escaped}</h3>
+  {stats_html}
   {access_html}
   {confidence_html}
   {links_html}

@@ -100,3 +100,40 @@ def test_annotate_place_info_skips_linestring_features(tmp_path):
     annotate_place_info(geojson, user_lang="ru", local_lang=None, cache_path=tmp_path / "place_info.json")
 
     assert "_placeInfo" not in geojson["features"][0]["properties"]
+
+
+from render_map import route_stats_html
+
+
+def test_route_stats_html_includes_all_present_fields():
+    props = {
+        "mode": "bike", "style": "leisure", "distance_km": 12.3,
+        "elevation_gain_m": 150.0, "elevation_loss_m": 140.0,
+        "duration_estimate_hours": 2.5, "duration_warning": None,
+        "curated_routes_count": 4, "is_loop": True,
+        "skipped_interest_points": ["Дальняя точка"],
+    }
+
+    html = route_stats_html(props, user_lang="ru")
+
+    assert "12.3" in html
+    assert "150" in html
+    assert "Дальняя точка" in html
+
+
+def test_route_stats_html_defaults_missing_mode_to_walk():
+    """Review Focus #2: an archive from before this round has no `mode`."""
+    html = route_stats_html({}, user_lang="ru")
+    assert "walk" in html or "пешком" in html
+
+
+def test_route_stats_html_omits_warning_line_when_none():
+    props = {"mode": "walk", "duration_warning": None}
+    html = route_stats_html(props, user_lang="ru")
+    assert "duration-warning" not in html.lower() or "None" not in html
+
+
+def test_route_stats_html_shows_warning_text_when_present():
+    props = {"mode": "walk", "duration_warning": "маршрут может не влезть в световой день"}
+    html = route_stats_html(props, user_lang="ru")
+    assert "маршрут может не влезть в световой день" in html

@@ -413,18 +413,57 @@ def test_barrier_ways_only_closed_rings_become_polygons():
 
 # --- fetch_area_data bucketing: explicit mode override on restricted ways -
 
-def test_fetch_area_data_access_no_with_bicycle_designated_is_not_restricted():
-    ways = [
-        {"type": "way", "id": 1, "tags": {"highway": "cycleway", "access": "no",
-                                          "bicycle": "designated"}},
-        {"type": "way", "id": 2, "tags": {"highway": "path", "access": "private",
-                                          "foot": "yes"}},
-    ]
-    with patch.object(route_graph, "query_overpass", return_value={"elements": ways}):
-        buckets = fetch_area_data(55.0, 37.0, routable_highway=["path", "cycleway"])
+_BIKE_DESIGNATED = {"type": "way", "id": 1, "tags": {"highway": "cycleway", "access": "no",
+                                                     "bicycle": "designated"}}
+_FOOT_YES = {"type": "way", "id": 2, "tags": {"highway": "path", "access": "private",
+                                              "foot": "yes"}}
+_OVERRIDE_ROUTABLE = ["path", "cycleway"]
+
+
+def _bucket_with_mode(elements, mode):
+    with patch.object(route_graph, "query_overpass", return_value={"elements": elements}):
+        return fetch_area_data(55.0, 37.0, routable_highway=_OVERRIDE_ROUTABLE, mode=mode)
+
+
+def test_fetch_area_data_bicycle_designated_exempt_only_for_bike_mode():
+    buckets = _bucket_with_mode([_BIKE_DESIGNATED], mode="bike")
 
     assert buckets["restricted"] == []
-    assert [w["id"] for w in buckets["walkable"]] == [1, 2]
+    assert [w["id"] for w in buckets["walkable"]] == [1]
+
+
+@pytest.mark.parametrize("mode", ["walk", None])
+def test_fetch_area_data_bicycle_designated_still_restricted_for_walk_or_no_mode(mode):
+    buckets = _bucket_with_mode([_BIKE_DESIGNATED], mode=mode)
+
+    assert [w["id"] for w in buckets["restricted"]] == [1]
+    assert buckets["walkable"] == []
+
+
+def test_fetch_area_data_foot_yes_exempt_only_for_walk_mode():
+    buckets = _bucket_with_mode([_FOOT_YES], mode="walk")
+
+    assert buckets["restricted"] == []
+    assert [w["id"] for w in buckets["walkable"]] == [2]
+
+
+@pytest.mark.parametrize("mode", ["bike", None])
+def test_fetch_area_data_foot_yes_still_restricted_for_bike_or_no_mode(mode):
+    buckets = _bucket_with_mode([_FOOT_YES], mode=mode)
+
+    assert [w["id"] for w in buckets["restricted"]] == [2]
+    assert buckets["walkable"] == []
+
+
+def test_fetch_area_data_restricted_area_with_foot_yes_stays_restricted_without_mode():
+    """Default (mode=None, an old caller) is the strict pre-override
+    behaviour: no exemption for any element, area or way."""
+    reserve = {"type": "relation", "id": 3,
+               "tags": {"leisure": "nature_reserve", "foot": "yes"}, "members": []}
+    with patch.object(route_graph, "query_overpass", return_value={"elements": [reserve]}):
+        buckets = fetch_area_data(55.0, 37.0)
+
+    assert [w["id"] for w in buckets["restricted"]] == [3]
 
 
 def test_fetch_area_data_plain_access_private_is_still_restricted():

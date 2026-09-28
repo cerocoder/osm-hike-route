@@ -92,7 +92,11 @@ own OSM tags are the cheapest source for this.
 **Walkable ways + highways + water + forest + fields + access
 restrictions** (graph building): already implemented as
 `route_graph.fetch_area_data(lat, lon, radius_m, routable_highway,
-hard_exclude_highway, exclude_highway_without_infra)`. The last three
+hard_exclude_highway, exclude_highway_without_infra, mode)`. `mode`
+(`weights["mode"]`) scopes the designated-path override — a
+restricted-tagged way that also carries `bicycle=yes|designated` is exempt
+only for `mode="bike"`, `foot=yes|designated` only for `mode="walk"`, and
+`mode=None` exempts nothing. The three tag-list
 arguments come straight from the active preset (spec §3.6) —
 `weights["routable_highway"]`, `weights["hard_exclude_tags"].get("highway",
 [])`, and `weights["exclude_highway_without_infra"]` respectively — and

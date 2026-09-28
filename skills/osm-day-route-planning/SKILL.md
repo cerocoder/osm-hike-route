@@ -92,8 +92,8 @@ new preset, no code changes).
 7. **Fetch area data via Overpass**: `route_graph.fetch_area_data(lat, lon,
    radius_m, routable_highway=weights["routable_highway"],
    hard_exclude_highway=weights["hard_exclude_tags"].get("highway", []),
-   exclude_highway_without_infra=weights["exclude_highway_without_infra"])`
-   returns walkable ways, highways (for avoidance), water, forest, fields,
+   exclude_highway_without_infra=weights["exclude_highway_without_infra"],
+   mode=weights["mode"])` returns walkable ways, highways (for avoidance), water, forest, fields,
    plus everything needed for hard exclusion — restricted ways/areas,
    barrier ways, and barrier nodes — in one query, bucketed by tag. The
    three preset-driven arguments matter: without them, a mode's own
@@ -274,9 +274,12 @@ all in `scripts/route_graph.py`:
    for large military areas and reserves) are reassembled from their
    `outer` member ways; a restricted *way* only counts if it is actually
    closed — an open `access=private` driveway is a line, not a zone (see
-   reference.md). An element that also carries `bicycle=yes|designated`
-   or `foot=yes|designated` is **not** bucketed as restricted — that's the
-   usual OSM pattern for a dedicated path through a closed area.
+   reference.md). With `mode=weights["mode"]` passed to `fetch_area_data`,
+   a restricted-tagged element that also carries `bicycle=yes|designated`
+   (bike) or `foot=yes|designated` (walk) is **not** bucketed as restricted
+   *for that mode only* — the usual OSM pattern for a dedicated path through
+   a closed area. A bicycle-designated path stays closed to a walk route,
+   and without `mode` no override applies at all (strict default).
    `filter_excluded_ways` drops any
    walkable way whose midpoint falls inside one of these polygons, and
    `waypoints.is_point_restricted`/`validate_user_waypoint` run the same
@@ -346,6 +349,7 @@ data = fetch_area_data(
     routable_highway=weights["routable_highway"],
     hard_exclude_highway=weights["hard_exclude_tags"].get("highway", []),
     exclude_highway_without_infra=weights["exclude_highway_without_infra"],
+    mode=weights["mode"],  # scopes the designated-path override to this mode
 )
 restricted = build_restricted_polygons(data["restricted"], data["barrier_ways"])
 walkable = filter_excluded_ways(

@@ -12,7 +12,8 @@ Typical flow:
     data = fetch_area_data(lat, lon, radius_m=2000,
                             routable_highway=weights['routable_highway'],
                             hard_exclude_highway=weights.get('hard_exclude_tags', {}).get('highway', []),
-                            exclude_highway_without_infra=weights.get('exclude_highway_without_infra', []))
+                            exclude_highway_without_infra=weights.get('exclude_highway_without_infra', []),
+                            mode=weights['mode'])
     restricted = build_restricted_polygons(data['restricted'], data['barrier_ways'])
     walkable = filter_excluded_ways(data['walkable'], restricted,
                                      hard_exclude_tags=weights.get('hard_exclude_tags'),
@@ -41,7 +42,7 @@ AVOIDANCE_HIGHWAY = ("motorway", "trunk", "primary", "secondary")
 
 def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
                      routable_highway=None, hard_exclude_highway=None,
-                     exclude_highway_without_infra=None) -> dict:
+                     exclude_highway_without_infra=None, mode: str | None = None) -> dict:
     """One combined Overpass query for everything build_graph/tag_edges/
     exclusion need: walkable ways, highways (for avoidance), water,
     forest, fields, plus access-restricted ways, military land, barrier
@@ -60,7 +61,14 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
     exclusion rules silently do nothing, since the way they're meant to
     exclude would never arrive at all. Defaults to walk's original fixed
     tag list when no preset arguments are given, so an existing no-args
-    call keeps behaving exactly as before."""
+    call keeps behaving exactly as before.
+
+    mode ("walk"/"bike", normally weights["mode"]) scopes the designated-
+    path override: a restricted-tagged element that ALSO carries
+    bicycle=yes|designated (bike) or foot=yes|designated (walk) is not
+    bucketed as restricted for THAT mode only — a bicycle-designated path
+    through an access=no area is still closed to walkers. mode=None (an
+    old caller) gets no override at all: the strict default."""
     routable_highway = tuple(routable_highway) if routable_highway else DEFAULT_ROUTABLE_HIGHWAY
     hard_exclude_highway = tuple(hard_exclude_highway or ())
     exclude_highway_without_infra = tuple(exclude_highway_without_infra or ())
@@ -131,17 +139,21 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
         if el["type"] == "node" and "barrier" in tags:
             buckets["barrier_nodes"].append(el)
             continue
-        # A dedicated path explicitly opened to bikes/pedestrians through an
-        # otherwise access-restricted area (e.g. access=no + bicycle=designated)
-        # is a deliberate OSM pattern — it's a route, not a closed zone.
+        # A dedicated path explicitly opened to bikes OR pedestrians through
+        # an otherwise access-restricted area (e.g. access=no +
+        # bicycle=designated) is a deliberate OSM pattern — but only for the
+        # mode it names, so the override is scoped to the active mode.
         is_restricted_tagged = (
             tags.get("access") in RESTRICTED_ACCESS or tags.get("landuse") == "military"
             or "military" in tags or tags.get("leisure") == "nature_reserve"
             or tags.get("boundary") == "protected_area"
         )
-        has_explicit_mode_override = (
-            tags.get("bicycle") in ("yes", "designated") or tags.get("foot") in ("yes", "designated")
-        )
+        if mode == "bike":
+            has_explicit_mode_override = tags.get("bicycle") in ("yes", "designated")
+        elif mode == "walk":
+            has_explicit_mode_override = tags.get("foot") in ("yes", "designated")
+        else:
+            has_explicit_mode_override = False
         if is_restricted_tagged and not has_explicit_mode_override:
             buckets["restricted"].append(el)
             continue

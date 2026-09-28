@@ -260,7 +260,10 @@ all in `scripts/route_graph.py`:
    for large military areas and reserves) are reassembled from their
    `outer` member ways; a restricted *way* only counts if it is actually
    closed — an open `access=private` driveway is a line, not a zone (see
-   reference.md). `filter_excluded_ways` drops any
+   reference.md). An element that also carries `bicycle=yes|designated`
+   or `foot=yes|designated` is **not** bucketed as restricted — that's the
+   usual OSM pattern for a dedicated path through a closed area.
+   `filter_excluded_ways` drops any
    walkable way whose midpoint falls inside one of these polygons, and
    `waypoints.is_point_restricted`/`validate_user_waypoint` run the same
    point-in-polygon check against individual waypoints before the graph is

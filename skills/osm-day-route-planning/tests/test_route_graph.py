@@ -407,3 +407,32 @@ def test_barrier_ways_only_closed_rings_become_polygons():
     polygons = build_restricted_polygons([], [closed_fence, open_fence])
 
     assert len(polygons) == 1
+
+
+# --- fetch_area_data bucketing: explicit mode override on restricted ways -
+
+def test_fetch_area_data_access_no_with_bicycle_designated_is_not_restricted():
+    ways = [
+        {"type": "way", "id": 1, "tags": {"highway": "cycleway", "access": "no",
+                                          "bicycle": "designated"}},
+        {"type": "way", "id": 2, "tags": {"highway": "path", "access": "private",
+                                          "foot": "yes"}},
+    ]
+    with patch.object(route_graph, "query_overpass", return_value={"elements": ways}):
+        buckets = fetch_area_data(55.0, 37.0, routable_highway=["path", "cycleway"])
+
+    assert buckets["restricted"] == []
+    assert [w["id"] for w in buckets["walkable"]] == [1, 2]
+
+
+def test_fetch_area_data_plain_access_private_is_still_restricted():
+    ways = [
+        {"type": "way", "id": 1, "tags": {"highway": "path", "access": "private"}},
+        {"type": "way", "id": 2, "tags": {"highway": "path", "access": "no",
+                                          "bicycle": "no"}},
+    ]
+    with patch.object(route_graph, "query_overpass", return_value={"elements": ways}):
+        buckets = fetch_area_data(55.0, 37.0)
+
+    assert [w["id"] for w in buckets["restricted"]] == [1, 2]
+    assert buckets["walkable"] == []

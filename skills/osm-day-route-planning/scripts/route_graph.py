@@ -131,9 +131,18 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
         if el["type"] == "node" and "barrier" in tags:
             buckets["barrier_nodes"].append(el)
             continue
-        if (tags.get("access") in RESTRICTED_ACCESS or tags.get("landuse") == "military"
-                or "military" in tags or tags.get("leisure") == "nature_reserve"
-                or tags.get("boundary") == "protected_area"):
+        # A dedicated path explicitly opened to bikes/pedestrians through an
+        # otherwise access-restricted area (e.g. access=no + bicycle=designated)
+        # is a deliberate OSM pattern — it's a route, not a closed zone.
+        is_restricted_tagged = (
+            tags.get("access") in RESTRICTED_ACCESS or tags.get("landuse") == "military"
+            or "military" in tags or tags.get("leisure") == "nature_reserve"
+            or tags.get("boundary") == "protected_area"
+        )
+        has_explicit_mode_override = (
+            tags.get("bicycle") in ("yes", "designated") or tags.get("foot") in ("yes", "designated")
+        )
+        if is_restricted_tagged and not has_explicit_mode_override:
             buckets["restricted"].append(el)
             continue
         if tags.get("barrier") in ("fence", "wall"):

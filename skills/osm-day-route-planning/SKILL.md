@@ -510,12 +510,24 @@ return a fresh dict; the caller writes that to the route's own
 
 `osm-day-route-show` renders this file, and reads specific property names
 — get them right the first time rather than relying on that skill to
-degrade gracefully. Built by `route_output.build_geojson`. Coordinates are
-**3D**: `[lon, lat, ele]` for every LineString vertex and every Point (a
-missing elevation is written as `0.0` rather than `null`, so the array
-shape is always consistent for a consumer — see `route_output._point_feature`/
-the LineString coordinate list comprehension). One `LineString` Feature for
-the solved path, one `Point` Feature per waypoint/interest point.
+degrade gracefully. Built by `route_output.build_geojson`. The two geometry
+types do **not** handle a missing elevation the same way — check
+`route_output.py` directly before assuming one behavior covers both:
+
+- **`LineString` coordinates** are always **3D**, `[lon, lat, ele]`, for
+  every vertex — `build_geojson`'s coordinate list comprehension coerces a
+  `None` elevation to `0.0` rather than emitting `null`, so the array shape
+  is always consistent (this was a deliberate Task 19 fix — see spec §3.11
+  and the Task 19 ledger ruling).
+- **`Point` coordinates** are `[lon, lat]` (2D) when elevation is unknown,
+  and `[lon, lat, ele]` (3D) only when it's known — `_point_feature` simply
+  **omits** the `ele` slot when `pf.get("ele")` is `None`, it does **not**
+  coerce it to `0.0` the way the LineString path does. Don't assume the two
+  geometry types are consistent here; a consumer reading Point coordinates
+  must handle both a 2-element and a 3-element array.
+
+One `LineString` Feature for the solved path, one `Point` Feature per
+waypoint/interest point.
 
 **`LineString` properties** (all computed outputs, spec §3.11 — never
 copy an input here):
@@ -632,6 +644,13 @@ Full query templates (with the header workaround Overpass needs) are in
   `route_output.build_geojson`'s `path_coords` argument and GeoJSON
   coordinate arrays are `(lon, lat, ele)`. Swapping them silently produces
   a route plotted in the wrong place with no error.
+- **Assuming Point coordinates are always 3D like LineString ones** —
+  `route_output._point_feature` omits the `ele` slot entirely (a 2-element
+  `[lon, lat]` array) when elevation is unknown, it does not coerce to
+  `0.0` the way `build_geojson`'s LineString path does. A consumer or
+  render step that unconditionally indexes `coordinates[2]` on a Point will
+  crash on any point with unresolved elevation. See **Output Format:
+  route.geojson**.
 - **Fabricating no-data interest layers** — if web search finds nothing,
   say so; don't invent a "known" spot.
 - **Skipping the access-point step** — every route needs a reachability

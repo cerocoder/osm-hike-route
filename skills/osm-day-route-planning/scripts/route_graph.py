@@ -9,7 +9,10 @@ Typical flow:
         filter_excluded_ways, build_graph, tag_edges, \
         weighted_shortest_path, route_through_waypoints
 
-    data = fetch_area_data(lat, lon, radius_m=2000)
+    data = fetch_area_data(lat, lon, radius_m=2000,
+                            routable_highway=weights['routable_highway'],
+                            hard_exclude_highway=weights.get('hard_exclude_tags', {}).get('highway', []),
+                            exclude_highway_without_infra=weights.get('exclude_highway_without_infra', []))
     restricted = build_restricted_polygons(data['restricted'], data['barrier_ways'])
     walkable = filter_excluded_ways(data['walkable'], restricted)
     graph, node_coords = build_graph(walkable, data['barrier_nodes'])

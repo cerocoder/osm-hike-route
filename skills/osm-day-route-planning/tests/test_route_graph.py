@@ -94,6 +94,45 @@ def test_filter_excluded_ways_drops_trunk_without_cycle_infra_for_bike():
     assert [w["id"] for w in kept] == [2]
 
 
+def test_filter_excluded_ways_drops_trunk_with_cycleway_no_for_bike():
+    """cycleway=no/none/separate mean 'no usable infra on this way' — must be
+    excluded exactly like a trunk with no cycleway tag at all."""
+    ways = [
+        _way_with_tags({"highway": "trunk"}, way_id=1),
+        _way_with_tags({"highway": "trunk", "cycleway": "no"}, way_id=2),
+        _way_with_tags({"highway": "trunk", "cycleway": "none"}, way_id=3),
+        _way_with_tags({"highway": "primary", "cycleway": "separate"}, way_id=4),
+        _way_with_tags({"highway": "trunk", "cycleway:right": "no"}, way_id=5),
+    ]
+
+    kept = filter_excluded_ways(ways, restricted_polygons=[],
+                                 exclude_highway_without_infra=["trunk", "primary"])
+
+    assert kept == []
+
+
+def test_filter_excluded_ways_keeps_trunk_with_positive_cycleway_value():
+    ways = [_way_with_tags({"highway": "trunk", "cycleway": "track"}, way_id=1)]
+
+    kept = filter_excluded_ways(ways, restricted_polygons=[],
+                                 exclude_highway_without_infra=["trunk"])
+
+    assert [w["id"] for w in kept] == [1]
+
+
+def test_filter_excluded_ways_keeps_trunk_with_positive_cycleway_side_subkey():
+    ways = [
+        _way_with_tags({"highway": "trunk", "cycleway:right": "lane"}, way_id=1),
+        _way_with_tags({"highway": "trunk", "cycleway:left": "no",
+                        "cycleway:both": "lane"}, way_id=2),
+    ]
+
+    kept = filter_excluded_ways(ways, restricted_polygons=[],
+                                 exclude_highway_without_infra=["trunk"])
+
+    assert [w["id"] for w in kept] == [1, 2]
+
+
 def test_filter_excluded_ways_keeps_everything_for_walk_with_no_rules():
     ways = [_way_with_tags({"highway": "trunk"}), _way_with_tags({"highway": "steps"}, way_id=2)]
 

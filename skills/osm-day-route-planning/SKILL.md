@@ -265,7 +265,9 @@ all in `scripts/route_graph.py`:
    `hard_exclude_tags`/`exclude_highway_without_infra`): mode-specific, not
    hardcoded — `walk` hard-excludes `foot=no`; `bike` hard-excludes
    `bicycle=no|dismount`, `highway=steps`, and (`exclude_highway_without_infra`)
-   any `trunk`/`primary` way with no `cycleway` tag. `sport`-style bike
+   any `trunk`/`primary` way with no positive cycle-infra tag (`cycleway`,
+   `cycleway:left|right|both` — values `no`/`none`/`separate` do **not**
+   count as infra). `sport`-style bike
    still hard-excludes the same infra-less trunk/primary ways — style never
    relaxes this particular exclusion, only the preference weights around it
    (spec §3.2).
@@ -574,7 +576,7 @@ discard a field already in hand," not an extra query.
 | Walkable paths (`walk`) | `highway=path\|footway\|track\|residential\|living_street` |
 | Routable ways (`bike`) | preset's `routable_highway` — adds `cycleway`, and `secondary` for `bike-sport` — passed to `fetch_area_data`'s `routable_highway` argument, or those ways are never fetched at all |
 | Bike hard-exclude | `bicycle=no\|dismount`, `highway=steps` — preset `hard_exclude_tags` |
-| Highway needs cycle infra (bike) | `trunk\|primary` with no `cycleway` tag — preset `exclude_highway_without_infra` |
+| Highway needs cycle infra (bike) | `trunk\|primary` with no positive `cycleway`/`cycleway:left\|right\|both` value (`no`/`none`/`separate` = no infra) — preset `exclude_highway_without_infra` |
 | Oneway respected (bike only) | `oneway=yes`, reopened by `oneway:bicycle=no` or `cycleway=opposite*` |
 | Blocking barrier (mode-specific) | preset `blocking_barrier_tags`, e.g. `cycle_barrier`, `turnstile` for bike |
 | Avoid parallel-to-highway | `highway=trunk\|primary\|secondary` (buffer distance = preset `buffers_m.highway`) |

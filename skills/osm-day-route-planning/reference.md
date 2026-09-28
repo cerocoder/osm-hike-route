@@ -157,7 +157,7 @@ takes precedence over the fixed avoidance-highway bucket for any
 overlapping tag value. For bike presets this includes `trunk` and
 `primary` (bike's `exclude_highway_without_infra`) — a `trunk`/`primary`
 way now lands in `walkable` (then gets hard-dropped by
-`filter_excluded_ways` unless it carries a `cycleway` tag) instead of in
+`filter_excluded_ways` unless it carries a positive cycle-infra tag) instead of in
 `highways`. That means such a way is **not** available to `tag_edges`'s
 `avoid_near_highway` proximity buffer, so a nearby parallel path currently
 gets no highway-avoidance penalty for running alongside an infra-less
@@ -173,7 +173,7 @@ these are per-way/per-node tag checks on already-fetched elements):
 | Concern | Tag(s) | Where checked |
 |---|---|---|
 | Bike hard-exclude | `bicycle=no\|dismount`, `highway=steps` | `filter_excluded_ways` via preset `hard_exclude_tags` |
-| Highway needs cycle infra | `trunk\|primary` without a `cycleway` tag | `filter_excluded_ways` via preset `exclude_highway_without_infra` |
+| Highway needs cycle infra | `trunk\|primary` without a positive `cycleway`/`cycleway:left\|right\|both` value (`no`/`none`/`separate` don't count) | `filter_excluded_ways` via preset `exclude_highway_without_infra` |
 | Oneway (bike only) | `oneway=yes`, reopened by `oneway:bicycle=no` or `cycleway=opposite*` | `build_graph` → `_direction_allowed` (only when `respect_oneway=True`) |
 | Blocking barrier (bike only) | `barrier=cycle_barrier\|turnstile` | `build_graph` → `_blocks_passage` via preset `blocking_barrier_tags` |
 

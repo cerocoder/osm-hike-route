@@ -204,10 +204,23 @@ def _has_hard_excluded_tag(tags: dict, hard_exclude_tags: dict) -> bool:
     return any(tags.get(key) in values for key, values in hard_exclude_tags.items())
 
 
+_NO_CYCLE_INFRA_VALUES = ("no", "none", "separate")
+
+
+def _has_cycle_infra(tags: dict) -> bool:
+    """A positive cycleway value on the way itself, or on either side via
+    cycleway:left/right/both — "no"/"none"/"separate" don't count as infra."""
+    for key in ("cycleway", "cycleway:left", "cycleway:right", "cycleway:both"):
+        value = tags.get(key)
+        if value and value not in _NO_CYCLE_INFRA_VALUES:
+            return True
+    return False
+
+
 def _lacks_required_cycle_infra(tags: dict, exclude_highway_without_infra: list) -> bool:
     if tags.get("highway") not in exclude_highway_without_infra:
         return False
-    return "cycleway" not in tags
+    return not _has_cycle_infra(tags)
 
 
 def filter_excluded_ways(walkable_ways, restricted_polygons,

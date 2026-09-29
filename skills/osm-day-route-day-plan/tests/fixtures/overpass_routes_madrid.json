@@ -1,0 +1,100 @@
+{
+ "version": 0.6,
+ "generator": "Overpass API 0.7.62.11 87bfad18",
+ "osm3s": {
+  "timestamp_osm_base": "2026-09-29T23:01:19Z",
+  "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+ },
+ "elements": [
+  {
+   "type": "relation",
+   "id": 334739,
+   "tags": {
+    "colour": "#0072CE",
+    "from": "Atocha",
+    "gtfs:route_id": "41",
+    "gtfs:shape_id": "041_A",
+    "name": "Bus 41: Atocha → Colonia del Manzanares",
+    "network": "Empresa Municipal de Transportes de Madrid",
+    "network:short": "EMT Madrid",
+    "network:wikidata": "Q1094755",
+    "operator": "Empresa Municipal de Transportes de Madrid",
+    "operator:short": "EMT Madrid",
+    "operator:wikidata": "Q1094755",
+    "public_transport:version": "2",
+    "ref": "41",
+    "route": "bus",
+    "to": "Colonia del Manzanares",
+    "type": "route"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 1760758,
+   "tags": {
+    "colour": "#0072CE",
+    "from": "Callao",
+    "gtfs:route_id": "75",
+    "gtfs:shape_id": "075_A",
+    "name": "Bus 75: Plaza de Callao → Colonia Manzanares",
+    "network": "Empresa Municipal de Transportes de Madrid",
+    "network:short": "EMT Madrid",
+    "network:wikidata": "Q1094755",
+    "operator": "Empresa Municipal de Transportes de Madrid",
+    "operator:short": "EMT Madrid",
+    "operator:wikidata": "Q1094755",
+    "public_transport:version": "2",
+    "ref": "75",
+    "route": "bus",
+    "source": "https://navegapormadrid.emtmadrid.es/app/",
+    "to": "Colonia Manzanares",
+    "type": "route"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 1760759,
+   "tags": {
+    "colour": "#0072CE",
+    "from": "Colonia Manzanares",
+    "gtfs:route_id": "75",
+    "gtfs:shape_id": "075_B",
+    "name": "Bus 75: Colonia Manzanares → Plaza de Callao",
+    "network": "Empresa Municipal de Transportes de Madrid",
+    "network:short": "EMT Madrid",
+    "network:wikidata": "Q1094755",
+    "operator": "Empresa Municipal de Transportes de Madrid",
+    "operator:short": "EMT Madrid",
+    "operator:wikidata": "Q1094755",
+    "public_transport:version": "2",
+    "ref": "75",
+    "route": "bus",
+    "source": "https://navegapormadrid.emtmadrid.es/app/",
+    "to": "Plaza de Callao",
+    "type": "route"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 2390660,
+   "tags": {
+    "colour": "#0072CE",
+    "from": "Colonia del Manzanares",
+    "gtfs:route_id": "41",
+    "gtfs:shape_id": "041_B",
+    "name": "Bus 41: Colonia del Manzanares → Atocha",
+    "network": "Empresa Municipal de Transportes de Madrid",
+    "network:short": "EMT Madrid",
+    "network:wikidata": "Q1094755",
+    "operator": "Empresa Municipal de Transportes de Madrid",
+    "operator:short": "EMT Madrid",
+    "operator:wikidata": "Q1094755",
+    "public_transport:version": "2",
+    "ref": "41",
+    "route": "bus",
+    "to": "Atocha",
+    "type": "route"
+   }
+  }
+ ]
+}

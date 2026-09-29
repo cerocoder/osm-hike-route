@@ -20,6 +20,12 @@ def block_real_network():
         yield
 
 
+@pytest.fixture(autouse=True)
+def no_real_sleep(monkeypatch):
+    """Overpass retries pause between rounds; tests must never wait for real."""
+    monkeypatch.setattr("day_plan.overpass._default_sleep", lambda seconds: None)
+
+
 @pytest.fixture
 def make_route(tmp_path):
     """Writes a minimal route.geojson (London-ish, 3D coords) and returns the folder."""

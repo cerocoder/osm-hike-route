@@ -8,10 +8,19 @@ _SEVERITY_RANK = {"danger": 0, "caution": 1, "info": 2}
 MAX_ITEMS = 5
 
 
+def _severity_label(severity: str, lang: str) -> str:
+    """Localized label; an unknown severity falls back to its own name so one
+    bad plugin cannot take the whole summary down."""
+    try:
+        return tr("sev_" + severity, lang)
+    except KeyError:
+        return str(severity).capitalize()
+
+
 def build_summary_section(sections: list, lang: str) -> Section:
     warnings = [w for s in sections for w in s.warnings]
     warnings.sort(key=lambda w: _SEVERITY_RANK.get(w.severity, 3))  # stable: keeps plugin order
-    lines = [f"- **{tr('sev_' + w.severity, lang)}:** {w.text}" for w in warnings[:MAX_ITEMS]]
+    lines = [f"- **{_severity_label(w.severity, lang)}:** {w.text}" for w in warnings[:MAX_ITEMS]]
     if not lines:
         lines.append("- " + tr("summary_none", lang))
     missing = [s.title or tr("h_" + s.section_id, lang) for s in sections if s.confidence == "no-data"]

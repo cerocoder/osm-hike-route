@@ -35,15 +35,34 @@ def _ordered(plugins: list) -> list:
     return order
 
 
+def _one_line(text: str, limit: int = 200) -> str:
+    """Collapse whitespace and truncate, so a traceback or an HTTP error body
+    cannot break the Markdown layout."""
+    flat = " ".join(str(text).split())
+    return flat if len(flat) <= limit else flat[: limit - 1] + "…"
+
+
+def _validate_registration(plugins: list) -> None:
+    seen = set()
+    for plugin in plugins:
+        if plugin.plugin_id in seen:
+            raise ValueError(f"duplicate plugin_id: {plugin.plugin_id}")
+        seen.add(plugin.plugin_id)
+        if plugin.section_id not in SECTION_ORDER:
+            raise ValueError(f"plugin {plugin.plugin_id}: unknown section_id {plugin.section_id!r} "
+                             f"(known: {', '.join(SECTION_ORDER)})")
+
+
 def run_plugins(ctx, plugins: list):
     """Returns (sections_in_registration_order, shared, failures)."""
+    _validate_registration(plugins)
     shared, failures, by_id = {}, [], {}
     for plugin in _ordered(plugins):
         deps = {d: shared[d] for d in plugin.depends_on if d in shared}
         try:
             section = plugin.run(ctx, deps)
         except Exception as e:  # noqa: BLE001 — isolate any plugin failure
-            reason = f"{type(e).__name__}: {e}"
+            reason = _one_line(f"{type(e).__name__}: {e}")
             failures.append((plugin.plugin_id, reason))
             section = Section(plugin.section_id, tr("plugin_failed", ctx.lang, reason=reason), "no-data")
         else:
@@ -93,12 +112,19 @@ def assemble_markdown(ctx, sections: list, summary: Section, fetched_at: datetim
             else:
                 body.append(s.markdown)
         parts.append(f"## {tr('h_' + section_id, lang)}\n\n" + "\n\n".join(body))
+    for s in sections:  # never drop a section whose id is not in SECTION_ORDER
+        if s.section_id not in SECTION_ORDER:
+            parts.append(f"## {s.section_id}\n\n{s.markdown}")
     return "\n\n".join(parts) + "\n"
 
 
 def build_plan(ctx, plugins: list) -> PlanResult:
     sections, shared, failures = run_plugins(ctx, plugins)
-    summary = build_summary_section(sections, ctx.lang)
+    try:
+        summary = build_summary_section(sections, ctx.lang)
+    except Exception as e:  # noqa: BLE001 — the summary is outside run_plugins' isolation
+        failures.append(("summary", _one_line(f"{type(e).__name__}: {e}")))
+        summary = Section("summary", "- " + tr("summary_none", ctx.lang), "derived")
     markdown = assemble_markdown(ctx, sections, summary, _fetched_at(ctx, shared),
                                  (shared.get("weather") or {}).get("utc_offset_seconds"), plugins)
     return PlanResult(markdown=markdown, sections=sections, failures=failures)

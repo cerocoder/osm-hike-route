@@ -435,6 +435,81 @@ def markdown_to_html(md_text: str) -> str:
     return "".join(fragments)
 
 
+_PLAN_HEADING = re.compile(r"^(#{1,3})\s+(.*)$")
+
+
+def _plan_inline(text: str) -> str:
+    """_inline_markdown plus *italic* (day plans use it for the metadata and
+    source lines). Bold is converted first, so a remaining single * pair is
+    italic."""
+    text = _inline_markdown(_xml_escape(text))
+    return re.sub(r"(?<![*\w])\*([^*]+)\*(?![*\w])", r"<i>\1</i>", text)
+
+
+def plan_markdown_to_html(md_text: str) -> str:
+    """Markdown -> HTML for a whole day-plan file: '#'/'##'/'###' headings
+    (rendered as h2/h3/h4), paragraphs, '- '/'1. ' lists, GFM tables, and
+    inline links/bold/italic/code. markdown_to_html deliberately stays as it
+    is for notes.md sections: it has no headings and turns bare lines into
+    list items, which would mangle a plan."""
+    lines = md_text.split("\n")
+    out, items, paragraph = [], [], []
+    current = None
+    i = 0
+
+    def flush_paragraph():
+        if paragraph:
+            out.append("<p>" + _plan_inline(" ".join(paragraph)) + "</p>")
+            paragraph.clear()
+
+    def flush_list():
+        nonlocal current
+        if current is not None:
+            items.append(current)
+            current = None
+        if items:
+            out.append("<ul>" + "".join(f"<li>{_plan_inline(item)}</li>" for item in items) + "</ul>")
+            items.clear()
+
+    while i < len(lines):
+        line = lines[i].strip()
+
+        if "|" in line and i + 1 < len(lines) and _TABLE_SEPARATOR_ROW.match(lines[i + 1].strip()):
+            flush_paragraph()
+            flush_list()
+            table_rows = [line, lines[i + 1].strip()]
+            i += 2
+            while i < len(lines) and lines[i].strip() and "|" in lines[i]:
+                table_rows.append(lines[i].strip())
+                i += 1
+            out.append(_render_table(table_rows))
+            continue
+
+        heading = _PLAN_HEADING.match(line)
+        if heading:
+            flush_paragraph()
+            flush_list()
+            level = len(heading.group(1)) + 1
+            out.append(f"<h{level}>{_plan_inline(heading.group(2))}</h{level}>")
+        elif _LIST_MARKER.match(line):
+            flush_paragraph()
+            if current is not None:
+                items.append(current)
+            current = line[_LIST_MARKER.match(line).end():]
+        elif not line:
+            flush_paragraph()
+            flush_list()
+        elif current is not None:
+            current = f"{current} {line}"
+        else:
+            paragraph.append(line)
+        i += 1
+
+    flush_paragraph()
+    flush_list()
+    return "".join(out)
+
+
 # ---------------------------------------------------------------------------
 # Place-info enrichment (spec §5): queries every configured plugin
 # (Wikipedia, Wikidata, Wikimedia Commons, OpenTripMap — see

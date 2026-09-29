@@ -9,20 +9,25 @@ Repository: <https://github.com/cerocoder/osm-hike-route>
 
 You describe the day you want ("a loop in Casa de Campo, mostly trees, no big roads, 15 km, start from a metro station"). Claude builds a route from OpenStreetMap data, shaped by your preferences rather than just "shortest path", and saves it in a folder you can reuse and tweak later. A second step turns that folder into a self-contained map page you open in your browser, with a GPX file you can load into Wikiloc or a Garmin device.
 
-The project is a Claude Code plugin made of two skills that work as a pair.
+The project is a Claude Code plugin made of three skills: two that work as a pair (plan a route, show it), and a third that briefs you on a specific day for a saved route.
 
 ## Architecture at a glance
 
 ```
  your request ──▶ osm-day-route-planning ──▶ routes/<place>-<date>/ ──▶ osm-day-route-show ──▶ map.html + GPX
-                  (builds the route)          route.geojson, notes.md,     (draws it)
-                                              weights.json, requests.md
+                  (builds the route)          route.geojson, notes.md,     (draws it, with
+                                              weights.json, requests.md,    every day plan inside)
+                                              day-plan-<date>.md  ▲
+                                                                  │
+                                      a date ──▶ osm-day-route-day-plan
+                                                 (daylight, weather by hour)
 ```
 
 | Skill | Purpose |
 |---|---|
 | `osm-day-route-planning` | Turns your request into a route and saves it in an archive folder. |
 | `osm-day-route-show` | Renders a saved route as an interactive map page. Needs a route from the planning skill. |
+| `osm-day-route-day-plan` | For a saved route and a date, writes a day plan: sunrise, sunset, daylight, hourly weather. Needs a route from the planning skill. |
 
 The archive folder is the hand-off between them, and it is also your history: every request you made is logged, so you can come back and say "swap that viewpoint for a café" instead of starting over.
 
@@ -50,14 +55,30 @@ Revising: refer to an existing route ("change the start point", "make it a bike 
 
 Not for: live turn-by-turn navigation, multi-day treks, driving routes, ski touring.
 
+## Skill: osm-day-route-day-plan
+
+**Use it when** you have a saved route and know the day you will go: "what will the weather and daylight be on Saturday?"
+
+What you get, as `day-plan-<YYYY-MM-DD>.md` in the route folder:
+- **Summary:** the most important warnings first (thunderstorm, strong gusts, finish after sunset, fog, cold, heavy rain).
+- **Daylight:** sunrise, sunset and day length, and how much daylight is left after the route's estimated finish (or the latest start that still finishes an hour before sunset).
+- **Weather by hour:** temperature and feels-like, precipitation and its probability, cloud cover, visibility, **wind speed and the direction it blows from**, gusts, snow cover, and a plain-language sky description.
+
+Good to know:
+- Forecasts reach about 15 days ahead. For a later date you get the average of that date over the last five years, clearly labelled as *not a forecast*. Past dates use actual recorded weather.
+- Ask for a plan for several dates: each gets its own file, and re-running a date overwrites only that date.
+- The plan records where you start from only as a city or station, never a street address, because the file is embedded in `map.html`, which is meant to be forwarded.
+- This is the first version: daylight, weather and the summary. Transit and opening hours, hazards (ticks, mosquitoes, mountains, air, radiation, fire) and mobile coverage are planned next.
+
 ## Skill: osm-day-route-show
 
 **Use it when** you want to see a planned route in a browser.
 
 What you get:
 - **`map.html`**, one file, opens in any browser. Route line with direction arrows, and a marker for every point with a popup (name, type, confidence).
-- **A side panel** on the right, always in the same order: title, route (mode, distance, elevation, time), how to get there, points of interest, export. Sections that come from your `notes.md` show "not in notes.md" if the notes have no matching heading. Use headings such as `## How to get there` and `## Points of interest`.
+- **A side panel** on the right, always in the same order: title, route (mode, distance, elevation, time), how to get there, points of interest, day plan, export. Sections that come from your `notes.md` show "not in notes.md" if the notes have no matching heading. Use headings such as `## How to get there` and `## Points of interest`.
 - **A layer switcher** at the top left to change the base map. Esri Street and Esri Satellite are always offered. CyclOSM (cycling) and IGN España (Spanish topographic maps) appear only where they have coverage for your route.
+- **Day plan:** if the route folder has `day-plan-<date>.md` files, every one is embedded in the page. The side panel shows a date picker and the plan's summary; "Open full plan" shows the whole plan (with the hourly weather table), and you can download it as `.md` or print it / save it as PDF from your browser. Because everything is inside the one HTML file, you can send `map.html` to someone and they get all planned days. Re-render the map after adding a new date.
 - **Export:** a GPX download (with elevation), plus links to open the area in Google Maps and OpenStreetMap.
 - **Place info:** links to Wikipedia, Wikidata, Wikimedia Commons and, optionally, OpenTripMap for each point.
 - **Your language:** the page's own labels follow the language you write in (English, Russian, Spanish, French, German, Portuguese, Italian). Place names stay as they are on the map.
@@ -91,7 +112,8 @@ Each route gets its own folder, `routes/<place>-<date>/`:
 | `notes.md` | Human-readable summary: how to get there, points of interest, caveats. |
 | `weights.json` | Your preferences and budget as they were used. |
 | `requests.md` | Every request you made for this route, in order. |
-| `map.html` | The rendered map (after the show step). |
+| `day-plan-<YYYY-MM-DD>.md` | A day plan for one date (daylight, hourly weather). One file per planned date. |
+| `map.html` | The rendered map (after the show step); contains every day plan. |
 
 ## Usage examples
 

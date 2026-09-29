@@ -310,6 +310,34 @@ layers themselves — there's no chat-based "which plugin?" prompt, the
 switcher **is** the picker. `--tile-timeout <seconds>` (default 5.0)
 controls the per-probe timeout for `cyclosm`/`ign_es_mtn`.
 
+## Day Plans
+
+`render_map.py` embeds every `day-plan-YYYY-MM-DD.md` found in the route
+folder (written by `osm-day-route-day-plan`) — so the single `map.html` can
+be forwarded with all planned days inside, no other file needed. Code lives
+in `scripts/day_plan_view.py` (loading, sidebar block, overlay, script, print
+CSS) plus `plan_markdown_to_html` in `render_map.py`.
+
+- **Sidebar block "Day plan"** sits after Points of interest and before
+  Export: a date `<select>` when there is more than one plan (default: the
+  nearest upcoming date, else the latest), the plan's Summary section (found
+  through `SECTION_ALIASES["day_plan_summary"]`, the seven summary headings
+  the day-plan skill writes — keep both lists in sync), and an "Open full
+  plan" button. With no plan files it shows a "No day plan yet" placeholder,
+  like every other block.
+- **Full-plan overlay**: the whole plan rendered by `plan_markdown_to_html`
+  (headings, paragraphs, lists, tables — `markdown_to_html` deliberately
+  stays untouched, it has no headings and would turn plan text into list
+  items), with fetched-at time, a "date has passed" marker (decided in the
+  browser when the page is opened), **Download .md** (a `data:text/markdown`
+  link, file name `<route>-day-plan-<date>.md`) and **Print / save as PDF**
+  (`window.print()`; `@media print` hides everything except the plan).
+- Plan text is HTML-escaped by the converter, and the JSON embedded in the
+  page escapes `</`, so a plan cannot break out of the inline `<script>`.
+- The file is a snapshot: a plan added after rendering is not in `map.html`
+  until it is re-rendered. Plans saved with a BOM or CRLF line endings load
+  normally; files with an impossible date in the name are skipped.
+
 ## Configuration
 
 The `opentripmap` plugin is optional and richer than the other three, but

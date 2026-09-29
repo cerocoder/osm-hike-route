@@ -1,0 +1,175 @@
+"""Localized strings for the plan text. Section headings, the metadata line
+and severity labels exist in all seven languages of osm-day-route-show
+(en/ru/es/fr/de/pt/it); the body strings of light/weather are translated for
+en and ru only and fall back to English for the rest (same fallback rule as
+osm-day-route-show's UI_STRINGS). The summary heading is also listed in
+osm-day-route-show's SECTION_ALIASES["day_plan_summary"] — keep them in sync."""
+
+LANGS = ("en", "ru", "es", "fr", "de", "pt", "it")
+
+STRINGS = {
+    "en": {
+        "h_summary": "Summary",
+        "h_light": "Daylight",
+        "h_weather": "Weather by hour",
+        "h_transit": "Getting there",
+        "h_pois": "Points of interest",
+        "h_hazards": "Hazards",
+        "h_cell_coverage": "Mobile coverage",
+        "sev_danger": "Danger", "sev_caution": "Caution", "sev_info": "Note",
+        "summary_none": "No warnings for this date.",
+        "summary_no_data": "Sections without data: {names}.",
+        "no_data_section": "No data available for this section.",
+        "plugin_failed": "This section could not be built ({reason}).",
+        "meta": "Forecast fetched {fetched} UTC · Mode: {mode}",
+        "meta_from": " · From: {departure}",
+        "mode_walk": "walking", "mode_bike": "cycling",
+        # light
+        "light_line": "Sunrise **{sunrise}**, sunset **{sunset}**, daylight **{length}**.",
+        "light_tz_approx": "Times use a time zone estimated from longitude (weather data was unavailable).",
+        "light_polar_day": "Polar day: the sun does not set on this date.",
+        "light_polar_night": "Polar night: the sun does not rise on this date.",
+        "light_finish": "Start {start} → estimated finish {finish}; margin to sunset: **{margin}**.",
+        "light_latest_start": "To finish {buffer} min before sunset, start no later than **{latest}**.",
+        "light_no_duration": "The route duration is not in the archive, so the finish margin is not estimated.",
+        "light_warn_after_sunset": "The route is estimated to end {minutes} min after sunset — carry a headlamp or start earlier.",
+        "light_warn_tight": "Less than {buffer} min of daylight will be left after the estimated finish.",
+        "light_warn_not_fit": "The route (about {hours} h) does not fit into the daylight ({length}) — shorten it or plan for a headlamp.",
+        "light_warn_polar_night": "The sun does not rise on this date — plan for artificial light all day.",
+        "unit_h": "h", "unit_min": "min",
+        # weather
+        "w_time": "Time", "w_temp": "°C", "w_feels": "Feels °C", "w_precip": "Precip mm (prob %)",
+        "w_cloud": "Cloud %", "w_vis": "Vis km", "w_wind": "Wind m/s (from)", "w_gust": "Gusts m/s",
+        "w_snow": "Snow cm", "w_sky": "Sky",
+        "w_source_forecast": "Source: Open-Meteo forecast (model output).",
+        "w_source_archive": "Source: Open-Meteo historical archive (actual past weather).",
+        "w_source_climate": "No forecast exists this far ahead: values are the average of this date over the last {years} years (climatology), not a forecast.",
+        "w_unavailable": "The weather service could not be reached ({reason}).",
+        "w_warn_thunder": "Thunderstorms are forecast — avoid ridges, open ground and lone trees.",
+        "w_warn_fog": "Fog or visibility under 1 km is expected — navigation will be harder.",
+        "w_warn_gust": "Gusts up to {value} m/s ({label}).",
+        "w_warn_cold": "Feels-like temperature down to {value} °C — risk of hypothermia and frostbite.",
+        "w_warn_heat": "Feels-like temperature up to {value} °C — carry extra water and avoid midday exertion.",
+        "w_warn_rain": "Heavy precipitation expected (up to {value} mm/h).",
+        "w_warn_snow": "Snow cover of about {value} cm is expected on the ground.",
+        "w_warn_climate": "Beyond the forecast horizon: this is climatology, not a forecast.",
+        "gust_strong": "strong wind", "gust_storm": "storm-force wind",
+        "sky_clear": "clear", "sky_partly": "partly cloudy", "sky_overcast": "overcast", "sky_fog": "fog",
+        "sky_drizzle": "drizzle", "sky_rain": "rain", "sky_snow": "snow", "sky_showers": "showers",
+        "sky_thunder": "thunderstorm", "sky_unknown": "–",
+        "compass": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
+    },
+    "ru": {
+        "h_summary": "Главное на день",
+        "h_light": "Световой день",
+        "h_weather": "Погода по часам",
+        "h_transit": "Как добраться",
+        "h_pois": "Точки интереса",
+        "h_hazards": "Опасности",
+        "h_cell_coverage": "Сотовая связь",
+        "sev_danger": "Опасно", "sev_caution": "Осторожно", "sev_info": "К сведению",
+        "summary_none": "Предупреждений на эту дату нет.",
+        "summary_no_data": "Разделы без данных: {names}.",
+        "no_data_section": "Для этого раздела нет данных.",
+        "plugin_failed": "Раздел не удалось построить ({reason}).",
+        "meta": "Прогноз получен {fetched} UTC · Режим: {mode}",
+        "meta_from": " · Откуда: {departure}",
+        "mode_walk": "пешком", "mode_bike": "на велосипеде",
+        "light_line": "Рассвет **{sunrise}**, закат **{sunset}**, световой день **{length}**.",
+        "light_tz_approx": "Время указано по часовому поясу, оценённому по долготе (данных погоды не было).",
+        "light_polar_day": "Полярный день: в эту дату солнце не заходит.",
+        "light_polar_night": "Полярная ночь: в эту дату солнце не восходит.",
+        "light_finish": "Старт {start} → расчётный финиш {finish}; запас до заката: **{margin}**.",
+        "light_latest_start": "Чтобы закончить за {buffer} мин до заката, стартуйте не позже **{latest}**.",
+        "light_no_duration": "Длительности маршрута нет в архиве, поэтому запас до заката не оценён.",
+        "light_warn_after_sunset": "Маршрут, по оценке, закончится через {minutes} мин после заката — возьмите налобный фонарь или стартуйте раньше.",
+        "light_warn_tight": "После расчётного финиша останется меньше {buffer} мин светлого времени.",
+        "light_warn_not_fit": "Маршрут (около {hours} ч) не помещается в световой день ({length}) — сократите его или рассчитывайте на фонарь.",
+        "light_warn_polar_night": "В эту дату солнце не восходит — рассчитывайте на искусственный свет весь день.",
+        "unit_h": "ч", "unit_min": "мин",
+        "w_time": "Время", "w_temp": "°C", "w_feels": "Ощущ. °C", "w_precip": "Осадки мм (вер. %)",
+        "w_cloud": "Облачн. %", "w_vis": "Вид. км", "w_wind": "Ветер м/с (откуда)", "w_gust": "Порывы м/с",
+        "w_snow": "Снег см", "w_sky": "Небо",
+        "w_source_forecast": "Источник: прогноз Open-Meteo (расчёт модели).",
+        "w_source_archive": "Источник: архив Open-Meteo (фактическая погода в прошлом).",
+        "w_source_climate": "Прогноза на такую дату нет: значения — среднее за эту дату за последние {years} лет (климатика), а не прогноз.",
+        "w_unavailable": "Сервис погоды недоступен ({reason}).",
+        "w_warn_thunder": "Ожидается гроза — избегайте гребней, открытых мест и одиноких деревьев.",
+        "w_warn_fog": "Ожидается туман или видимость меньше 1 км — ориентироваться будет труднее.",
+        "w_warn_gust": "Порывы до {value} м/с ({label}).",
+        "w_warn_cold": "Ощущаемая температура до {value} °C — риск переохлаждения и обморожения.",
+        "w_warn_heat": "Ощущаемая температура до {value} °C — возьмите больше воды, избегайте нагрузки в полдень.",
+        "w_warn_rain": "Ожидаются сильные осадки (до {value} мм/ч).",
+        "w_warn_snow": "Ожидается снежный покров около {value} см.",
+        "w_warn_climate": "За горизонтом прогноза: это климатика, а не прогноз.",
+        "gust_strong": "сильный ветер", "gust_storm": "штормовой ветер",
+        "sky_clear": "ясно", "sky_partly": "переменная облачность", "sky_overcast": "пасмурно", "sky_fog": "туман",
+        "sky_drizzle": "морось", "sky_rain": "дождь", "sky_snow": "снег", "sky_showers": "ливни",
+        "sky_thunder": "гроза", "sky_unknown": "–",
+        "compass": ["С", "СВ", "В", "ЮВ", "Ю", "ЮЗ", "З", "СЗ"],
+    },
+    "es": {
+        "h_summary": "Resumen del día", "h_light": "Luz diurna", "h_weather": "Tiempo por horas",
+        "h_transit": "Cómo llegar", "h_pois": "Puntos de interés", "h_hazards": "Peligros",
+        "h_cell_coverage": "Cobertura móvil",
+        "sev_danger": "Peligro", "sev_caution": "Precaución", "sev_info": "Nota",
+        "meta": "Previsión obtenida {fetched} UTC · Modo: {mode}", "meta_from": " · Desde: {departure}",
+        "mode_walk": "a pie", "mode_bike": "en bicicleta",
+        "compass": ["N", "NE", "E", "SE", "S", "SO", "O", "NO"],
+    },
+    "fr": {
+        "h_summary": "L'essentiel du jour", "h_light": "Lumière du jour", "h_weather": "Météo heure par heure",
+        "h_transit": "Comment s'y rendre", "h_pois": "Points d'intérêt", "h_hazards": "Dangers",
+        "h_cell_coverage": "Couverture mobile",
+        "sev_danger": "Danger", "sev_caution": "Prudence", "sev_info": "Remarque",
+        "meta": "Prévision récupérée {fetched} UTC · Mode : {mode}", "meta_from": " · Depuis : {departure}",
+        "mode_walk": "à pied", "mode_bike": "à vélo",
+        "compass": ["N", "NE", "E", "SE", "S", "SO", "O", "NO"],
+    },
+    "de": {
+        "h_summary": "Das Wichtigste", "h_light": "Tageslicht", "h_weather": "Wetter nach Stunden",
+        "h_transit": "Anreise", "h_pois": "Sehenswürdigkeiten", "h_hazards": "Gefahren",
+        "h_cell_coverage": "Mobilfunkempfang",
+        "sev_danger": "Gefahr", "sev_caution": "Vorsicht", "sev_info": "Hinweis",
+        "meta": "Vorhersage abgerufen {fetched} UTC · Modus: {mode}", "meta_from": " · Von: {departure}",
+        "mode_walk": "zu Fuß", "mode_bike": "mit dem Rad",
+        "compass": ["N", "NO", "O", "SO", "S", "SW", "W", "NW"],
+    },
+    "pt": {
+        "h_summary": "Resumo do dia", "h_light": "Luz do dia", "h_weather": "Tempo hora a hora",
+        "h_transit": "Como chegar", "h_pois": "Pontos de interesse", "h_hazards": "Perigos",
+        "h_cell_coverage": "Cobertura móvel",
+        "sev_danger": "Perigo", "sev_caution": "Cuidado", "sev_info": "Nota",
+        "meta": "Previsão obtida {fetched} UTC · Modo: {mode}", "meta_from": " · De: {departure}",
+        "mode_walk": "a pé", "mode_bike": "de bicicleta",
+        "compass": ["N", "NE", "L", "SE", "S", "SO", "O", "NO"],
+    },
+    "it": {
+        "h_summary": "In breve", "h_light": "Luce del giorno", "h_weather": "Meteo ora per ora",
+        "h_transit": "Come arrivare", "h_pois": "Punti di interesse", "h_hazards": "Pericoli",
+        "h_cell_coverage": "Copertura cellulare",
+        "sev_danger": "Pericolo", "sev_caution": "Attenzione", "sev_info": "Nota",
+        "meta": "Previsione ottenuta {fetched} UTC · Modalità: {mode}", "meta_from": " · Da: {departure}",
+        "mode_walk": "a piedi", "mode_bike": "in bici",
+        "compass": ["N", "NE", "E", "SE", "S", "SO", "O", "NO"],
+    },
+}
+
+
+def tr(key: str, lang: str, **fmt):
+    """String for `key` in `lang`, English fallback for any missing key or
+    unknown language. Formats with **fmt when given (lists are returned
+    as-is)."""
+    value = STRINGS.get(lang, {}).get(key)
+    if value is None:
+        value = STRINGS["en"][key]
+    if fmt and isinstance(value, str):
+        return value.format(**fmt)
+    return value
+
+
+def compass(degrees: float, lang: str) -> str:
+    """8-point compass label for a bearing in degrees (direction the wind
+    blows FROM)."""
+    names = tr("compass", lang)
+    return names[int(((degrees % 360) + 22.5) // 45) % 8]

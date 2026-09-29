@@ -28,49 +28,49 @@ DAY_PLAN_UI = {
         "day_plan_title": "Day plan", "day_plan_open": "Open full plan",
         "day_plan_download": "Download .md", "day_plan_print": "Print / save as PDF",
         "day_plan_none": "No day plan yet — ask Claude to plan a specific date",
-        "day_plan_fetched": "Forecast fetched", "day_plan_passed": "date has passed",
+        "day_plan_fetched": "Data fetched", "day_plan_passed": "date has passed",
         "day_plan_close": "Close", "day_plan_date": "Date",
     },
     "ru": {
         "day_plan_title": "План дня", "day_plan_open": "Открыть полный план",
         "day_plan_download": "Скачать .md", "day_plan_print": "Печать / сохранить в PDF",
         "day_plan_none": "Плана дня пока нет — попросите спланировать конкретную дату",
-        "day_plan_fetched": "Прогноз получен", "day_plan_passed": "дата прошла",
+        "day_plan_fetched": "Данные получены", "day_plan_passed": "дата прошла",
         "day_plan_close": "Закрыть", "day_plan_date": "Дата",
     },
     "es": {
         "day_plan_title": "Plan del día", "day_plan_open": "Abrir plan completo",
         "day_plan_download": "Descargar .md", "day_plan_print": "Imprimir / guardar como PDF",
         "day_plan_none": "Aún no hay plan del día — pide planificar una fecha concreta",
-        "day_plan_fetched": "Previsión obtenida", "day_plan_passed": "la fecha ya pasó",
+        "day_plan_fetched": "Datos obtenidos", "day_plan_passed": "la fecha ya pasó",
         "day_plan_close": "Cerrar", "day_plan_date": "Fecha",
     },
     "fr": {
         "day_plan_title": "Plan du jour", "day_plan_open": "Ouvrir le plan complet",
         "day_plan_download": "Télécharger .md", "day_plan_print": "Imprimer / enregistrer en PDF",
         "day_plan_none": "Pas encore de plan du jour — demandez de planifier une date précise",
-        "day_plan_fetched": "Prévision récupérée", "day_plan_passed": "date passée",
+        "day_plan_fetched": "Données récupérées", "day_plan_passed": "date passée",
         "day_plan_close": "Fermer", "day_plan_date": "Date",
     },
     "de": {
         "day_plan_title": "Tagesplan", "day_plan_open": "Vollständigen Plan öffnen",
         "day_plan_download": ".md herunterladen", "day_plan_print": "Drucken / als PDF speichern",
         "day_plan_none": "Noch kein Tagesplan – bitte ein bestimmtes Datum planen lassen",
-        "day_plan_fetched": "Vorhersage abgerufen", "day_plan_passed": "Datum liegt in der Vergangenheit",
+        "day_plan_fetched": "Daten abgerufen", "day_plan_passed": "Datum liegt in der Vergangenheit",
         "day_plan_close": "Schließen", "day_plan_date": "Datum",
     },
     "pt": {
         "day_plan_title": "Plano do dia", "day_plan_open": "Abrir plano completo",
         "day_plan_download": "Transferir .md", "day_plan_print": "Imprimir / guardar como PDF",
         "day_plan_none": "Ainda não há plano do dia — peça para planear uma data concreta",
-        "day_plan_fetched": "Previsão obtida", "day_plan_passed": "a data já passou",
+        "day_plan_fetched": "Dados obtidos", "day_plan_passed": "a data já passou",
         "day_plan_close": "Fechar", "day_plan_date": "Data",
     },
     "it": {
         "day_plan_title": "Piano del giorno", "day_plan_open": "Apri il piano completo",
         "day_plan_download": "Scarica .md", "day_plan_print": "Stampa / salva come PDF",
         "day_plan_none": "Nessun piano del giorno — chiedi di pianificare una data precisa",
-        "day_plan_fetched": "Previsione ottenuta", "day_plan_passed": "data trascorsa",
+        "day_plan_fetched": "Dati ottenuti", "day_plan_passed": "data trascorsa",
         "day_plan_close": "Chiudi", "day_plan_date": "Data",
     },
 }
@@ -137,13 +137,13 @@ DAY_PLAN_CSS = """
   #dp-body th { background: #f3f4f6; white-space: nowrap; }
   #dp-body a { color: #2563eb; }
   @media print {
-    body > *:not(#dp-overlay) { display: none !important; }
-    #dp-overlay { position: static; display: block; background: none; }
-    #dp-panel { max-width: none; height: auto; overflow: visible; padding: 0; }
-    #dp-toolbar { display: none; }
-    #dp-body tr, #dp-body h2, #dp-body h3 { break-inside: avoid; page-break-inside: avoid; }
-    #dp-body .table-wrap { overflow: visible; }
-    #dp-body table { font-size: 10px; }
+    body.dp-printing > *:not(#dp-overlay) { display: none !important; }
+    body.dp-printing #dp-overlay { position: static; display: block; background: none; }
+    body.dp-printing #dp-panel { max-width: none; height: auto; overflow: visible; padding: 0; }
+    body.dp-printing #dp-toolbar { display: none; }
+    body.dp-printing #dp-body tr, body.dp-printing #dp-body h2, body.dp-printing #dp-body h3 { break-inside: avoid; page-break-inside: avoid; }
+    body.dp-printing #dp-body .table-wrap { overflow: visible; }
+    body.dp-printing #dp-body table { font-size: 10px; }
   }
 """
 
@@ -172,8 +172,8 @@ _SCRIPT_TEMPLATE = """
       link.download = DP_FILE_BASE + '-day-plan-' + plan.date + '.md';
       if (select) select.value = String(i);
     }
-    function openPanel() { $('dp-overlay').hidden = false; $('dp-panel').scrollTop = 0; }
-    function closePanel() { $('dp-overlay').hidden = true; }
+    function openPanel() { document.body.classList.add('dp-printing'); $('dp-overlay').hidden = false; $('dp-panel').scrollTop = 0; }
+    function closePanel() { document.body.classList.remove('dp-printing'); $('dp-overlay').hidden = true; }
     if (select) select.addEventListener('change', () => show(Number(select.value)));
     $('dp-open').addEventListener('click', openPanel);
     $('dp-close').addEventListener('click', closePanel);
@@ -186,9 +186,11 @@ _SCRIPT_TEMPLATE = """
 
 
 def _json_for_script(value) -> str:
-    # "</" would let a plan's text end the inline <script> early; \/ is the
-    # same string to a JSON parser.
-    return json.dumps(value, ensure_ascii=False).replace("</", "<\\/")
+    # Every "<" becomes the JSON escape \u003c: "</" would end the inline
+    # <script> early and "<!--" + "<script" would switch the HTML parser into
+    # its double-escaped state. U+2028/2029 are escaped for old JS parsers.
+    return (json.dumps(value, ensure_ascii=False).replace("<", "\\u003c")
+            .replace("\u2028", "\\u2028").replace("\u2029", "\\u2029"))
 
 
 def build_day_plan_parts(plans: list[dict], labels: dict, file_base: str, today: str) -> tuple[str, str, str]:
@@ -223,9 +225,8 @@ def build_day_plan_parts(plans: list[dict], labels: dict, file_base: str, today:
                 "fetched_at": p["fetched_at"]} for p in plans]
     js_labels = {"title": labels["day_plan_title"], "fetched": labels["day_plan_fetched"],
                  "passed": labels["day_plan_passed"]}
-    script = (_SCRIPT_TEMPLATE
-              .replace("__PLANS__", _json_for_script(payload))
-              .replace("__LABELS__", _json_for_script(js_labels))
-              .replace("__FILE_BASE__", _json_for_script(file_base))
-              .replace("__DEFAULT__", str(default)))
+    values = {"PLANS": _json_for_script(payload), "LABELS": _json_for_script(js_labels),
+              "FILE_BASE": _json_for_script(file_base), "DEFAULT": str(default)}
+    # One pass, so substituted values are never rescanned for placeholders.
+    script = re.sub(r"__(PLANS|LABELS|FILE_BASE|DEFAULT)__", lambda m: values[m.group(1)], _SCRIPT_TEMPLATE)
     return sidebar, overlay, script

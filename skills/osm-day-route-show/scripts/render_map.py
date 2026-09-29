@@ -324,15 +324,26 @@ def _xml_escape(s: str) -> str:
     return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;"))
 
 
+# Only these schemes become links (javascript:, data:, vbscript:, file: ...
+# stay plain text). Leading whitespace/control characters are ignored when
+# checking, as browsers ignore them when parsing a URL.
+_SAFE_LINK_PREFIXES = ("http://", "https://", "mailto:")
+_LINK_STRIP_CHARS = "".join(chr(c) for c in range(0x21)) + "\x7f"
+
+
 def _inline_markdown(s: str) -> str:
     """[text](url), **bold**, `code` -> HTML. The link regex tolerates one
     level of parens inside the URL (e.g. a Wikipedia article title like
     ...wiki/L%C3%ADnea_C-5_(Cercan%C3%ADas_Madrid)) — a naive [^)]+ would
     truncate at the first ')' inside the URL itself."""
-    s = re.sub(
-        r'\[([^\]]+)\]\(((?:[^()]|\([^()]*\))*)\)',
-        r'<a href="\2" target="_blank" rel="noopener">\1</a>', s,
-    )
+    def link(m):
+        text, url = m.group(1), m.group(2)
+        target = url.lstrip(_LINK_STRIP_CHARS)
+        if not target.lower().startswith(_SAFE_LINK_PREFIXES):
+            return m.group(0)  # unsafe scheme or relative: leave as plain text
+        return f'<a href="{target}" target="_blank" rel="noopener">{text}</a>'
+
+    s = re.sub(r'\[([^\]]+)\]\(((?:[^()]|\([^()]*\))*)\)', link, s)
     s = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', s)
     s = re.sub(r'`([^`]+)`', r'<code>\1</code>', s)
     return s
@@ -801,7 +812,7 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
     # "</script>" can't end this inline <script> tag early and break the
     # whole page's JS (map, arrows, popups). \/ and / are equivalent in a
     # JSON string, so this doesn't change the parsed meaning.
-    geojson_json = json.dumps(geojson).replace("</", "<\\/")
+    geojson_json = json.dumps(geojson).replace("<", "\\u003c")
 
     gpx_content = build_gpx(geojson, title)
     gpx_data_uri = "data:application/gpx+xml;charset=utf-8," + urllib.parse.quote(gpx_content)

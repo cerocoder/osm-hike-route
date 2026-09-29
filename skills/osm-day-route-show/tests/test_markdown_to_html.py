@@ -86,3 +86,27 @@ def test_pipe_without_a_following_separator_row_is_not_treated_as_a_table():
     html = markdown_to_html(md)
     assert "<table>" not in html
     assert "<li>" in html
+
+
+import pytest
+
+
+@pytest.mark.parametrize("url", [
+    "javascript:alert(1)", "JaVaScRiPt:alert(1)", " javascript:alert(1)", "\tjava\x01script:alert(1)",
+    "data:text/html,<b>x</b>", "vbscript:x", "file:///etc/passwd", "/relative/path",
+])
+def test_unsafe_or_relative_link_targets_are_not_linked(url):
+    html = markdown_to_html(f"- [x]({url})\n")
+    assert "<a " not in html
+    assert "[x](" in html
+
+
+@pytest.mark.parametrize("url", ["https://e.com", "http://e.com", "mailto:a@b.c", "HTTPS://E.COM"])
+def test_http_https_mailto_links_still_linked(url):
+    html = markdown_to_html(f"- [x]({url})\n")
+    assert f'<a href="{url}"' in html
+
+
+def test_wikipedia_url_with_parentheses_still_linked():
+    url = "https://es.wikipedia.org/wiki/L%C3%ADnea_C-5_(Cercan%C3%ADas_Madrid)"
+    assert f'<a href="{url}"' in markdown_to_html(f"- [x]({url})\n")

@@ -107,7 +107,7 @@ def test_plan_text_cannot_break_out_of_the_script_tag():
 
 
 def test_plan_saved_with_a_bom_and_crlf_line_endings_still_loads_cleanly(tmp_path):
-    (tmp_path / "day-plan-2026-06-21.md").write_bytes(("﻿" + PLAN.replace("\n", "\r\n")).encode("utf-8"))
+    (tmp_path / "day-plan-2026-06-21.md").write_bytes(("\ufeff" + PLAN.replace("\n", "\r\n")).encode("utf-8"))
     plan = load_day_plans(tmp_path)[0]
     assert plan.markdown.startswith("# Route")
     assert "\r" not in plan.markdown

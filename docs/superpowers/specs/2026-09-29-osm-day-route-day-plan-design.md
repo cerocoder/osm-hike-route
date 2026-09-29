@@ -75,7 +75,8 @@ for the same date overwrites that date's file. Section order is fixed:
    weekday/holiday, services serving them, recommendations from the
    departure point.
 5. **Points of interest**: open or closed on that date, special features.
-6. **Hazards**: ticks and insects, animals, people-related risks (see
+6. **Hazards**: ticks and biting insects (mosquitoes, blackflies,
+   horseflies), animals, mountain hazards, people-related risks (see
    plugins), air quality and pollen, radiation, fire danger.
 7. **Mobile coverage**.
 
@@ -107,7 +108,7 @@ New package `scripts/day_plan/`, structured like `scripts/place_info/`:
 departure point, `facts` from `facts.json`, HTTP helper with timeout.
 
 Plugin order: `light`, `weather`, `transit`, `poi_hours`, `bio_hazards`,
-`people_hazards`, `air`, `radiation`, `fire`, `cell_coverage`, then
+`mountain`, `people_hazards`, `air`, `radiation`, `fire`, `cell_coverage`, then
 `summary` last.
 
 ## Plugins
@@ -147,12 +148,81 @@ special features from `notes.md` and `facts.json`. `tag-backed` or
 `web-sourced`.
 
 ### bio_hazards
-- Ticks and insects: activity estimated from the weather plugin's daily
-  mean temperature and the month (ticks generally active from about
-  +5 to +7 C), plus regional facts from `facts.json` (`derived` and
+- **Ticks:** activity estimated from the weather plugin's daily mean
+  temperature and the month (ticks generally active from about +5 to
+  +7 C), plus regional facts from `facts.json` (`derived` and
   `web-sourced`).
+- **Biting insects ("gnus": mosquitoes, blackflies/midges, horseflies,
+  biting midges).** Especially important for Siberia and the Urals, but
+  reported for any route. The complex is not one species, so the plan
+  reports each group separately from the weather plugin's hourly data and
+  the route's terrain:
+  - *Mosquitoes* depend on standing water (OSM `natural=wetland|water`,
+    `waterway=*` slow reaches near the route) and warm, calm air; worst
+    around dawn and dusk.
+  - *Blackflies/midges* are tied to running water (streams and rivers
+    within a few hundred metres) and can stay active until the first
+    autumn cold, in places outnumbering mosquitoes.
+  - *Horseflies* peak in the hottest, sunny hours (roughly 12:00-16:00
+    local), not at dusk.
+  - Wind speed, humidity, light and temperature all modulate activity;
+    stronger wind and cold suppress it, calm humid warm air favours it.
+  The output is a per-hour risk band (low/moderate/high) per group and a
+  short list of what to do (repellent, head net, clothing, avoid stopping
+  near still water at dusk, choose windy ridges for rests). Thresholds
+  are heuristics kept in a config table, not measurements; they are
+  labelled `derived`, and regional facts (season start and peak for the
+  route's region) are added from `facts.json` (`web-sourced`). The
+  heuristic table needs checking against regional sources during
+  implementation.
 - Animals (bears, wild boar, wolves, snakes, stray dogs, hunting season
   and hunting-area closures): from `facts.json` only, `web-sourced`.
+
+### mountain
+Reported only when the route is in the mountains, decided from the
+elevation data the planning skill stores in `route.geojson`
+(`elevation/`): maximum elevation at or above 600 m, **or** relief
+(max minus min elevation) of at least 300 m. If the archive has no
+elevation data the section is `no-data`, never guessed.
+
+Tiers by maximum elevation:
+- **From 600 m (or relief >= 300 m):** slips and falls (steepest
+  gradients from the elevation profile, OSM `sac_scale` T1-T6,
+  `via_ferrata_scale`, `trail_visibility`, `natural=scree|cliff|
+  bare_rock`, `hazard=*` on or near the track); rockfall, landslide and
+  mudflow risk after rain (a `derived` estimate from slope, recent rainfall
+  via Open-Meteo `past_days`, and scree/cliff features; the NASA LHASA
+  landslide nowcast is linked as a reference, not queried, because it is
+  gridded files without a point API); fast weather change and thunderstorms
+  on ridges; fog and whiteout navigation; cold (about 6.5 C per km of
+  height gained relative to the valley, hypothermia even in summer);
+  river crossings, flash floods in narrow valleys and afternoon
+  snowmelt rises; late-lying snow patches and ice where the freezing
+  level is below the route's high point; shading by ridges making sunset
+  earlier than the computed value; slower pace and harder rescue.
+- **From 1500 m:** stronger warnings for cold, wind, UV (higher with
+  altitude), dehydration and sunburn, and aggravation of existing
+  medical conditions.
+- **From 2500 m:** acute mountain sickness: unacclimatized people can
+  develop symptoms about 4-12 hours after arriving, some at lower
+  altitude; advice on acclimatization, and to descend if symptoms
+  appear. Oxygen shortage is *not* reported below this tier.
+- **Avalanche and glaciers, only where applicable:** avalanche danger
+  level from EAWS bulletins (CAAML v6, published for Austria, France,
+  Switzerland, Italy, Germany/Bavaria, Norway, Slovenia and others) for
+  the route's region and date when a bulletin exists; for regions without
+  a public bulletin (including Russia) the section says so and links what
+  exists. Glacier and crevasse warnings when OSM `natural=glacier` is
+  within reach of the track. Snow cornices in spring where snow is
+  reported.
+
+Weather inputs come from the weather plugin. Open-Meteo applies no
+elevation correction to wind, so ridge gusts are likely underestimated;
+the plan states this. Whether Open-Meteo offers freezing level height,
+CAPE and lightning potential as hourly variables is verified at
+implementation time; if not, thunderstorm risk uses weather codes and
+temperature/humidity heuristics, labelled `derived`. Confidence:
+`tag-backed` (OSM tags, EAWS), `derived` (models and thresholds).
 
 ### people_hazards
 Only verifiable, sourced items: conflict-zone or access restrictions,
@@ -286,9 +356,10 @@ recommendations in that session but is not written to disk.
 
 | Source | Key | Used by |
 |---|---|---|
-| Open-Meteo Forecast and Archive | none | weather, fire, bio_hazards |
+| Open-Meteo Forecast and Archive | none | weather, fire, bio_hazards, mountain |
+| EAWS avalanche bulletins (CAAML v6) | none | mountain |
 | Open-Meteo Air Quality | none | air |
-| Overpass (OSM) | none | transit, poi_hours, air, cell_coverage |
+| Overpass (OSM) | none | transit, poi_hours, air, cell_coverage, bio_hazards, mountain |
 | EFFIS WMS (Copernicus) | none | fire |
 | NASA FIRMS | optional `OSM_DAY_ROUTE_FIRMS_KEY` | fire |
 | Web search / Claude in Chrome | n/a | facts.json sections |

@@ -54,8 +54,8 @@ def test_cache_ignores_corrupt_file(tmp_path):
 
 def test_facts_lookup_prefers_date_over_all(tmp_path):
     (tmp_path / "facts.json").write_text(json.dumps({
-        "all": {"transit": {"markdown": "generic"}},
-        "2026-06-21": {"transit": {"markdown": "specific"}},
+        "all": {"transit": {"markdown": "generic", "sources": ["https://example.org/a"]}},
+        "2026-06-21": {"transit": {"markdown": "specific", "sources": ["https://example.org/b"]}},
     }), encoding="utf-8")
     facts = load_facts(tmp_path)
     assert lookup(facts, "2026-06-21", "transit")["markdown"] == "specific"

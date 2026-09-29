@@ -12,6 +12,21 @@ from .http import get_json
 
 
 @dataclass
+class RoutePoint:
+    """A Point feature of route.geojson (access point or point of interest)."""
+    name: str
+    type: str
+    lat: float
+    lon: float
+    role: str | None = None            # "start" | "end" for access points
+    opening_hours: str | None = None   # raw OSM tag
+    access_notes: str | None = None
+    note: str | None = None
+    osm_id: str | None = None
+    ele: float | None = None
+
+
+@dataclass
 class PlanContext:
     route_dir: Path
     date: datetime.date
@@ -29,6 +44,8 @@ class PlanContext:
     cache: JsonCache
     now: datetime.datetime  # timezone-aware UTC
     today: datetime.date = field(init=False)
+    access_points: list = field(default_factory=list)    # [RoutePoint] with type == "access"
+    interest_points: list = field(default_factory=list)  # [RoutePoint], every other Point feature
 
     def __post_init__(self):
         self.today = self.now.date()
@@ -43,6 +60,29 @@ def _line_feature(geojson: dict) -> dict:
         if (feature.get("geometry") or {}).get("type") == "LineString":
             return feature
     raise ValueError("route.geojson has no LineString feature")
+
+
+def _text(value) -> str | None:
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _points(geojson: dict) -> tuple[list, list]:
+    access, interest = [], []
+    for feature in geojson.get("features", []):
+        geometry = feature.get("geometry") or {}
+        coords = geometry.get("coordinates")
+        if geometry.get("type") != "Point" or not isinstance(coords, list) or len(coords) < 2:
+            continue
+        props = feature.get("properties") or {}
+        point = RoutePoint(
+            name=_text(props.get("name")) or "Waypoint", type=_text(props.get("type")) or "waypoint",
+            lat=coords[1], lon=coords[0], role=_text(props.get("role")),
+            opening_hours=_text(props.get("opening_hours")), access_notes=_text(props.get("access_notes")),
+            note=_text(props.get("note")), osm_id=_text(props.get("osm_id")),
+            ele=coords[2] if len(coords) > 2 else None,
+        )
+        (access if point.type == "access" else interest).append(point)
+    return access, interest
 
 
 def build_context(route_dir, date: datetime.date, lang: str = "en", departure: str | None = None,
@@ -64,6 +104,7 @@ def build_context(route_dir, date: datetime.date, lang: str = "en", departure: s
         center_lon -= 360.0
     centroid = ((min(lats) + max(lats)) / 2.0, center_lon)
     now = now or datetime.datetime.now(datetime.timezone.utc)
+    access_points, interest_points = _points(geojson)
     return PlanContext(
         route_dir=route_dir, date=date, lang=lang, departure=departure, start_time=start_time,
         mode=props.get("mode") or "walk",
@@ -76,4 +117,5 @@ def build_context(route_dir, date: datetime.date, lang: str = "en", departure: s
         http=http,
         cache=cache if cache is not None else JsonCache(route_dir / "day_plan_cache.json", now=now.timestamp),
         now=now,
+        access_points=access_points, interest_points=interest_points,
     )

@@ -372,7 +372,9 @@ recommendations in that session but is not written to disk.
 - Dedicated tests: NOAA sunrise/sunset against known dates and
   latitudes (including polar day/night edge cases), FWI against
   reference values, the `opening_hours` evaluator (including `PH` and
-  unparseable input), registry intersection with a track, orchestrator
+  unparseable input), registry intersection with a track, insect risk bands
+  from hourly fixtures, mountain tier activation (600 m, relief 300 m,
+  1500 m, 2500 m, missing elevation data), orchestrator
   survival when a plugin raises, `facts.json` merging, section-heading
   alias matching for the summary, `map.html` embedding of several plans,
   and the download/print markup.

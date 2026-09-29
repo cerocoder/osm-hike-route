@@ -71,8 +71,9 @@ def resolve_day_type(ctx) -> DayType:
     fact = lookup(ctx.facts, ctx.date_iso, "calendar")
     if fact and fact.get("day_type"):
         kind = fact["day_type"]
-        return DayType(weekday, True if kind == "weekend" else False if kind == "workday" else weekend,
-                       holiday=(kind == "holiday"), source="facts", sources=fact["sources"])
+        is_weekend_val = True if kind == "weekend" else False if kind == "workday" else weekend
+        holiday_val = True if kind == "holiday" else False if kind == "workday" else None
+        return DayType(weekday, is_weekend_val, holiday_val, source="facts", sources=fact["sources"])
     code = country_code(ctx)
     if code is None:
         return DayType(weekday, weekend, None, note_key="cal_no_country")

@@ -106,6 +106,20 @@ def test_working_saturday_fact(make_route, fixed_now):
     ctx = _ctx(make_route, fixed_now, FakeWeb(), datetime.date(2026, 6, 27), facts=facts)
     day = resolve_day_type(ctx)
     assert day.is_weekend is False and day.holiday is False
+    assert "not a public holiday" in describe(day, ctx)
+
+
+def test_weekend_fact_does_not_claim_the_day_is_not_a_public_holiday(make_route, fixed_now):
+    facts = {"2026-06-27": {"calendar": {"day_type": "weekend", "sources": ["https://consultant.ru/x"]}}}
+    web = FakeWeb()
+    ctx = _ctx(make_route, fixed_now, web, datetime.date(2026, 6, 27), facts=facts)
+    day = resolve_day_type(ctx)
+    assert day.holiday is None and day.is_weekend is True and day.source == "facts"
+    assert web.calls == []                       # no network calls for a fact
+    text = describe(day, ctx)
+    assert "public-holiday status unknown" in text
+    assert "(web-sourced)" in text
+    assert "not a public holiday" not in text
 
 
 def test_a_calendar_fact_without_sources_is_ignored(make_route, fixed_now):

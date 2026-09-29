@@ -45,6 +45,24 @@ def make_route(tmp_path):
 
 
 @pytest.fixture
+def make_route_with_points(tmp_path):
+    """Like make_route, plus Point features: points = [(name, type, lon, lat, {extra properties}), ...]."""
+    def _make(points, folder="proute", name="Test route", mode="walk", duration_hours=4.0,
+              coords=((-3.75, 40.42, 600.0), (-3.74, 40.43, 640.0))):
+        route_dir = tmp_path / folder
+        route_dir.mkdir()
+        features = [{"type": "Feature", "geometry": {"type": "LineString", "coordinates": [list(c) for c in coords]},
+                     "properties": {"name": name, "mode": mode, "duration_estimate_hours": duration_hours}}]
+        for pname, ptype, lon, lat, props in points:
+            features.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                             "properties": {"name": pname, "type": ptype, **props}})
+        (route_dir / "route.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": features}),
+                                                 encoding="utf-8")
+        return route_dir
+    return _make
+
+
+@pytest.fixture
 def weather_response():
     """Factory for an Open-Meteo hourly response for one date. Every hour
     gets the same values unless `overrides` maps a variable name to either a

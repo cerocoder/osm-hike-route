@@ -35,6 +35,7 @@ from place_info.providers.wikipedia import WikipediaProvider
 from place_info.providers.wikidata import WikidataProvider
 from place_info.providers.wikimedia_commons import WikimediaCommonsProvider
 from place_info.providers.opentripmap import OpenTripMapProvider
+from day_plan_view import DAY_PLAN_SUMMARY_HEADINGS, DAY_PLAN_UI
 from tile_providers import TileProviderService
 from tile_providers.providers.esri_street import EsriStreetProvider
 from tile_providers.providers.esri_satellite import EsriSatelliteProvider
@@ -160,6 +161,11 @@ SECTION_ALIASES = {
         "Punti di interesse",
     ],
 }
+
+
+for _lang, _strings in DAY_PLAN_UI.items():
+    UI_STRINGS[_lang].update(_strings)
+SECTION_ALIASES["day_plan_summary"] = list(DAY_PLAN_SUMMARY_HEADINGS)
 
 
 def t(key: str, lang: str) -> str:

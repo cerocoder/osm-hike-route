@@ -81,3 +81,13 @@ def test_polar_night_is_a_danger_and_polar_day_is_info():
 def test_russian_output():
     section = _run(lang="ru")
     assert "Рассвет" in section.markdown and "ч" in section.markdown
+
+
+def test_no_latest_start_line_when_route_cannot_fit_in_a_winter_day():
+    section = _run(date=datetime.date(2026, 11, 15), duration_hours=16.0)
+    assert "start no later than" not in section.markdown
+    assert any(w.severity == "danger" for w in section.warnings)
+
+
+def test_latest_start_line_still_printed_on_a_normal_day():
+    assert "start no later than" in _run(duration_hours=5.0).markdown

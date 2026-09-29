@@ -65,7 +65,7 @@ What you get, as `day-plan-<YYYY-MM-DD>.md` in the route folder:
 - **Weather by hour:** temperature and feels-like, precipitation and its probability, cloud cover, visibility, **wind speed and the direction it blows from**, gusts, snow cover, and a plain-language sky description.
 
 Good to know:
-- Forecasts reach about 15 days ahead. For a later date you get the average of that date over the last five years, clearly labelled as *not a forecast*. Past dates use actual recorded weather.
+- Forecasts reach about 15 days ahead. For a later date you get the average of that date over the last five years, clearly labelled as *not a forecast*. Dates older than a week use recorded weather; the last week uses model data.
 - Ask for a plan for several dates: each gets its own file, and re-running a date overwrites only that date.
 - The plan records where you start from only as a city or station, never a street address, because the file is embedded in `map.html`, which is meant to be forwarded.
 - This is the first version: daylight, weather and the summary. Transit and opening hours, hazards (ticks, mosquitoes, mountains, air, radiation, fire) and mobile coverage are planned next.

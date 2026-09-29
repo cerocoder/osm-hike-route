@@ -1,8 +1,8 @@
 """Hourly weather from Open-Meteo (free, no key). Source depends on the
 date relative to today:
 
-  today-92d .. today+15d  forecast API (past days are model reanalysis-like)
-  older than today-92d    historical archive (actual weather)
+  today-7d .. today+15d   forecast API (the last week is model data)
+  older than today-7d     historical archive (recorded weather)
   beyond today+15d        climatology: average of the same date over the
                           last CLIMATE_YEARS years from the archive, labelled
                           as NOT a forecast (spec)
@@ -23,7 +23,7 @@ from ..sun import sun_times
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 FORECAST_HORIZON_DAYS = 15
-FORECAST_PAST_DAYS = 92
+FORECAST_PAST_DAYS = 7  # the forecast API keeps about a week of past days
 CLIMATE_YEARS = 5
 FORECAST_TTL_S = 3 * 3600
 
@@ -165,7 +165,11 @@ def _fetch(ctx, source: str, lat: float, lon: float):
 
 
 def daytime_rows(rows: list[dict], date: datetime.date, lat: float, lon: float,
-                 utc_offset_seconds: float | None) -> list[dict]:
+                 utc_offset_seconds: float | None,
+                 route_window: tuple[float, float] | None = None) -> list[dict]:
+    """Rows for the daylight hours; `route_window` = (start, end) in local
+    minutes of the day additionally keeps the hours walked outside daylight
+    (not applied on polar days/nights, which use a fixed window)."""
     sun = sun_times(date, lat, lon)
     if sun.kind == "polar_day":
         lo, hi = _POLAR_DAY_HOURS
@@ -176,7 +180,13 @@ def daytime_rows(rows: list[dict], date: datetime.date, lat: float, lon: float,
     offset_min = (utc_offset_seconds if utc_offset_seconds is not None else round(lon / 15.0 * 2) / 2 * 3600) / 60.0
     sunrise = sun.sunrise_utc_min + offset_min
     sunset = sun.sunset_utc_min + offset_min
-    return [r for r in rows if r["hour"] * 60 + 59 >= sunrise and r["hour"] * 60 <= sunset]
+    def wanted(r):
+        lo, hi = r["hour"] * 60, r["hour"] * 60 + 59
+        if hi >= sunrise and lo <= sunset:
+            return True
+        return route_window is not None and hi >= route_window[0] and lo <= route_window[1]
+
+    return [r for r in rows if wanted(r)]
 
 
 def _sky_key(code) -> str:
@@ -206,7 +216,8 @@ def _sky_key(code) -> str:
 def _num(value, digits=0) -> str:
     if value is None:
         return "–"
-    return f"{value:.{digits}f}"
+    text = f"{value:.{digits}f}"
+    return text[1:] if text.startswith("-") and float(text) == 0 else text
 
 
 def _wind_cell(row: dict, lang: str) -> str:
@@ -291,7 +302,11 @@ class WeatherPlugin(SectionPlugin):
         except (HttpError, KeyError, IndexError, ValueError, TypeError) as e:
             return Section("weather", tr("w_unavailable", ctx.lang, reason=str(e) or type(e).__name__),
                            "no-data")
-        day = daytime_rows(rows, ctx.date, lat, lon, offset) or rows
+        window = None
+        if ctx.start_time is not None and ctx.duration_hours:
+            start = ctx.start_time.hour * 60 + ctx.start_time.minute
+            window = (start, min(start + ctx.duration_hours * 60.0, 23 * 60.0))
+        day = daytime_rows(rows, ctx.date, lat, lon, offset, route_window=window) or rows
         note_key = {"forecast": "w_source_forecast", "archive": "w_source_archive",
                     "climate": "w_source_climate"}[source]
         note = tr(note_key, ctx.lang, years=CLIMATE_YEARS) if source == "climate" else tr(note_key, ctx.lang)

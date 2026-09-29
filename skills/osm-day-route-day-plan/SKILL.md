@@ -57,7 +57,7 @@ live navigation, multi-day plans.
    thunderstorm), say so and offer to go back to osm-day-route-planning —
    this skill never changes the route.
 6. Offer to re-render the map so the new date is inside it:
-   `python3 ../osm-day-route-show/scripts/render_map.py <route_dir> --user-lang <code>`.
+   `python3 ../../osm-day-route-show/scripts/render_map.py <route_dir> --user-lang <code>`.
    A `map.html` is a snapshot; a plan added later does not appear until it is
    re-rendered. Tell the person which dates the map will contain.
 

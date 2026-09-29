@@ -21,7 +21,7 @@
 - Section order in the file is fixed: Summary, Daylight, Weather by hour, then (later plans) Getting there, Points of interest, Hazards, Mobile coverage. Headings are localized in `en`, `ru`, `es`, `fr`, `de`, `pt`, `it`.
 - The departure point is recorded at **city, station or stop level only**, never a street address, because the plan is embedded in `map.html`, a file meant to be forwarded.
 - Only sunrise, sunset and day length: **no astronomical events** (twilight tables, moon, eclipses, meteors).
-- Weather source by date: today+15 days and earlier (down to today-92 days) use the forecast API; older dates use the archive; later than today+15 days use climatology (the average of the same date over the last 5 years) and must say it is not a forecast. Forecast cache lifetime is 3 hours.
+- Weather source by date: today+15 days and earlier (down to today-7 days) use the forecast API; older dates use the archive; later than today+15 days use climatology (the average of the same date over the last 5 years) and must say it is not a forecast. Forecast cache lifetime is 3 hours.
 - Wind direction is reported as the direction the wind blows **from**; wind speed is in m/s.
 - `map.html` embeds **every** `day-plan-*.md` of the route folder with no external file needed; PDF is produced by the browser's print (`window.print()`), no PDF library.
 - Tests never use the live network.
@@ -1356,8 +1356,8 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'day_plan.plugins.weat
 """Hourly weather from Open-Meteo (free, no key). Source depends on the
 date relative to today:
 
-  today-92d .. today+15d  forecast API (past days are model reanalysis-like)
-  older than today-92d    historical archive (actual weather)
+  today-7d .. today+15d   forecast API (the last week is model data)
+  older than today-7d     historical archive (recorded weather)
   beyond today+15d        climatology: average of the same date over the
                           last CLIMATE_YEARS years from the archive, labelled
                           as NOT a forecast (spec)
@@ -2210,7 +2210,7 @@ live navigation, multi-day plans.
    thunderstorm), say so and offer to go back to osm-day-route-planning —
    this skill never changes the route.
 6. Offer to re-render the map so the new date is inside it:
-   `python3 ../osm-day-route-show/scripts/render_map.py <route_dir> --user-lang <code>`.
+   `python3 ../../osm-day-route-show/scripts/render_map.py <route_dir> --user-lang <code>`.
    A `map.html` is a snapshot; a plan added later does not appear until it is
    re-rendered. Tell the person which dates the map will contain.
 
@@ -3251,7 +3251,7 @@ What you get, as `day-plan-<YYYY-MM-DD>.md` in the route folder:
 - **Weather by hour:** temperature and feels-like, precipitation and its probability, cloud cover, visibility, **wind speed and the direction it blows from**, gusts, snow cover, and a plain-language sky description.
 
 Good to know:
-- Forecasts reach about 15 days ahead. For a later date you get the average of that date over the last five years, clearly labelled as *not a forecast*. Past dates use actual recorded weather.
+- Forecasts reach about 15 days ahead. For a later date you get the average of that date over the last five years, clearly labelled as *not a forecast*. Dates older than a week use recorded weather; the last week uses model data.
 - Ask for a plan for several dates: each gets its own file, and re-running a date overwrites only that date.
 - The plan records where you start from only as a city or station, never a street address, because the file is embedded in `map.html`, which is meant to be forwarded.
 - This is the first version: daylight, weather and the summary. Transit and opening hours, hazards (ticks, mosquitoes, mountains, air, radiation, fire) and mobile coverage are planned next.

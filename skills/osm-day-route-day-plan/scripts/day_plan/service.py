@@ -59,18 +59,23 @@ def _fetched_at(ctx, shared: dict) -> datetime.datetime:
     return datetime.datetime.fromtimestamp(stamp, tz=datetime.timezone.utc)
 
 
-def assemble_markdown(ctx, sections: list, summary: Section, fetched_at: datetime.datetime) -> str:
+def assemble_markdown(ctx, sections: list, summary: Section, fetched_at: datetime.datetime,
+                      utc_offset_seconds: float | None = None, plugins: list = ()) -> str:
     lang = ctx.lang
     stamp = fetched_at.strftime("%Y-%m-%d %H:%M")
+    local = ""
+    if utc_offset_seconds is not None:
+        local_time = fetched_at + datetime.timedelta(seconds=utc_offset_seconds)
+        local = tr("meta_local", lang, local=local_time.strftime("%Y-%m-%d %H:%M"))
     mode = tr("mode_bike" if ctx.mode == "bike" else "mode_walk", lang)
-    meta = tr("meta", lang, fetched=stamp, mode=mode)
+    meta = tr("meta", lang, fetched=stamp + " UTC" + local, mode=mode)
     if ctx.departure:
         meta += tr("meta_from", lang, departure=ctx.departure)
     header = "\n".join([
         f"# {ctx.route_name} — {ctx.date_iso}",
         f"<!-- day-plan fetched_at: {fetched_at.strftime('%Y-%m-%dT%H:%M:%SZ')} -->",
         f"*{meta}*",
-    ])
+    ] + ([f"<!-- plugins: {', '.join(f'{p.plugin_id} {p.version}' for p in plugins)} -->"] if plugins else []))
     parts = [
         header,
         f"## {tr('h_summary', lang)}\n\n{summary.markdown}",
@@ -94,5 +99,6 @@ def assemble_markdown(ctx, sections: list, summary: Section, fetched_at: datetim
 def build_plan(ctx, plugins: list) -> PlanResult:
     sections, shared, failures = run_plugins(ctx, plugins)
     summary = build_summary_section(sections, ctx.lang)
-    markdown = assemble_markdown(ctx, sections, summary, _fetched_at(ctx, shared))
+    markdown = assemble_markdown(ctx, sections, summary, _fetched_at(ctx, shared),
+                                 (shared.get("weather") or {}).get("utc_offset_seconds"), plugins)
     return PlanResult(markdown=markdown, sections=sections, failures=failures)

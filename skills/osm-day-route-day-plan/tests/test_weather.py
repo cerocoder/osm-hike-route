@@ -19,8 +19,8 @@ def _ctx(make_route, fixed_now, http, date=datetime.date(2026, 6, 21), lang="en"
 def test_choose_source_boundaries():
     assert choose_source(TODAY + datetime.timedelta(days=15), TODAY) == "forecast"
     assert choose_source(TODAY + datetime.timedelta(days=16), TODAY) == "climate"
-    assert choose_source(TODAY - datetime.timedelta(days=92), TODAY) == "forecast"
-    assert choose_source(TODAY - datetime.timedelta(days=93), TODAY) == "archive"
+    assert choose_source(TODAY - datetime.timedelta(days=7), TODAY) == "forecast"
+    assert choose_source(TODAY - datetime.timedelta(days=8), TODAY) == "archive"
 
 
 def test_parse_hourly_maps_variables_and_tolerates_missing_ones(weather_response):
@@ -240,3 +240,54 @@ def test_dst_day_with_twenty_three_hourly_rows_does_not_crash(make_route, fixed_
         _ctx(make_route, fixed_now, lambda url: response, date=datetime.date(2026, 3, 29)), {})
     assert section.confidence == "derived"
     assert len(section.shared["rows"]) == 23
+
+
+def test_daytime_rows_extend_to_the_route_finish_after_sunset(weather_response):
+    rows = parse_hourly(weather_response())
+    # start 15:00 + 6 h = finish 21:00 (sunset 21:21 -> hour 21 already shown); use 8 h -> 23:00
+    day = daytime_rows(rows, datetime.date(2026, 6, 21), 51.5, -0.13, 3600, route_window=(15 * 60, 23 * 60))
+    hours = [r["hour"] for r in day]
+    assert hours == list(range(4, 24))
+
+
+def test_daytime_rows_route_window_after_dark_in_winter(weather_response):
+    rows = parse_hourly(weather_response(date="2026-11-15"))
+    plain = daytime_rows(rows, datetime.date(2026, 11, 15), 51.5, -0.13, 0)
+    assert plain[-1]["hour"] == 16
+    day = daytime_rows(rows, datetime.date(2026, 11, 15), 51.5, -0.13, 0, route_window=(14 * 60, 19 * 60 + 30))
+    hours = [r["hour"] for r in day]
+    assert hours[-1] == 19 and hours == sorted(set(hours))
+
+
+def test_daytime_rows_route_window_before_sunrise(weather_response):
+    rows = parse_hourly(weather_response())
+    day = daytime_rows(rows, datetime.date(2026, 6, 21), 51.5, -0.13, 3600, route_window=(2 * 60 + 30, 8 * 60))
+    assert [r["hour"] for r in day][0] == 2
+
+
+def test_daytime_rows_without_route_window_unchanged(weather_response):
+    rows = parse_hourly(weather_response())
+    assert daytime_rows(rows, datetime.date(2026, 6, 21), 51.5, -0.13, 3600) == \
+        daytime_rows(rows, datetime.date(2026, 6, 21), 51.5, -0.13, 3600, route_window=None)
+
+
+def test_daytime_rows_polar_unaffected_by_route_window(weather_response):
+    rows = parse_hourly(weather_response(date="2026-12-21"))
+    day = daytime_rows(rows, datetime.date(2026, 12, 21), 69.65, 18.96, 3600, route_window=(5 * 60, 20 * 60))
+    assert [r["hour"] for r in day] == list(range(9, 16))
+
+
+def test_plugin_table_covers_hours_walked_after_sunset(make_route, fixed_now, weather_response):
+    import datetime as dt
+    ctx = build_context(make_route(duration_hours=6.0), datetime.date(2026, 6, 21), start_time=dt.time(17, 0),
+                        http=lambda u: weather_response(), now=fixed_now)
+    section = WeatherPlugin().run(ctx, {})
+    assert "| 22:00 |" in section.markdown   # finish 23:00 -> 23 shown too
+    assert "| 23:00 |" in section.markdown
+
+
+def test_num_never_prints_negative_zero():
+    from day_plan.plugins.weather import _num
+    assert _num(-0.3, 0) == "0"
+    assert _num(-0.04, 1) == "0.0"
+    assert _num(-1.6, 0) == "-2"

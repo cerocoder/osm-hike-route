@@ -73,7 +73,9 @@ class LightPlugin(SectionPlugin):
                     warnings.append(PlanWarning("caution", tr("light_warn_tight", lang, buffer=SAFETY_BUFFER_MIN)))
             else:
                 latest = sunset - SAFETY_BUFFER_MIN - duration_min
-                lines.append("- " + tr("light_latest_start", lang, buffer=SAFETY_BUFFER_MIN, latest=_hhmm(latest)))
+                if latest >= sunrise:  # earlier than sunrise the route cannot fit; the warning below says so
+                    lines.append("- " + tr("light_latest_start", lang, buffer=SAFETY_BUFFER_MIN,
+                                           latest=_hhmm(latest)))
                 if latest < sunrise and duration_min <= length:
                     warnings.append(PlanWarning("caution", tr("light_warn_tight", lang, buffer=SAFETY_BUFFER_MIN)))
             if duration_min > length:

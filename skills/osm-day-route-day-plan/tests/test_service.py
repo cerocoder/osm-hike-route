@@ -92,7 +92,9 @@ def test_full_plan_has_fixed_section_order_and_metadata(make_route, fixed_now, w
     lines = result.markdown.splitlines()
     assert lines[0] == "# Test route — 2026-06-21"
     assert lines[1] == "<!-- day-plan fetched_at: 2026-06-20T12:00:00Z -->"
-    assert lines[2] == "*Forecast fetched 2026-06-20 12:00 UTC · Mode: walking · From: Waterloo*"
+    assert lines[2] == ("*Data fetched 2026-06-20 12:00 UTC (2026-06-20 13:00 local)"
+                        " · Mode: walking · From: Waterloo*")
+    assert lines[3] == "<!-- plugins: weather 1, light 1 -->"
     headings = [l for l in lines if l.startswith("## ")]
     assert headings == ["## Summary", "## Daylight", "## Weather by hour"]
     assert result.failures == []
@@ -133,3 +135,38 @@ def test_weather_outage_does_not_break_the_plan(make_route, fixed_now):
     result = build_plan(ctx, [WeatherPlugin(), LightPlugin()])
     assert "estimated from longitude" in result.markdown       # light still works
     assert "Sections without data: Weather by hour." in result.markdown
+
+
+def _meta_line(make_route, fixed_now, fetched, shared, lang="en"):
+    ctx = _ctx(make_route, fixed_now, lang=lang)
+    stub = Stub("weather", section_id="weather", shared=dict(shared, fetched_at=fetched.timestamp()))
+    return build_plan(ctx, [stub]).markdown.splitlines()
+
+
+def test_metadata_shows_local_time_when_offset_known(make_route, fixed_now):
+    fetched = datetime.datetime(2026, 9, 29, 22, 31, tzinfo=datetime.timezone.utc)
+    lines = _meta_line(make_route, fixed_now, fetched, {"utc_offset_seconds": 10800})
+    assert lines[2] == "*Data fetched 2026-09-29 22:31 UTC (2026-09-30 01:31 local) · Mode: walking*"
+
+
+def test_metadata_is_utc_only_without_offset(make_route, fixed_now):
+    fetched = datetime.datetime(2026, 9, 29, 22, 31, tzinfo=datetime.timezone.utc)
+    lines = _meta_line(make_route, fixed_now, fetched, {"utc_offset_seconds": None})
+    assert lines[2] == "*Data fetched 2026-09-29 22:31 UTC · Mode: walking*"
+    assert "local" not in lines[2]
+
+
+def test_metadata_is_neutral_and_localized_in_all_languages():
+    from day_plan.i18n import LANGS, STRINGS, tr
+    assert tr("meta", "en", fetched="X", mode="m").startswith("Data fetched X")
+    assert tr("meta", "ru", fetched="X", mode="m").startswith("Данные получены X")
+    for lang in LANGS:
+        assert "orecast" not in STRINGS[lang]["meta"] and "прогноз" not in STRINGS[lang]["meta"].lower()
+        assert "{local}" in STRINGS[lang]["meta_local"]
+
+
+def test_plugin_versions_comment_follows_metadata_line(make_route, fixed_now, weather_response):
+    ctx = _ctx(make_route, fixed_now, weather_response=weather_response)
+    lines = build_plan(ctx, [WeatherPlugin(), LightPlugin()]).markdown.splitlines()
+    assert lines[3] == "<!-- plugins: weather 1, light 1 -->"
+    assert lines[4] == ""

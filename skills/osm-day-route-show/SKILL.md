@@ -337,6 +337,8 @@ CSS) plus `plan_markdown_to_html` in `render_map.py`.
 - The file is a snapshot: a plan added after rendering is not in `map.html`
   until it is re-rendered. Plans saved with a BOM or CRLF line endings load
   normally; files with an impossible date in the name are skipped.
+- The map itself still loads Leaflet and tiles from the internet; the
+  sidebar and plan panel work offline.
 
 ## Configuration
 

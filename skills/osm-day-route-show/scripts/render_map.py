@@ -65,6 +65,8 @@ UI_STRINGS = {
         "open_google": "Open area in Google Maps",
         "open_osm": "Open area in OpenStreetMap",
         "wikipedia": "Wikipedia",
+        "route_title": "Route",
+        "no_section": "Not in notes.md",
     },
     "ru": {
         "getting_there": "Как добраться",
@@ -74,6 +76,8 @@ UI_STRINGS = {
         "open_google": "Открыть область в Google Maps",
         "open_osm": "Открыть область в OpenStreetMap",
         "wikipedia": "Википедия",
+        "route_title": "Маршрут",
+        "no_section": "Нет в notes.md",
     },
     "es": {
         "getting_there": "Cómo llegar",
@@ -83,6 +87,8 @@ UI_STRINGS = {
         "open_google": "Abrir la zona en Google Maps",
         "open_osm": "Abrir la zona en OpenStreetMap",
         "wikipedia": "Wikipedia",
+        "route_title": "Ruta",
+        "no_section": "No está en notes.md",
     },
     "fr": {
         "getting_there": "Comment s'y rendre",
@@ -92,6 +98,8 @@ UI_STRINGS = {
         "open_google": "Ouvrir la zone dans Google Maps",
         "open_osm": "Ouvrir la zone dans OpenStreetMap",
         "wikipedia": "Wikipédia",
+        "route_title": "Itinéraire",
+        "no_section": "Absent de notes.md",
     },
     "de": {
         "getting_there": "Anreise",
@@ -101,6 +109,8 @@ UI_STRINGS = {
         "open_google": "Gebiet in Google Maps öffnen",
         "open_osm": "Gebiet in OpenStreetMap öffnen",
         "wikipedia": "Wikipedia",
+        "route_title": "Route",
+        "no_section": "Nicht in notes.md",
     },
     "pt": {
         "getting_there": "Como chegar",
@@ -110,6 +120,8 @@ UI_STRINGS = {
         "open_google": "Abrir a área no Google Maps",
         "open_osm": "Abrir a área no OpenStreetMap",
         "wikipedia": "Wikipédia",
+        "route_title": "Percurso",
+        "no_section": "Não consta em notes.md",
     },
     "it": {
         "getting_there": "Come arrivare",
@@ -119,6 +131,8 @@ UI_STRINGS = {
         "open_google": "Apri l'area in Google Maps",
         "open_osm": "Apri l'area in OpenStreetMap",
         "wikipedia": "Wikipedia",
+        "route_title": "Percorso",
+        "no_section": "Non presente in notes.md",
     },
 }
 
@@ -567,7 +581,7 @@ def build_tile_layers_js(providers: list, active_id: str | None) -> str:
         pairs = ", ".join(
             f"{json.dumps(name, ensure_ascii=False)}: {var}" for name, var in control_entries
         )
-        lines.append(f"L.control.layers({{{pairs}}}).addTo(map);")
+        lines.append(f"L.control.layers({{{pairs}}}, null, {{position: 'topleft'}}).addTo(map);")
 
     return "\n  ".join(lines)
 
@@ -669,19 +683,18 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
         )
     tile_layers_js = build_tile_layers_js(available_tile_providers, active_tile_provider_id)
 
-    access_html = ""
-    confidence_html = ""
-    if notes_path and notes_path.exists():
-        notes = notes_path.read_text(encoding="utf-8")
-        access = extract_md_section(notes, "access")
-        confidence = extract_md_section(notes, "confidence")
-        if access:
-            access_html = f"<h3>{t('getting_there', user_lang)}</h3>{markdown_to_html(access)}"
-        if confidence:
-            confidence_html = f"<h3>{t('interest_layers', user_lang)}</h3>{markdown_to_html(confidence)}"
+    # Every sidebar block is always present, in a fixed order; a block whose
+    # source data is missing shows a placeholder instead of vanishing.
+    notes = notes_path.read_text(encoding="utf-8") if notes_path and notes_path.exists() else ""
+    placeholder = f'<p><em>{t("no_section", user_lang)}</em></p>'
+    access = extract_md_section(notes, "access")
+    confidence = extract_md_section(notes, "confidence")
+    access_html = f"<h3>{t('getting_there', user_lang)}</h3>{markdown_to_html(access) if access else placeholder}"
+    confidence_html = f"<h3>{t('interest_layers', user_lang)}</h3>{markdown_to_html(confidence) if confidence else placeholder}"
 
     line_feature = next((f for f in geojson.get("features", []) if f["geometry"]["type"] == "LineString"), None)
-    stats_html = f"<h3>Route</h3>{route_stats_html(line_feature['properties'], user_lang)}" if line_feature else ""
+    stats_body = route_stats_html(line_feature['properties'], user_lang) if line_feature else f'<p><em>{t("no_section", user_lang)}</em></p>'
+    stats_html = f"<h3>{t('route_title', user_lang)}</h3>{stats_body}"
 
     for feature in geojson.get("features", []):
         if feature["geometry"]["type"] == "Point":

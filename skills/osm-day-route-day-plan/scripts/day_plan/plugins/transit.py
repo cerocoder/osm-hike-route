@@ -93,6 +93,8 @@ class TransitPlugin(SectionPlugin):
                                                 "tr_col_interval", "tr_col_runs")]
                 lines += ["", tr("tr_routes_title", lang), "",
                           "| " + " | ".join(header) + " |", "|" + "---|" * len(header), *route_rows]
+                if failed:
+                    lines.append("- " + tr("tr_lines_partial", lang))
             else:
                 lines += ["", "- " + tr("tr_no_osm_lines", lang)]
 

@@ -4,7 +4,8 @@ import json
 import urllib.error
 import urllib.request
 
-USER_AGENT = "osm-day-route-day-plan/1.0"
+# Nominatim's usage policy asks for an identifying User-Agent.
+USER_AGENT = "osm-day-route-day-plan/1.0 (+https://github.com/cerocoder/osm-hike-route)"
 
 
 class HttpError(Exception):

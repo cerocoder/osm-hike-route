@@ -22,6 +22,7 @@ optional per-point `search_names` override, to search a given
 Wikipedia language edition.
 """
 import argparse
+import datetime
 import json
 import math
 import re
@@ -35,7 +36,9 @@ from place_info.providers.wikipedia import WikipediaProvider
 from place_info.providers.wikidata import WikidataProvider
 from place_info.providers.wikimedia_commons import WikimediaCommonsProvider
 from place_info.providers.opentripmap import OpenTripMapProvider
-from day_plan_view import DAY_PLAN_SUMMARY_HEADINGS, DAY_PLAN_UI
+from day_plan_view import (
+    DAY_PLAN_CSS, DAY_PLAN_SUMMARY_HEADINGS, DAY_PLAN_UI, build_day_plan_parts, load_day_plans,
+)
 from tile_providers import TileProviderService
 from tile_providers.providers.esri_street import EsriStreetProvider
 from tile_providers.providers.esri_satellite import EsriSatelliteProvider
@@ -781,6 +784,19 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
         if feature["geometry"]["type"] == "Point":
             feature["properties"]["_popupExtra"] = point_popup_html(feature["properties"])
 
+    # Every day-plan-<date>.md in the route folder is embedded, so the single
+    # map.html can be forwarded with all planned days inside.
+    day_plans = [
+        {"date": p.date, "md": p.markdown, "html": plan_markdown_to_html(p.markdown),
+         "summary_html": markdown_to_html(extract_md_section(p.markdown, "day_plan_summary")),
+         "fetched_at": p.fetched_at}
+        for p in load_day_plans(geojson_path.parent)
+    ]
+    day_plan_sidebar, day_plan_overlay, day_plan_script = build_day_plan_parts(
+        day_plans, {key: t(key, user_lang) for key in DAY_PLAN_UI["en"]},
+        file_base=re.sub(r'[\\/:*?"<>|]+', "_", title), today=datetime.date.today().isoformat(),
+    )
+
     # Escape "</" so a provider's free-text summary containing a literal
     # "</script>" can't end this inline <script> tag early and break the
     # whole page's JS (map, arrows, popups). \/ and / are equivalent in a
@@ -831,6 +847,7 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
   #sidebar th, #sidebar td {{ border: 1px solid #d1d5db; padding: 3px 6px; text-align: left; vertical-align: top; }}
   #sidebar th {{ background: #f3f4f6; white-space: nowrap; }}
   #sidebar .links-section a {{ display: inline-block; margin: 2px 0; }}
+  {DAY_PLAN_CSS}
   .route-arrow div {{ color: #2563eb; font-size: 16px; line-height: 16px; text-align: center; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }}
   @media (max-width: 480px) {{
     #sidebar {{ left: 10px; right: 10px; max-width: none; top: auto; bottom: 10px; max-height: 40vh; }}
@@ -844,8 +861,10 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
   {stats_html}
   {access_html}
   {confidence_html}
+  {day_plan_sidebar}
   {links_html}
 </div>
+{day_plan_overlay}
 <script src="{LEAFLET_JS}"></script>
 <script>
   const data = {geojson_json};
@@ -969,6 +988,9 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
   if (lineFeature) {{
     addDirectionArrows(lineFeature.geometry.coordinates);
   }}
+</script>
+<script>
+{day_plan_script}
 </script>
 </body>
 </html>

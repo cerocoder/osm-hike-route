@@ -173,3 +173,26 @@ def test_a_non_dict_feature_before_the_line_does_not_break_the_context(tmp_path,
     route_dir = _write_route(tmp_path, ["junk", None, {"type": "Feature", "geometry": []}, LINE])
     ctx = build_context(route_dir, datetime.date(2026, 6, 21), now=fixed_now)
     assert ctx.route_name == "R" and ctx.access_points == [] and ctx.interest_points == []
+
+
+@pytest.mark.parametrize("bad_url", ["http://[::1", "https://[fe80::1%25eth0", "http://[", "https://ex ample.com"])
+def test_a_malformed_url_is_dropped_not_a_crash(bad_url):
+    assert normalize_entry({"markdown": "x", "sources": [bad_url]}) is None
+    kept = normalize_entry({"markdown": "x", "sources": [bad_url, "https://ok.example/a"]})
+    assert kept["sources"] == ["https://ok.example/a"]
+
+
+def test_a_broken_source_url_in_a_hand_edited_facts_file_never_breaks_the_cli(tmp_path, capsys):
+    import build_day_plan
+    import datetime
+    route_dir = tmp_path / "r"
+    route_dir.mkdir()
+    (route_dir / "route.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": [
+        {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-3.75, 40.42, 600], [-3.74, 40.43, 640]]},
+         "properties": {"name": "R", "mode": "walk", "duration_estimate_hours": 3}}]}))
+    (route_dir / "facts.json").write_text(json.dumps({"all": {"transit": {"markdown": "x", "sources": ["http://[::1"]}}}))
+    now = datetime.datetime(2026, 6, 20, 12, tzinfo=datetime.timezone.utc)
+    code = build_day_plan.main([str(route_dir), "2026-06-21"], http=lambda url: {"hourly": {"time": []}}, now=now)
+    assert code == 0
+    assert (route_dir / "day-plan-2026-06-21.md").exists()
+    assert "hint: no web-sourced facts recorded for transit" in capsys.readouterr().out

@@ -2117,7 +2117,7 @@ curl -s -A "osm-day-route-day-plan/1.0" "https://nominatim.openstreetmap.org/rev
 curl -s "https://date.nager.at/api/v3/PublicHolidays/2026/RU" | head -c 400
 ```
 
-Expected: `"country_code":"es"` in the first; a JSON list of holidays in the second. Verified when this plan was written; note that the Russian list has the fixed holidays only (no 8–11 January, 9 March or 11 May 2026).
+Expected: `"country_code":"es"` in the first; a JSON list of holidays in the second. Verified when this plan was written; note that the Russian list is incomplete: it lacks 8 January (a fixed statutory holiday) and the transferred days off (for example 9 March and 11 May 2026).
 
 - [ ] **Step 6: Commit**
 

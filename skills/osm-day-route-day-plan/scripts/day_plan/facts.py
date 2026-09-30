@@ -44,8 +44,12 @@ def _valid_time(value) -> bool:
 
 def _valid_source(url: str) -> bool:
     """An http(s) URL with a host and no whitespace (parentheses are fine)."""
-    return (url.lower().startswith(("http://", "https://")) and not any(c.isspace() for c in url)
-            and bool(urllib.parse.urlparse(url).netloc))
+    if not url.lower().startswith(("http://", "https://")) or any(c.isspace() for c in url):
+        return False
+    try:
+        return bool(urllib.parse.urlparse(url).netloc)
+    except ValueError:      # e.g. "http://[::1": urlparse raises instead of returning
+        return False
 
 
 def normalize_entry(entry) -> dict | None:

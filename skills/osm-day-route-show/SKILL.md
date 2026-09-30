@@ -72,7 +72,9 @@ Extension).
    tries a small set of aliases in several languages case-insensitively,
    with trailing text after the heading tolerated, e.g. "## Как добраться
    (Екатеринбург → Бажуково)" still matches — see `SECTION_ALIASES` in
-   `render_map.py`). Those sections are converted from markdown to real
+   `render_map.py`). If no Interest-layer section is found (for example the notes name it "Порядок точек" — now an alias — or
+   something unrecognised), the block lists the route's own non-access points from `route.geojson` (name, type,
+   tier, note, an http(s) source as a link) instead of "Not in notes.md". Those sections are converted from markdown to real
    HTML (`markdown_to_html` — `- ` and `1. ` list items (with hard-wrapped
    continuation lines rejoined into one item first), `**bold**`,
    `` `code` ``, and `[text](url)` links become an actual `<a href>`, not

@@ -508,3 +508,56 @@ def test_the_panel_shows_the_explicit_activity_label():
 def test_the_activity_label_is_escaped():
     assert "<b>" not in route_stats_html({"mode": "<b>", "style": None}, user_lang="en")
 
+
+
+# ---- the "Points of interest" block falls back to the route's own points -------------------------------------------------
+
+def _route_with_points(tmp_path, notes):
+    route_dir = tmp_path / "r"
+    route_dir.mkdir()
+    geojson = {"type": "FeatureCollection", "features": [
+        {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-4.33, 40.36, 600.0], [-4.32, 40.37, 700.0]]},
+         "properties": {"name": "R", "mode": "walk"}},
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-4.33, 40.36]},
+         "properties": {"name": "Parada", "type": "access", "role": "start", "tier": "tag-backed"}},
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-4.32, 40.37]},
+         "properties": {"name": "Cerro <b>", "type": "viewpoint", "tier": "tag-backed", "note": "Vista 819 m",
+                        "source": "https://www.visitmadrid.es/x"}},
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-4.31, 40.38]},
+         "properties": {"name": "Ruinas", "type": "historic", "source": "javascript:alert(1)"}}]}
+    (route_dir / "route.geojson").write_text(json.dumps(geojson), encoding="utf-8")
+    if notes is not None:
+        (route_dir / "notes.md").write_text(notes, encoding="utf-8")
+    return route_dir
+
+
+def _panel(tmp_path, notes, lang="ru"):
+    route_dir = _route_with_points(tmp_path, notes)
+    with patch("tile_providers.providers.base.probe_tile", return_value=False):
+        return build_map_html(route_dir / "route.geojson", route_dir / "notes.md" if notes is not None else None,
+                              title="T", user_lang=lang, resolve_wiki=False)
+
+
+def test_interest_block_lists_the_geojson_points_when_notes_have_no_recognised_section(tmp_path):
+    html = _panel(tmp_path, "# R\n\n## Запрос\n- что-то\n\n## Итог\n- 10 км\n")
+    block = html.split("Точки интереса</h3>")[1].split("<h3>")[0]
+    assert "Нет в notes.md" not in block
+    assert "Vista 819 m" in block and "Ruinas" in block and "Parada" not in block      # access points are not interest points
+    assert "Cerro &lt;b&gt;" in block and "Cerro <b>" not in block                             # escaped
+    assert '<a href="https://www.visitmadrid.es/x"' in block and "javascript:" not in block
+
+
+def test_interest_block_prefers_the_notes_section_and_recognises_the_order_of_points_heading(tmp_path):
+    html = _panel(tmp_path, "## Порядок точек\nСтарт → Cerro\n\n| Точка | Тип |\n|---|---|\n| Cerro | viewpoint |\n")
+    block = html.split("Точки интереса</h3>")[1].split("<h3>")[0]
+    assert "<table" in block and "Vista 819 m" not in block
+
+
+def test_interest_block_says_so_when_there_are_no_points_at_all(tmp_path):
+    route_dir = _route_with_points(tmp_path, None)
+    geojson = json.loads((route_dir / "route.geojson").read_text(encoding="utf-8"))
+    geojson["features"] = geojson["features"][:2]
+    (route_dir / "route.geojson").write_text(json.dumps(geojson), encoding="utf-8")
+    with patch("tile_providers.providers.base.probe_tile", return_value=False):
+        html = build_map_html(route_dir / "route.geojson", None, title="T", user_lang="ru", resolve_wiki=False)
+    assert "Нет в notes.md" in html.split("Точки интереса</h3>")[1].split("<h3>")[0]

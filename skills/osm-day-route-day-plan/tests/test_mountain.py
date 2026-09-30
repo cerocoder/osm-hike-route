@@ -188,3 +188,26 @@ def test_freezing_level_above_the_top_never_claims_no_snow_or_ice(make_route, fi
     assert "ice and snow are still possible" in near_top.markdown and "keeps the air above" not in near_top.markdown
     ru = run(make_route, fixed_now, (1000.0, 2400.0), weather_rows=rows(fzl=3500.0, temp=15.0), folder="r", lang="ru")
     assert "снега и льда не ожидается" not in ru.markdown and "выше 0 °C" in ru.markdown
+
+
+def test_all_zero_elevations_are_unknown_elevation_not_a_flat_route(make_route, fixed_now):
+    assert elevation_stats([(0, 0, 0.0), (0, 0, 0.0)]) is None
+    section = run(make_route, fixed_now, (0.0, 0.0, 0.0))          # the planning skill writes 0.0 for unknown
+    assert section.confidence == "no-data" and "no elevation data" in section.markdown and not section.omit
+
+
+def test_placeholder_zeros_are_ignored_next_to_real_elevations():
+    assert elevation_stats([(0, 0, 0.0), (0, 0, 1500.0), (0, 0, 1200.0)]) == (1200.0, 1500.0, 300.0)
+    assert elevation_stats([(0, 0, 0.0), (0, 0, 40.0)]) == (0.0, 40.0, 40.0)         # nothing well above sea level: keep
+
+
+def test_a_route_with_zero_placeholders_still_gets_its_mountain_section(make_route, fixed_now):
+    section = run(make_route, fixed_now, (0.0, 1500.0, 1800.0), weather_rows=rows())
+    assert "Route elevation 1500–1800 m (relief 300 m)" in section.markdown
+
+
+def test_a_regional_fact_is_shown_even_without_elevation_data(make_route, fixed_now):
+    fact = {"markdown": "The avalanche bulletin for the Caucasus is published daily.", "sources": ["https://example.org/aval"]}
+    section = run(make_route, fixed_now, (None, None), facts={"all": {"mountain": fact}})
+    assert "no elevation data" in section.markdown and "avalanche bulletin for the Caucasus" in section.markdown
+    assert section.confidence == "web-sourced" and "Sources: [example.org](https://example.org/aval)" in section.markdown

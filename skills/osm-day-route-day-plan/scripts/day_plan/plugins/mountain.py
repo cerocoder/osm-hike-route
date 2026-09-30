@@ -22,6 +22,7 @@ from .common import sources_line
 
 MOUNTAIN_MIN_ELEVATION_M = 600
 MOUNTAIN_MIN_RELIEF_M = 300
+PLACEHOLDER_CHECK_M = 100.0
 HIGH_M, AMS_M, AMS_STRONG_M = 1500, 2500, 3500
 TRACK_RADIUS_M = 300.0
 GLACIER_RADIUS_M = 1000.0
@@ -36,9 +37,13 @@ _THUNDER_CODES = (95, 96, 99)
 
 
 def elevation_stats(coords: list):
-    """(min, max, relief) of the route elevations, or None when the route carries none."""
+    """(min, max, relief) of the route elevations, or None when the route carries none. The planning skill
+    writes 0.0 for an unknown elevation: all zeros means unknown, and zeros beside real values (any of them
+    100 m or more) are placeholders and are ignored."""
     values = [c[2] for c in coords if len(c) > 2 and isinstance(c[2], (int, float))]
-    if not values:
+    if any(v >= PLACEHOLDER_CHECK_M for v in values):
+        values = [v for v in values if v != 0.0]
+    if not values or all(v == 0.0 for v in values):
         return None
     return min(values), max(values), max(values) - min(values)
 
@@ -57,7 +62,9 @@ class MountainPlugin(SectionPlugin):
         lang = ctx.lang
         stats = elevation_stats(ctx.coords)
         if stats is None:
-            return Section("hazards", "- " + tr("mt_no_elevation", lang), "no-data")
+            lines = ["- " + tr("mt_no_elevation", lang)]
+            fact = lookup(ctx.facts, ctx.date_iso, "mountain")
+            return self._with_fact(lines, [], fact, lang, "no-data")
         low, top, relief = stats
         if top < MOUNTAIN_MIN_ELEVATION_M and relief < MOUNTAIN_MIN_RELIEF_M:
             return Section("hazards", "", "derived", omit=True)          # not a mountain route
@@ -155,9 +162,13 @@ class MountainPlugin(SectionPlugin):
             lines.append("- " + tr("mt_shade", lang))
 
         fact = lookup(ctx.facts, ctx.date_iso, "mountain")
+        return self._with_fact(lines, warnings, fact, lang, "derived")
+
+    @staticmethod
+    def _with_fact(lines, warnings, fact, lang, confidence) -> Section:
         if fact:
             lines += ["", tr("mt_web_title", lang), "", fact["markdown"], "", sources_line(fact["sources"], lang)]
             for w in fact.get("warnings", []):
                 warnings.append(PlanWarning(w["severity"], w["text"]))
-        return Section("hazards", "\n".join(lines), "web-sourced" if fact else "derived",
+        return Section("hazards", "\n".join(lines), "web-sourced" if fact else confidence,
                        sources=list(fact["sources"]) if fact else [], warnings=warnings)

@@ -2,6 +2,13 @@
 coordinates, and LineString properties that hold computed OUTPUTS only
 (never duplicating weights.json's inputs)."""
 
+ELEVATION_DECIMALS = 1                      # elevations are stored to 0.1 m: the source data is ~30 m resolution
+
+
+def _round_elevation(value):
+    return round(value, ELEVATION_DECIMALS)
+
+
 _OPTIONAL_POINT_KEYS = (
     "note", "source", "osm_id", "wikidata", "wikipedia", "search_names",
     "opening_hours", "access_notes",
@@ -11,7 +18,7 @@ _OPTIONAL_POINT_KEYS = (
 def _point_feature(pf: dict) -> dict:
     coords = [pf["lon"], pf["lat"]]
     if pf.get("ele") is not None:
-        coords.append(pf["ele"])
+        coords.append(_round_elevation(pf["ele"]))
     properties = {"name": pf["name"], "type": pf["type"]}
     if pf.get("tier") is not None:
         properties["tier"] = pf["tier"]
@@ -30,15 +37,16 @@ def build_geojson(path_coords, route_name, mode, style, distance_km, elevation_g
         "type": "Feature",
         "geometry": {
             "type": "LineString",
-            "coordinates": [[lon, lat, ele if ele is not None else 0.0] for lon, lat, ele in path_coords],
+            "coordinates": [[lon, lat, _round_elevation(ele) if ele is not None else 0.0]
+                            for lon, lat, ele in path_coords],
         },
         "properties": {
             "name": route_name,
             "mode": mode,
             "style": style,
             "distance_km": distance_km,
-            "elevation_gain_m": elevation_gain_m,
-            "elevation_loss_m": elevation_loss_m,
+            "elevation_gain_m": _round_elevation(elevation_gain_m),
+            "elevation_loss_m": _round_elevation(elevation_loss_m),
             "duration_estimate_hours": duration_estimate_hours,
             "duration_warning": duration_warning,
             "curated_routes_count": curated_routes_count,

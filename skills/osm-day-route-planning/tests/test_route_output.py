@@ -90,3 +90,25 @@ def test_way_segments_have_no_default_so_they_cannot_be_left_out():
     import inspect
     assert inspect.signature(build_geojson).parameters["way_segments"].default is inspect.Parameter.empty
 
+
+
+def test_elevations_are_stored_to_a_tenth_of_a_metre():
+    result = _sample_call(
+        path_coords=[(37.0, 55.0, 682.020635343171), (37.001, 55.001, 542.0), (37.002, 55.002, 100.04)],
+        elevation_gain_m=840.3456, elevation_loss_m=839.96,
+        point_features=[{"lon": 37.0005, "lat": 55.0005, "ele": 615.9931371309518, "name": "P", "type": "viewpoint"}])
+    line = next(f for f in result["features"] if f["geometry"]["type"] == "LineString")
+    assert [c[2] for c in line["geometry"]["coordinates"]] == [682.0, 542.0, 100.0]
+    assert line["properties"]["elevation_gain_m"] == 840.3 and line["properties"]["elevation_loss_m"] == 840.0
+    point = next(f for f in result["features"] if f["geometry"]["type"] == "Point")
+    assert point["geometry"]["coordinates"] == [37.0005, 55.0005, 616.0]
+
+
+def test_rounding_keeps_coordinates_and_the_unknown_elevation_rules():
+    result = _sample_call(
+        path_coords=[(37.123456789, 55.987654321, None), (37.1, 55.9, 10.0)],
+        point_features=[{"lon": 37.0, "lat": 55.0, "ele": None, "name": "P", "type": "viewpoint"}])
+    line = next(f for f in result["features"] if f["geometry"]["type"] == "LineString")
+    assert line["geometry"]["coordinates"][0] == [37.123456789, 55.987654321, 0.0]     # unknown stays 0.0
+    point = next(f for f in result["features"] if f["geometry"]["type"] == "Point")
+    assert point["geometry"]["coordinates"] == [37.0, 55.0]                              # and no elevation for a point

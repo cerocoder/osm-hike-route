@@ -61,7 +61,7 @@ class TrailPassabilityPlugin(SectionPlugin):
             return Section("hazards", "", "derived", omit=True)
         fact = lookup(ctx.facts, ctx.date_iso, "trail_conditions")
         weather = shared.get("weather") or {}
-        history = shared.get("snow_history") or {}
+        history = shared.get("snow_history") or {"error": tr("tp_history_failed", lang)}   # the data plugin raised
         lat, _ = ctx.centroid
         top = max((c[2] for c in ctx.coords if c[2] is not None), default=None)
         cold = in_cold_season(ctx.date.month, lat, top)

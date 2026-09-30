@@ -491,6 +491,7 @@ from render_map import activity_label
     ({"mode": "ski"}, "ru", "лыжи"),
     ({"mode": "ski"}, "en", "skiing"),
     ({}, "ru", "пешком"),
+    ({"mode": None}, "ru", "пешком"),
     ({"mode": "bike", "style": "gravel"}, "ru", "вело (gravel)"),
     ({"mode": "boat"}, "en", "boat"),
     ({"mode": "walk"}, "de", "on foot"),

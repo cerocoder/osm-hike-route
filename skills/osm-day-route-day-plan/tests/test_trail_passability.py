@@ -227,3 +227,13 @@ def test_the_planned_window_comes_from_the_weather_plugins_daytime_hours(tmp_pat
     assert "(10:00–14:00)" in section.markdown
     default = run(tmp_path, shared_of(hist_rows(), weather_rows=[]), folder="default")
     assert "(06:00–20:00)" in default.markdown
+
+
+def test_a_crashed_snow_history_plugin_is_a_no_data_line_in_the_cold_season_not_a_silent_omission(tmp_path):
+    shared = shared_of(hist_rows())
+    del shared["snow_history"]                      # what run_plugins leaves when the data plugin raised
+    section = run(tmp_path, shared)
+    assert section.confidence == "no-data" and "the weather history step failed" in section.markdown
+    summer = datetime.date(2026, 7, 10)
+    ctx = build_context(archive(tmp_path, folder="summer"), summer, http=lambda url: {}, now=TODAY_NOW)
+    assert TrailPassabilityPlugin().run(ctx, shared).omit is True

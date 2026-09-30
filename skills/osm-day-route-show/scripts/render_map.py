@@ -251,7 +251,7 @@ def activity_label(line_properties: dict, user_lang: str) -> str:
     """"пешком" / "вело (спорт)" / "cycling (leisure)" ...: the type of the outing from the route's mode and style.
     An unknown combination falls back to the mode label (or the raw mode) with the raw style in brackets."""
     labels = _ACTIVITY_LABELS.get(user_lang, _ACTIVITY_LABELS["en"])
-    mode = line_properties.get("mode", "walk")
+    mode = line_properties.get("mode") or "walk"
     style = line_properties.get("style")
     if style and f"{mode}:{style}" in labels:
         return labels[f"{mode}:{style}"]

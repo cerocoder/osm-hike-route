@@ -41,6 +41,7 @@ SNOW_THRESHOLDS = {
 STEEP_GRADIENT_PCT = 10.0          # walking on high ice: not recommended on a leg at least this steep
 ICY_SAC_RANK = 3                   # T3 and harder with any snow on foot: not recommended
 SNOW_ON_TECHNICAL_CM = 1.0
+CRUST_SNOW_CM = 0.5             # below this the snow is model noise: ice with no real snow is ice alone
 MTB_SCALE_CAUTION = 2              # mtb:scale from this with snow: difficult by bicycle
 LEG_DANGER_SHARE = 0.20            # a leg is not recommended when its not-recommended runs make up this share
 LEG_CAUTION_SHARE = 0.30           # difficult when difficult plus not-recommended runs make up this share
@@ -229,7 +230,7 @@ def judge_run(profile: str, surface: Surface, conditions: Conditions, gradient_p
         if surface.sac >= ICY_SAC_RANK and conditions.snow_cm >= SNOW_ON_TECHNICAL_CM:
             verdict = "danger"
     else:                                   # studded tires: ice alone costs nothing
-        if not surface.cleared and ice != "none" and conditions.snow_cm > 0:
+        if not surface.cleared and ice != "none" and conditions.snow_cm >= CRUST_SNOW_CM:
             verdict = _worse(verdict, "caution")            # an icy crust or rutted ice on an uncleared run
         if snow > 0 and conditions.slush:
             verdict = _worse(verdict, "caution")

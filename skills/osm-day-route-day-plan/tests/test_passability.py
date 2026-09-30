@@ -191,6 +191,7 @@ def test_studded_tires_make_ice_alone_harmless_but_crust_slush_and_technical_tra
     mtb = classify_segment({"highway": "path", "surface": "ground", "mtb:scale": "2"})
     assert judge_run("bike_sport", mtb, cond(1.0), 2.0) == "caution"
     assert judge_run("bike_sport", mtb, cond(0.0), 2.0) == "passable"
+    assert judge_run("bike_leisure", UNCLEARED_TRACK, cond(0.05, "high"), 2.0) == "passable"        # model noise is not snow
 
 
 def leg_with(*runs, gradient=2.0):

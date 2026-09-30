@@ -8,6 +8,8 @@
 
 **Tech Stack:** Python 3 stdlib only, pytest. No API keys, no network at run time for radiation.
 
+**Note:** this plan was regenerated after its execution and contains the final code, including the fixes of the final whole-branch review (a truthful no-entry line next to advisory areas, distances in tenths of a kilometre, no repeated event in the pinned caution, the corrected Russian mushroom name, a failure-safe hint, the credit line as its own paragraph). The task order and tests are those that were executed.
+
 **Spec:** `docs/superpowers/specs/2026-09-29-osm-day-route-day-plan-design.md`. Parts 1, 2 and 3a are merged. This is part **3b**, the last of the third plan.
 
 **Deviations from the spec (decided while researching):**
@@ -328,12 +330,13 @@ Modify `skills/osm-day-route-day-plan/scripts/day_plan/i18n.py` — apply this p
 ```diff
 --- a/skills/osm-day-route-day-plan/scripts/day_plan/i18n.py
 +++ b/skills/osm-day-route-day-plan/scripts/day_plan/i18n.py
-@@ -154,6 +154,35 @@
+@@ -154,6 +154,36 @@
          "air_warn_emissions": "Industrial emissions may be carried toward the route ({hours}).",
          "hz_bio": "Ticks and biting insects", "hz_mountain": "Mountain hazards", "hz_fire": "Fire danger",
          "hz_air": "Air: pollen and pollution",
 +        "hz_radiation": "Radiation", "hz_people": "People and access",
 +        "rad_none": "No zone of the radiation registry lies within {km} km of the route or its points. The registry is curated by hand and incomplete (it covers: {areas}), so no entry does not mean the land is clean.",
++        "rad_none_advisory": "No danger zone or affected area of the radiation registry lies within {km} km of the route or its points. The registry is curated by hand and incomplete (it covers: {areas}), so no entry does not mean the land is clean.",
 +        "rad_areas": "the East Urals trace, the Techa river, Mayak and Lake Karachay, the Chernobyl zones (Ukraine, Belarus, the Bryansk, Tula, Kaluga and Orel regions), the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-mushroom areas in Bavaria and Norway",
 +        "rad_inside": "- **{name}** ({severity}): the route or one of its points is inside the zone. {contamination}. {status}",
 +        "rad_near": "- **{name}** ({severity}): the route passes about {km} km from the zone. {contamination}. {status}",
@@ -346,7 +349,7 @@ Modify `skills/osm-day-route-day-plan/scripts/day_plan/i18n.py` — apply this p
 +        "rad_replan": "Consider changing the route (osm-day-route-planning) so that it avoids the zone.",
 +        "rad_osm_credit": "Zone outlines from OpenStreetMap (© OpenStreetMap contributors, ODbL) where noted.",
 +        "rad_warn_inside_danger": "The route enters {name}: contaminated land. Do not pick mushrooms or berries, do not drink from springs or streams, stay out of the zone if it is closed.",
-+        "rad_warn_inside_caution": "The route crosses {name} (contamination: {event}). Do not pick mushrooms or berries and do not drink from springs or streams.",
++        "rad_warn_inside_caution": "The route crosses {name}. Do not pick mushrooms or berries and do not drink from springs or streams.",
 +        "rad_warn_near": "The route passes about {km} km from {name}: do not pick mushrooms or berries and do not drink from springs or streams near it.",
 +        "rad_sev_danger": "danger zone", "rad_sev_caution": "affected area", "rad_sev_info": "advisory area",
 +        "rad_advice_mushrooms": "- Wild mushrooms and game from these areas can still carry caesium-137: eat them in moderation and check the local advice.",
@@ -364,12 +367,13 @@ Modify `skills/osm-day-route-day-plan/scripts/day_plan/i18n.py` — apply this p
          "weekday_names": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
          "cal_line": "Date: {weekday} {date} — {kind}; {holiday} {source}",
          "cal_weekend": "weekend", "cal_workday": "working day", "cal_dayoff": "day off",
-@@ -332,6 +361,35 @@
+@@ -332,6 +362,36 @@
          "air_warn_emissions": "Выбросы промышленных объектов могут нести на маршрут ({hours}).",
          "hz_bio": "Клещи и кровососущие насекомые", "hz_mountain": "Горные опасности",
          "hz_fire": "Пожарная опасность", "hz_air": "Воздух: пыльца и загрязнение",
 +        "hz_radiation": "Радиация", "hz_people": "Люди и доступ",
 +        "rad_none": "В радиус {km} км от маршрута и его точек не попадает ни одна зона реестра радиации. Реестр составлен вручную и неполон (в нём: {areas}), поэтому отсутствие записи не означает, что земля чистая.",
++        "rad_none_advisory": "Ни опасная зона, ни затронутая территория реестра радиации не лежат в радиусе {km} км от маршрута и его точек. Реестр составлен вручную и неполон (в нём: {areas}), поэтому отсутствие записи не означает, что земля чистая.",
 +        "rad_areas": "Восточно-Уральский след, река Теча, «Маяк» и озеро Карачай, чернобыльские зоны (Украина, Беларусь, Брянская, Тульская, Калужская и Орловская области), Семипалатинский полигон, Енисей ниже Железногорска, районы Баварии и Норвегии с грибами",
 +        "rad_inside": "- **{name}** ({severity}): маршрут или одна из его точек внутри зоны. {contamination}. {status}",
 +        "rad_near": "- **{name}** ({severity}): маршрут проходит примерно в {km} км от зоны. {contamination}. {status}",
@@ -382,7 +386,7 @@ Modify `skills/osm-day-route-day-plan/scripts/day_plan/i18n.py` — apply this p
 +        "rad_replan": "Подумайте об изменении маршрута (osm-day-route-planning), чтобы обойти зону.",
 +        "rad_osm_credit": "Контуры зон — из OpenStreetMap (© участники OpenStreetMap, ODbL), где это указано.",
 +        "rad_warn_inside_danger": "Маршрут входит в зону: {name} — заражённая земля. Не собирайте грибы и ягоды, не пейте из родников и ручьёв; если зона закрыта, не входите в неё.",
-+        "rad_warn_inside_caution": "Маршрут пересекает зону: {name} (загрязнение: {event}). Не собирайте грибы и ягоды и не пейте из родников и ручьёв.",
++        "rad_warn_inside_caution": "Маршрут пересекает зону: {name}. Не собирайте грибы и ягоды и не пейте из родников и ручьёв.",
 +        "rad_warn_near": "Маршрут проходит примерно в {km} км от зоны: {name}. Рядом не собирайте грибы и ягоды и не пейте из родников и ручьёв.",
 +        "rad_sev_danger": "опасная зона", "rad_sev_caution": "затронутая территория", "rad_sev_info": "зона с рекомендациями",
 +        "rad_advice_mushrooms": "- Дикие грибы и дичь из этих районов всё ещё могут содержать цезий-137: ешьте их умеренно и уточняйте местные рекомендации.",
@@ -629,7 +633,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Create: `skills/osm-day-route-day-plan/data/radiation_zones.json`
 - Create: `skills/osm-day-route-day-plan/data/README.md`
 
-- [ ] **Step 1: Add the tests** (62 tests in the file(s) below)
+- [ ] **Step 1: Add the tests** (65 tests in the file(s) below)
 
 Create `skills/osm-day-route-day-plan/tests/test_radiation_registry.py`:
 
@@ -775,6 +779,25 @@ def test_the_techa_buffer_follows_the_river_not_its_bounding_box():
     assert "ural-techa-river" not in [h.zone["id"] for h in far]
 
 
+def _hit(pts, zone_id):
+    return [h for h in find_hits(REGISTRY, pts, []) if h.zone["id"] == zone_id]
+
+
+def test_a_long_segment_crossing_the_mayak_circle_with_both_ends_far_outside_is_a_hit():
+    west, east = (60.6, 55.7333), (61.2, 55.7333)                # about 19 km either side of the 6 km circle
+    assert _hit([west, west], "ural-mayak-site") == [] and _hit([east, east], "ural-mayak-site") == []
+    hits = _hit([west, east], "ural-mayak-site")
+    assert len(hits) == 1 and hits[0].inside and hits[0].distance_km == 0
+
+
+def test_a_long_segment_crossing_the_techa_line_between_two_far_ends_is_a_hit():
+    lon, lat = ZONES["ural-techa-river"]["geometry"]["lines"][0][20]      # a river vertex
+    south, north = (lon, lat - 0.1), (lon, lat + 0.1)                     # about 11 km either side, beyond buffer and margin
+    assert _hit([south, south], "ural-techa-river") == [] and _hit([north, north], "ural-techa-river") == []
+    hits = _hit([south, north], "ural-techa-river")
+    assert len(hits) == 1 and hits[0].inside and hits[0].distance_km == 0
+
+
 def test_the_corridor_of_the_trace_does_not_reach_upwind_of_the_release_point():
     trace = [h for h in find_hits(REGISTRY, [(60.62, 55.70), (60.6201, 55.70)], []) if h.zone["id"] == "ural-eurt-trace"]
     assert trace == []                                    # Kyshtym-side land west of Mayak: the plume went north-east
@@ -839,6 +862,11 @@ def test_validation_catches_broken_entries():
     broken = copy.deepcopy(REGISTRY)
     broken["zones"].append(copy.deepcopy(broken["zones"][0]))
     assert any("duplicate" in p for p in validate_registry(broken))
+
+
+def test_the_norwegian_zone_names_the_right_russian_mushroom():
+    ru = ZONES["no-wild-mushroom-municipalities"]["status"]["ru"]
+    assert "колпаке кольчатом" in ru and "кольцевик" not in ru
 ```
 
 - [ ] **Step 2: Run them and see them fail** — `cd skills/osm-day-route-day-plan && python3 -m pytest tests/test_radiation_registry.py -q` (import errors or assertion failures: the code does not exist yet).
@@ -1106,8 +1134,8 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
     "ru": "стронций-90 после аварии на «Маяке» в 1957 году"
    },
    "status": {
-    "en": "State radiation and strict nature reserve, not open to the public; about 180 km² near the explosion site are still officially off-limits.",
-    "ru": "Государственный радиационный и строгий заповедник, закрыт для посещения; около 180 км² у места взрыва официально остаются закрытыми."
+    "en": "State radiation and strict nature reserve, not open to the public; about 180 km² near the explosion site are still officially off-limits (NRPA, 2007).",
+    "ru": "Государственный радиационный и строгий заповедник, закрыт для посещения; около 180 км² у места взрыва официально остаются закрытыми (NRPA, 2007 год)."
    },
    "geometry": {
     "type": "polygons",
@@ -1161,7 +1189,7 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
     "half_width_km": 25.0
    },
    "geometry_note": {
-    "en": "Centre line through Mayak, Bagaryak, Kamensk-Uralsky and the area between Bogdanovich and Kamyshlov (the settlements named on the source's map), starting 25 km downwind of Mayak and ending so that the outline spans 300 km from Mayak; half-width 25 km is the upper bound of the 30–50 km width given by the source. An outline, not an isoline.",
+    "en": "Centre line through Bagaryak, Kamensk-Uralsky and the area between Bogdanovich and Kamyshlov (the settlements named on the source's map), starting 25 km downwind of Mayak and ending so that the outline spans 300 km from Mayak; half-width 25 km is the upper bound of the 30–50 km width given by the source. An outline, not an isoline.",
     "ru": "Осевая линия через Багаряк, Каменск-Уральский и место между Богдановичем и Камышловом (населённые пункты с карты источника), начинается в 25 км от «Маяка» по ветру и заканчивается так, чтобы контур занимал 300 км от «Маяка»; полуширина 25 км — верхняя граница ширины 30–50 км из источника. Контур, а не изолиния."
    },
    "event": {
@@ -1624,7 +1652,7 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
    },
    "status": {
     "en": "The Norwegian Radiation and Nuclear Safety Authority (DSA, report 2/2026) finds the highest caesium levels in wild mushrooms from the most contaminated areas of Innlandet, Trøndelag and Nordland (2017–2025: up to 17 000 Bq/kg in gypsy mushroom from Øystre Slidre, 12 000 Bq/kg in another edible species from Lierne) and no clear decline over the last decade. It advises against taking in more than 80 000 Bq of caesium a year, which concerns people who eat very large amounts of wild food from the hard-hit areas; the national limits were removed in 2025.",
-    "ru": "Норвежское управление радиационной и ядерной безопасности (DSA, доклад 2/2026) находит самое высокое содержание цезия в диких грибах из наиболее загрязнённых районов Иннландета, Трёнделага и Нурланна (в 2017–2025 годах до 17 000 Бк/кг в морщинистом кольцевике (норв. rimsopp) из Эйстре-Слидре, 12 000 Бк/кг в другом съедобном виде из Лирне) и не видит явного снижения за последнее десятилетие. Оно советует не получать более 80 000 Бк цезия в год, что касается людей, которые едят очень много дикой пищи из сильно пострадавших районов; национальные пределы отменены в 2025 году."
+    "ru": "Норвежское управление радиационной и ядерной безопасности (DSA, доклад 2/2026) находит самое высокое содержание цезия в диких грибах из наиболее загрязнённых районов Иннландета, Трёнделага и Нурланна (в 2017–2025 годах до 17 000 Бк/кг в колпаке кольчатом (норв. rimsopp) из Эйстре-Слидре, 12 000 Бк/кг в другом съедобном виде из Лирне) и не видит явного снижения за последнее десятилетие. Оно советует не получать более 80 000 Бк цезия в год, что касается людей, которые едят очень много дикой пищи из сильно пострадавших районов; национальные пределы отменены в 2025 году."
    },
    "event": {
     "en": "Chernobyl accident, 1986",
@@ -1671,7 +1699,8 @@ A hand-curated list of contaminated or closed zones, read by
 ```json
 {
   "id": "unique-slug",
-  "severity": "danger | caution",
+  "severity": "danger | caution | info",
+  "advice": "full | mushrooms",
   "approximate": true,
   "name": {"en": "...", "ru": "..."},
   "contamination": {"en": "...", "ru": "..."},
@@ -1719,7 +1748,7 @@ A hand-curated list of contaminated or closed zones, read by
 | `ural-karachay` | circle at 55.6783°N 60.7997°E (Wikipedia), r = 3 km assumed | NRPA Report 2008:3 (1967 dispersal); Wikipedia |
 | `ua-chernobyl-exclusion-zone` | OSM relation 3311547 | IAEA/UIAR presentation (evacuated in 1986, 2 122 km²) |
 | `by-polesie-reserve` | OSM relation 3397849 | Order No. 39 of the Belarus Ministry for Emergency Situations, 1995 (FAOLEX) |
-| `ru-bryansk-contaminated-districts` | OSM boundaries of seven districts | Radiation Hygiene 2023;16(4):55-63 (districts, mushrooms up to 75–82 % of the internal dose) |
+| `ru-bryansk-contaminated-districts` | OSM boundaries of seven districts | Radiation Hygiene 2023;16(4):55-63 (districts, mushrooms up to 75–82 % of the internal dose); Government decree No. 1074 of 8 Oct 2015 |
 | `kz-semipalatinsk-test-site` | OSM way 932505322 (boundary=hazard) | National Nuclear Center of Kazakhstan, radioecological surveys |
 | `ru-central-chernobyl-districts` | OSM boundaries of nine districts (Tula: Arsenyevsky, Belevsky, Plavsky, Chernsky, Shchekinsky; Kaluga: Zhizdra, Ulyanovo, Khvastovichi; Orel: Bolkhov) | Government decree No. 1074 of 8 Oct 2015 (the list itself, read at government.ru: zone of residence with the right to resettle) |
 | `de-bavaria-wild-food-areas` | OSM: Bayerischer Wald region, Landkreis Berchtesgadener Land, Mittenwald, Karlshuld (stands for the Donaumoos) | BfS press release of 10 Sep 2024 (regions, 600 Bq/kg, moderate consumption harmless) |
@@ -1745,7 +1774,7 @@ A hand-curated list of contaminated or closed zones, read by
 
 ```bash
 git add skills README.md
-git commit -m "Radiation registry: nine researched zones, validation and route search
+git commit -m "Radiation registry: thirteen researched zones, validation and route search
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
@@ -1758,7 +1787,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Create: `skills/osm-day-route-day-plan/tests/test_radiation.py`
 - Create: `skills/osm-day-route-day-plan/scripts/day_plan/plugins/radiation.py`
 
-- [ ] **Step 1: Add the tests** (15 tests in the file(s) below)
+- [ ] **Step 1: Add the tests** (18 tests in the file(s) below)
 
 Create `skills/osm-day-route-day-plan/tests/test_radiation.py`:
 
@@ -1776,7 +1805,7 @@ MADRID = ((-3.75, 40.42, 650.0), (-3.74, 40.43, 660.0))
 SYDNEY = ((151.20, -33.86, 20.0), (151.21, -33.85, 25.0))
 BEIJING = ((116.39, 39.90, 50.0), (116.41, 39.92, 50.0))
 BAVARIAN_FOREST = ((13.35, 48.85, 700.0), (13.42, 48.88, 900.0))
-NEAR_BAVARIAN_FOREST = ((14.0, 48.9, 500.0), (14.05, 48.95, 500.0))
+NEAR_BAVARIAN_AREA = ((12.08, 49.075, 500.0), (12.081, 49.076, 500.0))     # about 1.5 km outside a Bavarian area
 TULA = ((37.50, 54.00, 200.0), (37.55, 54.02, 210.0))
 KYSHTYM = ((60.50, 55.70, 250.0), (60.62, 55.74, 255.0), (60.85, 55.80, 260.0))     # the reserve, Mayak and the trace
 
@@ -1808,7 +1837,7 @@ def test_the_neighbouring_reserve_is_reported_as_near_with_its_distance(make_rou
     section = run(make_route, fixed_now, CROSSING)
     assert "Polesie State Radioecological Reserve (Belarus)** (danger zone): the route passes about 0.9 km from the zone." \
         in section.markdown
-    assert any(w.severity == "caution" and "about 1 km from Polesie" in w.text for w in section.warnings)
+    assert any(w.severity == "caution" and "about 0.9 km from Polesie" in w.text for w in section.warnings)
 
 
 def test_a_near_miss_is_a_caution_not_a_danger(make_route, fixed_now):
@@ -1847,15 +1876,31 @@ def test_the_norwegian_mountain_municipalities_are_an_info_line_with_the_dsa_sou
     assert section.confidence == "tag-backed"
 
 
-def test_being_near_an_advisory_area_says_nothing(make_route, fixed_now):
-    section = run(make_route, fixed_now, ((13.2, 49.4, 500.0), (13.21, 49.41, 500.0)), folder="near")
-    assert section.warnings == [] and section.markdown.startswith("- No zone of the radiation registry")
+def test_being_near_an_advisory_area_says_nothing_but_tells_the_truth(make_route, fixed_now):
+    section = run(make_route, fixed_now, NEAR_BAVARIAN_AREA, folder="near")
+    assert section.warnings == []
+    assert section.markdown.startswith(
+        "- No danger zone or affected area of the radiation registry lies within 3 km of the route or its points.")
+    assert "so no entry does not mean the land is clean" in section.markdown and "safe" not in section.markdown.lower()
+    assert "No zone of the radiation registry" not in section.markdown
 
 
-def test_the_full_advice_wins_when_both_kinds_of_zone_are_reached(make_route, fixed_now):
+def test_the_advisory_wording_is_translated(make_route, fixed_now):
+    section = run(make_route, fixed_now, NEAR_BAVARIAN_AREA, lang="ru", folder="nearru")
+    assert section.markdown.startswith("- Ни опасная зона, ни затронутая территория реестра радиации не лежат в радиусе 3 км")
+
+
+def test_a_route_inside_an_advisory_area_alone_gets_no_full_advice(make_route, fixed_now):
     section = run(make_route, fixed_now, ((13.0, 48.9, 500.0), (13.4, 48.9, 500.0)), folder="mixed")
     assert "(advisory area)" in section.markdown       # the Bavarian Forest
     assert "Wild mushrooms and game from these areas" in section.markdown and "Springs, streams" not in section.markdown
+
+
+def test_a_small_near_miss_reads_in_tenths_of_a_kilometre(make_route, fixed_now):
+    section = run(make_route, fixed_now, ((30.3851, 51.0805, 120.0), (30.3861, 51.0805, 120.0)), folder="tenth")
+    near = [w.text for w in section.warnings if "about" in w.text]
+    assert len(near) == 1 and near[0].startswith("The route passes about 0.3 km from ")
+    assert "about 0 km" not in near[0]
 
 
 def test_central_russian_districts_are_a_caution_with_the_decree_as_source(make_route, fixed_now):
@@ -1888,8 +1933,11 @@ def test_the_east_urals_trace_is_an_approximate_caution_and_the_reserve_a_danger
     section = run(make_route, fixed_now, KYSHTYM)
     assert "East Ural State Nature Reserve (core of the East Urals Radioactive Trace)** (danger zone)" in section.markdown
     assert "East Urals Radioactive Trace (fallout of 1957, approximate outline)** (affected area)" in section.markdown
-    assert "Approximate outline: Centre line through Mayak, Bagaryak" in section.markdown
-    assert any("(contamination: Kyshtym accident, 1957)" in w.text for w in section.warnings)
+    assert "Approximate outline: Centre line through Bagaryak" in section.markdown
+    assert any(w.text == "The route crosses East Urals Radioactive Trace (fallout of 1957, approximate outline). "
+               "Do not pick mushrooms or berries and do not drink from springs or streams."
+               for w in section.warnings)
+    assert all("contamination:" not in w.text for w in section.warnings)
 
 
 def test_russian_text_uses_the_russian_names_and_advice(make_route, fixed_now):
@@ -1899,6 +1947,23 @@ def test_russian_text_uses_the_russian_names_and_advice(make_route, fixed_now):
     assert "Родники, ручьи и другая природная вода могут быть заражены" in section.markdown
     assert section.warnings[0].text.startswith("Маршрут входит в зону: Чернобыльская зона отчуждения (Украина) — заражённая земля.")
     assert section.markdown.count("Источники:") == 1 and "Centre" not in section.markdown and "Outline" not in section.markdown
+
+
+def test_osm_credit_is_its_own_paragraph(make_route, fixed_now):
+    section = run(make_route, fixed_now, CROSSING, folder="osm_en")
+    md = section.markdown
+    assert "\n\n*Zone outlines from OpenStreetMap" in md
+    # The line before the blank lines should be the sources line starting with "Sources:"
+    sources_idx = md.index("Sources:")
+    credit_idx = md.index("\n\n*Zone outlines from OpenStreetMap")
+    assert sources_idx < credit_idx
+    # Also test in Russian
+    section_ru = run(make_route, fixed_now, CROSSING, lang="ru", folder="osm_ru")
+    md_ru = section_ru.markdown
+    assert "\n\n*Контуры зон — из OpenStreetMap" in md_ru
+    sources_idx_ru = md_ru.index("Источники:")
+    credit_idx_ru = md_ru.index("\n\n*Контуры зон — из OpenStreetMap")
+    assert sources_idx_ru < credit_idx_ru
 
 
 def test_radiation_needs_no_network_and_no_other_plugin(make_route, fixed_now):
@@ -1954,15 +2019,11 @@ class RadiationPlugin(SectionPlugin):
         if not any(in_scope(registry, c[1], c[0]) for c in route[:1] + route[-1:] + [(lon, lat)]):
             return Section("hazards", "", "derived", omit=True)             # far outside the registry's area
         margin = registry["margin_km"]
-        hits = find_hits(registry, route, points)
+        all_hits = find_hits(registry, route, points)
+        hits = [h for h in all_hits if h.inside or h.zone["severity"] != "info"]     # an advisory area matters only inside it
         if not hits:
-            return Section("hazards", "- " + tr("rad_none", lang, km=f"{margin:g}", areas=tr("rad_areas", lang)),
-                           "derived")
-
-        hits = [h for h in hits if h.inside or h.zone["severity"] != "info"]     # an advisory area matters only inside it
-        if not hits:
-            return Section("hazards", "- " + tr("rad_none", lang, km=f"{margin:g}", areas=tr("rad_areas", lang)),
-                           "derived")
+            key = "rad_none_advisory" if all_hits else "rad_none"      # near-but-outside advisory areas were dropped
+            return Section("hazards", "- " + tr(key, lang, km=f"{margin:g}", areas=tr("rad_areas", lang)), "derived")
         lines, warnings, urls = [], [], []
         any_danger_zone_reached = False
         for hit in hits:
@@ -1988,12 +2049,10 @@ class RadiationPlugin(SectionPlugin):
             elif hit.inside and zone["severity"] == "info":
                 warnings.append(PlanWarning("info", tr("rad_warn_inside_info", lang, name=name)))
             elif hit.inside:
-                event = zone["event"].get(lang) or zone["event"]["en"]
-                warnings.append(PlanWarning("caution", tr("rad_warn_inside_caution", lang, name=name, event=event),
-                                            pinned=True))
+                warnings.append(PlanWarning("caution", tr("rad_warn_inside_caution", lang, name=name), pinned=True))
             else:
                 warnings.append(PlanWarning("caution" if danger_zone else "info",
-                                            tr("rad_warn_near", lang, name=name, km=f"{hit.distance_km:.0f}"),
+                                            tr("rad_warn_near", lang, name=name, km=f"{hit.distance_km:.1f}"),
                                             pinned=True))
         if any(h.zone["advice"] == "full" for h in hits):
             lines += ["", tr("rad_advice_title", lang), tr("rad_advice_food", lang), tr("rad_advice_water", lang),
@@ -2005,7 +2064,7 @@ class RadiationPlugin(SectionPlugin):
         urls = _unique(urls)
         lines += ["", sources_line(urls, lang)]
         if any("OpenStreetMap" in h.zone.get("geometry_note", {}).get("en", "") for h in hits):
-            lines.append("*" + tr("rad_osm_credit", lang) + "*")
+            lines += ["", "*" + tr("rad_osm_credit", lang) + "*"]
         primary = all(any(s["kind"] == "primary" for s in h.zone["sources"]) for h in hits)
         return Section("hazards", "\n".join(lines), "tag-backed" if primary else "web-sourced",
                        sources=urls, warnings=warnings,
@@ -2262,7 +2321,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Modify: `skills/osm-day-route-day-plan/scripts/build_day_plan.py`
 - Modify: `skills/osm-day-route-day-plan/scripts/record_fact.py`
 
-- [ ] **Step 1: Add the tests** (25 tests in the file(s) below)
+- [ ] **Step 1: Add the tests** (26 tests in the file(s) below)
 
 Modify `skills/osm-day-route-day-plan/tests/test_cli.py` — apply this patch (`patch -p1`):
 
@@ -2306,7 +2365,7 @@ Modify `skills/osm-day-route-day-plan/tests/test_cli.py` — apply this patch (`
  
  
  def test_record_fact_accepts_the_hazard_plugins_and_their_warnings(tmp_path):
-@@ -260,3 +261,51 @@
+@@ -260,3 +261,62 @@
      text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
      assert "## Getting there" in text and "### Fire danger" in text and "could not be built" in text
      assert "plugin fire failed" in capsys.readouterr().err
@@ -2358,6 +2417,17 @@ Modify `skills/osm-day-route-day-plan/tests/test_cli.py` — apply this patch (`
 +    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text,
 +                               now=fixed_now) == 0
 +    assert (route_dir / "day-plan-2026-06-21.md").exists() and "hint (optional)" not in capsys.readouterr().out
++
++
++def test_a_failing_missing_facts_check_never_fails_the_written_plan(make_route, weather_response, fixed_now,
++                                                                     monkeypatch):
++    def boom(ctx):
++        raise RuntimeError("missing facts exploded")
++    monkeypatch.setattr(build_day_plan, "missing_web_facts", boom)
++    route_dir = make_route()
++    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text,
++                               now=fixed_now) == 0
++    assert (route_dir / "day-plan-2026-06-21.md").exists()
 ```
 
 - [ ] **Step 2: Run them and see them fail** — `cd skills/osm-day-route-day-plan && python3 -m pytest tests/test_cli.py -q` (import errors or assertion failures: the code does not exist yet).
@@ -2405,7 +2475,19 @@ Modify `skills/osm-day-route-day-plan/scripts/build_day_plan.py` — apply this 
      return [pid for pid in wanted if lookup(ctx.facts, ctx.date_iso, pid) is None]
  
  
-@@ -112,11 +118,15 @@
+@@ -104,7 +110,10 @@
+     print(f"wrote {out.resolve()}")
+     for plugin_id, reason in result.failures:
+         print(f"warning: plugin {plugin_id} failed: {reason}", file=sys.stderr)
+-    missing = missing_web_facts(ctx)
++    try:
++        missing = missing_web_facts(ctx)
++    except Exception:  # noqa: BLE001 — a hint must never turn a written plan into a failure
++        missing = []
+     if missing:
+         print(f"hint: no web-sourced facts recorded for {', '.join(missing)} on {date.isoformat()}: search the "
+               f"web (timetables, directions from the departure point, opening days), record what you find with "
+@@ -112,11 +121,15 @@
                + (". calendar: check in the official calendar whether the date is a public holiday, a "
                   "transferred day off or a working Saturday, and record it with --plugin calendar "
                   "--day-type ..." if "calendar" in missing else ""))
@@ -2483,7 +2565,7 @@ Modify `README.md` — apply this patch (`patch -p1`):
    - *Fire danger:* the official Fire Weather Index (Copernicus GWIS, up to 8 days ahead), the Russian Nesterov class for routes in Russia, and active fires detected near the route by satellite.
    - *Ticks and biting insects:* ticks, mosquitoes, blackflies and midges, horseflies, estimated from temperature, wind, humidity and water near the route. Especially useful for Siberia and the Urals.
    - *Air:* pollen (Europe up to about 45° E; for the rest of Russia the plan points to Yandex Weather) and pollution (European AQI, PM10, PM2.5, ozone), up to about 4 days ahead.
-+  - *Radiation*, listed first when it applies: the route and its points are checked against a hand-made registry of contaminated or closed areas (the East Urals trace and reserve, the Techa river, Mayak and Lake Karachay, the Chernobyl zones in Ukraine and Belarus, the Bryansk, Tula, Kaluga and Orel districts, the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-mushroom areas in Bavaria and Norway). A hit gives a warning at the top of the plan: do not pick mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires. No hit means "no entry in the registry", not "safe". The registry is incomplete and some outlines are approximate; the plan says which.
++  - *Radiation*, listed first when it applies: the route and its points are checked against a hand-made registry of contaminated or closed areas (the East Urals trace and reserve, the Techa river, Mayak and Lake Karachay, the Chernobyl zones in Ukraine and Belarus, the Bryansk, Tula, Kaluga and Orel districts, the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-mushroom areas in Bavaria and Norway). A route inside a danger zone or an affected area gives a warning at the top of the plan; an advisory area only adds an info line. The warning says: do not pick mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires. No hit means "no entry in the registry", not "safe". The registry is incomplete and some outlines are approximate; the plan says which.
 +  - *People and access:* only sourced notes Claude recorded (permit or border zones, travel advisories, access restrictions). Animals are recorded with the insect notes.
    - Regional knowledge Claude finds on the web (fire bans, avalanche bulletins, insect seasons) is added with its sources when recorded.
 +- **Mobile coverage:** the masts OpenStreetMap knows near your route, practical advice (offline maps, tell someone your plan, power bank, 112) and links to coverage maps. OpenStreetMap lists only some masts, so this is not a signal forecast.
@@ -2627,13 +2709,14 @@ Modify `skills/osm-day-route-day-plan/SKILL.md` — apply this patch (`patch -p1
  
  ## Common Mistakes
  
-@@ -211,6 +250,12 @@
+@@ -211,6 +250,13 @@
  - Editing `facts.json` by hand (use `record_fact.py`: it validates, refuses
    source-less facts and never overwrites a file it cannot parse).
  - Forgetting to re-render `map.html` after adding a plan.
 +- Treating a radiation hit as a trivia line: a route that enters a danger zone
 +  is a reason to offer going back to osm-day-route-planning (this skill never
-+  changes the route itself), and the Summary says so.
++  changes the route itself), and the Radiation section says so (the Summary
++  lists the danger warning).
 +- Recording a radiation zone as a fact: there is no `radiation` fact plugin.
 +  New zones go into `data/radiation_zones.json` with a cited source, both
 +  languages and geometry, and `tests/test_radiation_registry.py` must pass.

@@ -5,7 +5,7 @@ import datetime
 from dataclasses import dataclass
 
 from .base import SECTION_ORDER, Section
-from .i18n import tr
+from .i18n import activity_label, tr
 from .summary import build_summary_section
 
 
@@ -88,7 +88,7 @@ def assemble_markdown(ctx, sections: list, summary: Section, fetched_at: datetim
     if utc_offset_seconds is not None:
         local_time = fetched_at + datetime.timedelta(seconds=utc_offset_seconds)
         local = tr("meta_local", lang, local=local_time.strftime("%Y-%m-%d %H:%M"))
-    mode = tr("mode_bike" if ctx.mode == "bike" else "mode_walk", lang)
+    mode = activity_label(ctx.mode, getattr(ctx, "style", None), lang)
     meta = tr("meta", lang, fetched=stamp + " UTC" + local, mode=mode)
     if ctx.departure:
         meta += tr("meta_from", lang, departure=ctx.departure)

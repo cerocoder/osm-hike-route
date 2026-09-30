@@ -48,6 +48,8 @@ class PlanContext:
     http_text: Callable = get_text                        # GET -> text, for services that answer HTML
     access_points: list = field(default_factory=list)    # [RoutePoint] with type == "access"
     interest_points: list = field(default_factory=list)  # [RoutePoint], every other Point feature
+    style: str | None = None                             # "leisure" | "sport" for a bicycle, else None
+    segments: list | None = None                         # which road each part of the route runs on (route.geojson); None in an older archive
 
     def __post_init__(self):
         self.today = self.now.date()
@@ -63,6 +65,24 @@ def _dict(value) -> dict:
 
 def _number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _segments(value, vertex_count: int):
+    """The `segments` of the route archive when they are well formed (a list of dicts with integer, contiguous
+    from/to ranges covering every vertex), else None: a malformed or missing value must read as "no road data",
+    never as a wrong road."""
+    if not isinstance(value, list) or not value or vertex_count < 2:
+        return None
+    expected = 0
+    for segment in value:
+        if not isinstance(segment, dict):
+            return None
+        start, end = segment.get("from"), segment.get("to")
+        if (isinstance(start, bool) or isinstance(end, bool) or not isinstance(start, int)
+                or not isinstance(end, int) or start != expected or end <= start):
+            return None
+        expected = end
+    return [dict(s) for s in value] if expected == vertex_count - 1 else None
 
 
 def _line_feature(geojson: dict) -> dict:
@@ -121,6 +141,8 @@ def build_context(route_dir, date: datetime.date, lang: str = "en", departure: s
     return PlanContext(
         route_dir=route_dir, date=date, lang=lang, departure=departure, start_time=start_time,
         mode=props.get("mode") or "walk",
+        style=props.get("style") if isinstance(props.get("style"), str) else None,
+        segments=_segments(props.get("segments"), len(coords)),
         route_name=props.get("name") or route_dir.name,
         coords=coords,
         distance_km=props.get("distance_km"),

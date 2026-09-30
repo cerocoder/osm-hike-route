@@ -93,7 +93,7 @@ def test_full_plan_has_fixed_section_order_and_metadata(make_route, fixed_now, w
     assert lines[0] == "# Test route — 2026-06-21"
     assert lines[1] == "<!-- day-plan fetched_at: 2026-06-20T12:00:00Z -->"
     assert lines[2] == ("*Data fetched 2026-06-20 12:00 UTC (2026-06-20 13:00 local)"
-                        " · Mode: walking · From: Waterloo*")
+                        " · Mode: on foot · From: Waterloo*")
     assert lines[3] == "<!-- plugins: weather 1, light 1 -->"
     headings = [l for l in lines if l.startswith("## ")]
     assert headings == ["## Summary", "## Daylight", "## Weather by hour"]
@@ -146,13 +146,13 @@ def _meta_line(make_route, fixed_now, fetched, shared, lang="en"):
 def test_metadata_shows_local_time_when_offset_known(make_route, fixed_now):
     fetched = datetime.datetime(2026, 9, 29, 22, 31, tzinfo=datetime.timezone.utc)
     lines = _meta_line(make_route, fixed_now, fetched, {"utc_offset_seconds": 10800})
-    assert lines[2] == "*Data fetched 2026-09-29 22:31 UTC (2026-09-30 01:31 local) · Mode: walking*"
+    assert lines[2] == "*Data fetched 2026-09-29 22:31 UTC (2026-09-30 01:31 local) · Mode: on foot*"
 
 
 def test_metadata_is_utc_only_without_offset(make_route, fixed_now):
     fetched = datetime.datetime(2026, 9, 29, 22, 31, tzinfo=datetime.timezone.utc)
     lines = _meta_line(make_route, fixed_now, fetched, {"utc_offset_seconds": None})
-    assert lines[2] == "*Data fetched 2026-09-29 22:31 UTC · Mode: walking*"
+    assert lines[2] == "*Data fetched 2026-09-29 22:31 UTC · Mode: on foot*"
     assert "local" not in lines[2]
 
 

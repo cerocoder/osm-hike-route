@@ -1,3 +1,4 @@
+import pytest
 import json
 
 from render_map import lang_priority, t, build_gpx, build_map_html
@@ -474,3 +475,35 @@ def test_build_map_html_raises_on_unavailable_forced_provider(tmp_path):
             assert False, "expected ValueError"
         except ValueError as e:
             assert "cyclosm" in str(e)
+
+
+from render_map import activity_label
+
+
+@pytest.mark.parametrize("props, lang, expected", [
+    ({"mode": "walk"}, "ru", "пешком"),
+    ({"mode": "walk"}, "en", "on foot"),
+    ({"mode": "bike", "style": "sport"}, "ru", "вело (спорт)"),
+    ({"mode": "bike", "style": "leisure"}, "ru", "вело (прогулка)"),
+    ({"mode": "bike", "style": "sport"}, "en", "cycling (sport)"),
+    ({"mode": "bike", "style": "leisure"}, "en", "cycling (leisure)"),
+    ({"mode": "bike"}, "ru", "вело"),
+    ({"mode": "ski"}, "ru", "лыжи"),
+    ({"mode": "ski"}, "en", "skiing"),
+    ({}, "ru", "пешком"),
+    ({"mode": "bike", "style": "gravel"}, "ru", "вело (gravel)"),
+    ({"mode": "boat"}, "en", "boat"),
+    ({"mode": "walk"}, "de", "on foot"),
+])
+def test_activity_label(props, lang, expected):
+    assert activity_label(props, lang) == expected
+
+
+def test_the_panel_shows_the_explicit_activity_label():
+    html = route_stats_html({"mode": "bike", "style": "sport", "distance_km": 10.0}, user_lang="ru")
+    assert "<p>вело (спорт)</p>" in html and "sport" not in html
+
+
+def test_the_activity_label_is_escaped():
+    assert "<b>" not in route_stats_html({"mode": "<b>", "style": None}, user_lang="en")
+

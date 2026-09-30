@@ -25,7 +25,8 @@ STRINGS = {
         "meta": "Data fetched {fetched} · Mode: {mode}",
         "meta_local": " ({local} local)",
         "meta_from": " · From: {departure}",
-        "mode_walk": "walking", "mode_bike": "cycling",
+        "mode_walk": "on foot", "mode_bike": "cycling", "mode_bike_sport": "cycling (sport)",
+        "mode_bike_leisure": "cycling (leisure)", "mode_ski": "skiing",
         # light
         "light_line": "Sunrise **{sunrise}**, sunset **{sunset}**, daylight **{length}**.",
         "light_tz_approx": "Times use a time zone estimated from longitude (weather data was unavailable).",
@@ -155,6 +156,28 @@ STRINGS = {
         "hz_bio": "Ticks and biting insects", "hz_mountain": "Mountain hazards", "hz_fire": "Fire danger",
         "hz_air": "Air: pollen and pollution",
         "hz_radiation": "Radiation", "hz_people": "People and access",
+        "hz_trails": "Trail and road passability",
+        "tp_activity": "- Assessed for: **{activity}**.{studs}",
+        "tp_studded": " Studded tires are assumed (mandatory in winter; in summer they can stay on, only slower).",
+        "tp_conditions": "- Snow at the route's level: up to **{snow} cm** (the model's own value: {model} cm). Ice on cleared roads: **{ice_cleared}**, on uncleared paths: **{ice_uncleared}** — the worst in the planned window ({window}).",
+        "tp_ice": {"none": "none", "moderate": "moderate", "high": "high"},
+        "tp_verdict": {"passable": "passable", "caution": "difficult", "danger": "not recommended"},
+        "tp_cols": ["Leg", "km", "Surfaces", "Snow, cm", "Ice", "Verdict"],
+        "tp_start": "Start", "tp_finish": "Finish", "tp_whole": "Whole route", "tp_other": "other",
+        "tp_advice_spikes": "- Micro-spikes for the icy parts; they do not suit steep ice.",
+        "tp_advice_snowshoes": "- Snowshoes or skis where the snow is 20 cm or deeper; on foot without them it is slow and tiring.",
+        "tp_advice_fatbike": "- Studded tires do not help in deep snow: choose a fat bike, another route or another day.",
+        "tp_no_data_share": "- For {pct} % of the route the archive has no road data; it is judged as an uncleared soft path.",
+        "tp_assumed": "- The surface is not tagged on {pct} % of the route; the usual surface of the road class is assumed.",
+        "tp_note": "*An estimate from the Open-Meteo model and OpenStreetMap tags, not a measurement: the snow is corrected for the elevation of each leg; roads of the main classes are assumed cleared, tracks and paths are not.*",
+        "tp_no_segments": "- The route archive has no road data (it was saved before the planner stored it), so passability cannot be judged. Re-plan the route to get the assessment.",
+        "tp_unavailable": "- The weather history could not be loaded ({reason}): passability was not assessed.",
+        "tp_beyond": "- There is no forecast this far ahead: passability cannot be assessed.",
+        "tp_web_title": "**Reports of the current season (from web sources, not verified in person)**",
+        "tp_warn_danger": "Not recommended ({activity}): {legs} — snow up to {snow} cm, ice {ice}.",
+        "tp_warn_danger_ice": "Not recommended ({activity}): {legs} — ice: {ice}.",
+        "tp_warn_caution": "Difficult going on {n} of {m} legs: {legs}.",
+        "tp_more": "and {n} more",
         "rad_none": "No zone of the radiation registry lies within {km} km of the route or its points. The registry is curated by hand and incomplete (it covers: {areas}), so no entry does not mean the land is clean.",
         "rad_none_advisory": "No danger zone or affected area of the radiation registry lies within {km} km of the route or its points. The registry is curated by hand and incomplete (it covers: {areas}), so no entry does not mean the land is clean.",
         "rad_areas": "the East Urals trace, the Techa river, Mayak and Lake Karachay, the Chernobyl zones (Ukraine, Belarus, the Bryansk, Tula, Kaluga and Orel regions), the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-mushroom areas in Bavaria and Norway",
@@ -240,7 +263,8 @@ STRINGS = {
         "meta": "Данные получены {fetched} · Режим: {mode}",
         "meta_local": " ({local} местное)",
         "meta_from": " · Откуда: {departure}",
-        "mode_walk": "пешком", "mode_bike": "на велосипеде",
+        "mode_walk": "пешком", "mode_bike": "вело", "mode_bike_sport": "вело (спорт)",
+        "mode_bike_leisure": "вело (прогулка)", "mode_ski": "лыжи",
         "light_line": "Рассвет **{sunrise}**, закат **{sunset}**, световой день **{length}**.",
         "light_tz_approx": "Время указано по часовому поясу, оценённому по долготе (данных погоды не было).",
         "light_polar_day": "Полярный день: в эту дату солнце не заходит.",
@@ -363,6 +387,28 @@ STRINGS = {
         "hz_bio": "Клещи и кровососущие насекомые", "hz_mountain": "Горные опасности",
         "hz_fire": "Пожарная опасность", "hz_air": "Воздух: пыльца и загрязнение",
         "hz_radiation": "Радиация", "hz_people": "Люди и доступ",
+        "hz_trails": "Проходимость троп и дорог",
+        "tp_activity": "- Оценка для: **{activity}**.{studs}",
+        "tp_studded": " Предполагаются шипованные шины (зимой обязательны, летом их можно оставить, но едется медленнее).",
+        "tp_conditions": "- Снег на высоте маршрута: до **{snow} см** (значение самой модели: {model} см). Лёд на расчищенных дорогах: **{ice_cleared}**, на нерасчищенных тропах: **{ice_uncleared}** — худшее значение в плановом окне ({window}).",
+        "tp_ice": {"none": "нет", "moderate": "умеренный", "high": "сильный"},
+        "tp_verdict": {"passable": "проходимо", "caution": "трудно", "danger": "не рекомендуется"},
+        "tp_cols": ["Участок", "км", "Покрытия", "Снег, см", "Лёд", "Вердикт"],
+        "tp_start": "Старт", "tp_finish": "Финиш", "tp_whole": "Весь маршрут", "tp_other": "прочее",
+        "tp_advice_spikes": "- Ледоступы (микрошипы) на обледенелых участках; на крутом льду они не подходят.",
+        "tp_advice_snowshoes": "- Снегоступы или лыжи там, где снега 20 см и больше; пешком без них медленно и тяжело.",
+        "tp_advice_fatbike": "- Шины с шипами не помогают в глубоком снегу: выберите фэтбайк, другой маршрут или другой день.",
+        "tp_no_data_share": "- Для {pct} % маршрута в архиве нет данных о дороге; она оценивается как нерасчищенная мягкая тропа.",
+        "tp_assumed": "- Покрытие не указано на {pct} % маршрута; принято обычное покрытие для класса дороги.",
+        "tp_note": "*Оценка по модели Open-Meteo и тегам OpenStreetMap, а не измерение: снег поправлен на высоту каждого участка; дороги основных классов считаются расчищенными, грунтовки и тропы — нет.*",
+        "tp_no_segments": "- В архиве маршрута нет данных о дорогах (он сохранён до того, как планировщик начал их записывать), поэтому проходимость оценить нельзя. Перепланируйте маршрут, чтобы получить оценку.",
+        "tp_unavailable": "- Историю погоды загрузить не удалось ({reason}): проходимость не оценивалась.",
+        "tp_beyond": "- На такой срок прогноза нет: проходимость оценить нельзя.",
+        "tp_web_title": "**Отчёты текущего сезона (по веб-источникам, лично не проверено)**",
+        "tp_warn_danger": "Не рекомендуется ({activity}): {legs} — снег до {snow} см, лёд: {ice}.",
+        "tp_warn_danger_ice": "Не рекомендуется ({activity}): {legs} — лёд: {ice}.",
+        "tp_warn_caution": "Трудно пройти {n} из {m} участков: {legs}.",
+        "tp_more": "и ещё {n}",
         "rad_none": "В радиус {km} км от маршрута и его точек не попадает ни одна зона реестра радиации. Реестр составлен вручную и неполон (в нём: {areas}), поэтому отсутствие записи не означает, что земля чистая.",
         "rad_none_advisory": "Ни опасная зона, ни затронутая территория реестра радиации не лежат в радиусе {km} км от маршрута и его точек. Реестр составлен вручную и неполон (в нём: {areas}), поэтому отсутствие записи не означает, что земля чистая.",
         "rad_areas": "Восточно-Уральский след, река Теча, «Маяк» и озеро Карачай, чернобыльские зоны (Украина, Беларусь, Брянская, Тульская, Калужская и Орловская области), Семипалатинский полигон, Енисей ниже Железногорска, районы Баварии и Норвегии с грибами",
@@ -437,7 +483,8 @@ STRINGS = {
         "sev_danger": "Peligro", "sev_caution": "Precaución", "sev_info": "Nota",
         "meta": "Datos obtenidos {fetched} · Modo: {mode}", "meta_from": " · Desde: {departure}",
         "meta_local": " ({local} hora local)",
-        "mode_walk": "a pie", "mode_bike": "en bicicleta",
+        "mode_walk": "a pie", "mode_bike": "en bicicleta", "mode_bike_sport": "en bicicleta (deporte)",
+        "mode_bike_leisure": "en bicicleta (paseo)", "mode_ski": "esquí",
         "compass": ["N", "NE", "E", "SE", "S", "SO", "O", "NO"],
     },
     "fr": {
@@ -447,7 +494,8 @@ STRINGS = {
         "sev_danger": "Danger", "sev_caution": "Prudence", "sev_info": "Remarque",
         "meta": "Données récupérées {fetched} · Mode : {mode}", "meta_from": " · Depuis : {departure}",
         "meta_local": " ({local} heure locale)",
-        "mode_walk": "à pied", "mode_bike": "à vélo",
+        "mode_walk": "à pied", "mode_bike": "à vélo", "mode_bike_sport": "à vélo (sport)",
+        "mode_bike_leisure": "à vélo (balade)", "mode_ski": "à ski",
         "compass": ["N", "NE", "E", "SE", "S", "SO", "O", "NO"],
     },
     "de": {
@@ -457,7 +505,8 @@ STRINGS = {
         "sev_danger": "Gefahr", "sev_caution": "Vorsicht", "sev_info": "Hinweis",
         "meta": "Daten abgerufen {fetched} · Modus: {mode}", "meta_from": " · Von: {departure}",
         "meta_local": " ({local} Ortszeit)",
-        "mode_walk": "zu Fuß", "mode_bike": "mit dem Rad",
+        "mode_walk": "zu Fuß", "mode_bike": "mit dem Rad", "mode_bike_sport": "mit dem Rad (Sport)",
+        "mode_bike_leisure": "mit dem Rad (Ausflug)", "mode_ski": "auf Skiern",
         "compass": ["N", "NO", "O", "SO", "S", "SW", "W", "NW"],
     },
     "pt": {
@@ -467,7 +516,8 @@ STRINGS = {
         "sev_danger": "Perigo", "sev_caution": "Cuidado", "sev_info": "Nota",
         "meta": "Dados obtidos {fetched} · Modo: {mode}", "meta_from": " · De: {departure}",
         "meta_local": " ({local} hora local)",
-        "mode_walk": "a pé", "mode_bike": "de bicicleta",
+        "mode_walk": "a pé", "mode_bike": "de bicicleta", "mode_bike_sport": "de bicicleta (desporto)",
+        "mode_bike_leisure": "de bicicleta (passeio)", "mode_ski": "de esqui",
         "compass": ["N", "NE", "L", "SE", "S", "SO", "O", "NO"],
     },
     "it": {
@@ -477,7 +527,8 @@ STRINGS = {
         "sev_danger": "Pericolo", "sev_caution": "Attenzione", "sev_info": "Nota",
         "meta": "Dati ottenuti {fetched} · Modalità: {mode}", "meta_from": " · Da: {departure}",
         "meta_local": " ({local} ora locale)",
-        "mode_walk": "a piedi", "mode_bike": "in bici",
+        "mode_walk": "a piedi", "mode_bike": "in bici", "mode_bike_sport": "in bici (sport)",
+        "mode_bike_leisure": "in bici (passeggiata)", "mode_ski": "con gli sci",
         "compass": ["N", "NE", "E", "SE", "S", "SO", "O", "NO"],
     },
 }
@@ -493,6 +544,15 @@ def tr(key: str, lang: str, **fmt):
     if fmt and isinstance(value, str):
         return value.format(**fmt)
     return value
+
+
+def activity_label(mode: str, style: str | None, lang: str) -> str:
+    """The type of the outing: "on foot", "cycling (sport)", "cycling (leisure)", "skiing" ... An unknown mode or
+    style falls back to what is known (the mode label, or the raw mode, with the raw style in brackets)."""
+    if style and f"mode_{mode}_{style}" in STRINGS["en"]:
+        return tr(f"mode_{mode}_{style}", lang)
+    label = tr(f"mode_{mode}", lang) if f"mode_{mode}" in STRINGS["en"] else mode
+    return f"{label} ({style})" if style else label
 
 
 def compass(degrees: float, lang: str) -> str:

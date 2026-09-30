@@ -238,10 +238,25 @@ TIER_LABELS = {
     "it": {"tag-backed": "da OSM", "web-sourced": "fonte web", "derived": "stimato", "no-data": "nessun dato"},
 }
 
-_MODE_LABELS = {
-    "en": {"walk": "walking", "bike": "cycling"},
-    "ru": {"walk": "пешком", "bike": "на велосипеде"},
+# The type of the outing, keyed by mode or "mode:style"; skiing has no producer yet, its label is ready.
+_ACTIVITY_LABELS = {
+    "en": {"walk": "on foot", "bike": "cycling", "bike:sport": "cycling (sport)", "bike:leisure": "cycling (leisure)",
+           "ski": "skiing"},
+    "ru": {"walk": "пешком", "bike": "вело", "bike:sport": "вело (спорт)", "bike:leisure": "вело (прогулка)",
+           "ski": "лыжи"},
 }
+
+
+def activity_label(line_properties: dict, user_lang: str) -> str:
+    """"пешком" / "вело (спорт)" / "cycling (leisure)" ...: the type of the outing from the route's mode and style.
+    An unknown combination falls back to the mode label (or the raw mode) with the raw style in brackets."""
+    labels = _ACTIVITY_LABELS.get(user_lang, _ACTIVITY_LABELS["en"])
+    mode = line_properties.get("mode", "walk")
+    style = line_properties.get("style")
+    if style and f"{mode}:{style}" in labels:
+        return labels[f"{mode}:{style}"]
+    label = labels.get(mode, mode)
+    return f"{label} ({style})" if style else label
 
 
 def route_stats_html(line_properties: dict, user_lang: str) -> str:
@@ -249,12 +264,7 @@ def route_stats_html(line_properties: dict, user_lang: str) -> str:
     weights.json — this function never sees weights.json at all. A
     pre-this-round archive with none of these properties still renders a
     walk-labeled, mostly-empty block instead of raising."""
-    mode = line_properties.get("mode", "walk")
-    mode_label = _MODE_LABELS.get(user_lang, _MODE_LABELS["en"]).get(mode, mode)
-    parts = [f"<p>{mode_label}"]
-    if line_properties.get("style"):
-        parts[-1] += f" ({line_properties['style']})"
-    parts[-1] += "</p>"
+    parts = [f"<p>{_xml_escape(activity_label(line_properties, user_lang))}</p>"]
 
     if line_properties.get("distance_km") is not None:
         parts.append(f"<p>{line_properties['distance_km']:.1f} km</p>")

@@ -141,6 +141,13 @@ class BioHazardsPlugin(SectionPlugin):
                 lines.append("  *" + tr("bio_insect_note_water", lang) + "*")
             lines.append("  *" + tr("bio_rules", lang) + "*")
 
+        missing_weather = False
+        if not lines and not rows and mean is None:
+            seasons = (TICK_MONTHS, *INSECT_MONTHS.values())
+            if any(in_season(month, months, lat) for months in seasons):
+                lines.append("- " + tr("bio_no_weather", lang))          # in season, but nothing to judge by
+                missing_weather = True
+
         fact = lookup(ctx.facts, ctx.date_iso, "bio_hazards")
         if fact:
             lines += ["", tr("bio_web_title", lang), "", fact["markdown"], "", sources_line(fact["sources"], lang)]
@@ -148,5 +155,5 @@ class BioHazardsPlugin(SectionPlugin):
                 warnings.append(PlanWarning(w["severity"], w["text"]))
         if not lines:
             return Section("hazards", "", "derived", omit=True)          # nothing in season: not applicable
-        return Section("hazards", "\n".join(lines), "web-sourced" if fact else "derived",
+        return Section("hazards", "\n".join(lines), "web-sourced" if fact else "no-data" if missing_weather else "derived",
                        sources=list(fact["sources"]) if fact else [], warnings=warnings)

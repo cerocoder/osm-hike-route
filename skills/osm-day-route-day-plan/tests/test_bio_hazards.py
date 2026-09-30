@@ -141,7 +141,15 @@ def test_missing_osm_data_is_said_and_assumes_a_habitat(make_route, fixed_now):
 
 def test_missing_weather_or_light_do_not_crash(make_route, fixed_now):
     no_rows = run(make_route, fixed_now, [], mean=None, features=[water()])
-    assert no_rows.omit is True
+    assert not no_rows.omit and no_rows.confidence == "no-data"          # July: in season, but no forecast to judge by
+    assert "could not be estimated without the weather forecast" in no_rows.markdown
+    ru = run(make_route, fixed_now, [], mean=None, features=[water()], folder="ru", lang="ru")
+    assert "без прогноза погоды" in ru.markdown
+    winter = run(make_route, fixed_now, [], mean=None, date=JANUARY, folder="win")
+    assert winter.omit is True                                         # out of season: still not applicable
+    fact = {"markdown": "Bears are active.", "sources": ["https://example.org/b"]}
+    kept = run(make_route, fixed_now, [], mean=None, date=JANUARY, facts={"all": {"bio_hazards": fact}}, folder="fact")
+    assert not kept.omit and "Bears are active" in kept.markdown and "weather forecast" not in kept.markdown
     no_light = run(make_route, fixed_now, rows(temp=20.0), features=[water()], light=False, folder="nl")
     assert "Mosquitoes" in no_light.markdown
 

@@ -68,7 +68,12 @@ Extension).
    ```
    Defaults to writing `<route_dir>/map.html`. Reads `route.geojson`
    (required) and `notes.md` (optional — only the Access and
-   Interest-layer-confidence sections are extracted; heading matching
+   Points-of-interest sections are extracted; the planner writes them under
+   fixed headings, one per language (`NOTES_HEADINGS` in `render_map.py`,
+   identical to the planner's `notes_headings.py`: "Access"/"Доступ"/"Acceso"…,
+   "Points of interest"/"Точки интереса"/"Puntos de interés"…), matched by the
+   whole heading line, found first. Only for notes written before the headings
+   were fixed, heading matching
    tries a small set of aliases in several languages case-insensitively,
    with trailing text after the heading tolerated, e.g. "## Как добраться
    (Екатеринбург → Бажуково)" still matches — see `SECTION_ALIASES` in

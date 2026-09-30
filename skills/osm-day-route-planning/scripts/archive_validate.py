@@ -24,6 +24,8 @@ import json
 import sys
 from pathlib import Path
 
+from notes_headings import HEADINGS, missing_sections
+
 REQUIRED_ARCHIVE_FILES = ("route.geojson", "weights.json", "requests.md", "notes.md")
 
 REQUIRED_LINE_PROPERTIES = (
@@ -55,6 +57,12 @@ def validate_archive(route_dir) -> None:
     geojson = _load_json(route_dir / "route.geojson", problems)
     if geojson is not None:
         problems.extend(_validate_geojson(geojson))
+
+    notes_path = route_dir / "notes.md"
+    if notes_path.exists():
+        for key in missing_sections(notes_path.read_text(encoding="utf-8")):
+            problems.append(f"в notes.md нет обязательного раздела '## {HEADINGS[key]['en']}' "
+                            f"(или его перевода: '## {HEADINGS[key]['ru']}' и т. д., см. notes_headings.py)")
 
     weights = _load_json(route_dir / "weights.json", problems)
     if isinstance(weights, dict) and "mode" not in weights:

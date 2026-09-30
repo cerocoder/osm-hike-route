@@ -140,6 +140,41 @@ UI_STRINGS = {
     },
 }
 
+# The fixed section headings of notes.md, one per section and language — the same table as
+# osm-day-route-planning/scripts/notes_headings.py (a planning test compares them). The planner writes
+# exactly these, so the panel finds "Access" and "Points of interest" by name; SECTION_ALIASES below only
+# rescues notes written before the headings were fixed.
+NOTES_HEADINGS = {
+    "request": {
+        "en": "Request", "ru": "Запрос", "es": "Solicitud", "fr": "Demande", "de": "Anfrage", "pt": "Pedido",
+        "it": "Richiesta"},
+    "access": {
+        "en": "Access", "ru": "Доступ", "es": "Acceso", "fr": "Accès", "de": "Zugang", "pt": "Acesso",
+        "it": "Accesso"},
+    "reasoning": {
+        "en": "Route reasoning", "ru": "Обоснование маршрута", "es": "Razonamiento de la ruta",
+        "fr": "Justification de l'itinéraire", "de": "Begründung der Route", "pt": "Justificação do percurso",
+        "it": "Motivazione del percorso"},
+    "interest": {
+        "en": "Points of interest", "ru": "Точки интереса", "es": "Puntos de interés", "fr": "Points d'intérêt",
+        "de": "Sehenswürdigkeiten", "pt": "Pontos de interesse", "it": "Punti di interesse"},
+    "skipped": {
+        "en": "Optional points skipped for budget", "ru": "Пропущенные необязательные точки",
+        "es": "Puntos opcionales omitidos", "fr": "Points facultatifs écartés",
+        "de": "Übersprungene optionale Punkte", "pt": "Pontos opcionais omitidos",
+        "it": "Punti facoltativi saltati"},
+    "curated": {
+        "en": "Curated routes nearby", "ru": "Готовые маршруты рядом", "es": "Rutas señalizadas cercanas",
+        "fr": "Itinéraires balisés à proximité", "de": "Ausgewiesene Routen in der Nähe",
+        "pt": "Percursos marcados próximos", "it": "Percorsi segnalati vicini"},
+    "distance": {
+        "en": "Distance and duration", "ru": "Дистанция и время", "es": "Distancia y duración",
+        "fr": "Distance et durée", "de": "Distanz und Dauer", "pt": "Distância e duração",
+        "it": "Distanza e durata"},
+}
+
+_EXACT_KEYS = {"access": "access", "confidence": "interest"}           # the panel's section key -> NOTES_HEADINGS key
+
 # Heading aliases (any language) recognized in notes.md, so headings written
 # in the user's / local language are picked up, not just the English
 # defaults from osm-hike-route-planning's own template. Matching tries every
@@ -321,7 +356,15 @@ def extract_md_section(md_text: str, section_key: str) -> str:
     tolerated in either direction — "## Как добраться (Екатеринбург →
     Бажуково)" matches "Как добраться", and "## 8 точек интереса" matches
     "точек интереса" (a numbered heading like "## N точек интереса" would
-    otherwise need one alias per N)."""
+    otherwise need one alias per N).
+
+    The fixed heading of the section (any language of NOTES_HEADINGS, the whole line) is tried first; the
+    aliases are the fallback for notes written before the headings were fixed."""
+    fixed = NOTES_HEADINGS.get(_EXACT_KEYS.get(section_key, ""), {})
+    for text in fixed.values():
+        match = re.search(rf"(?mi)^##[ \t]+{re.escape(text)}[ \t]*\n(.*?)(?=\n##\s|\Z)", md_text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
     for alias in SECTION_ALIASES.get(section_key, []):
         pattern = rf"(?m)^##\s[^\n]*?{re.escape(alias)}[^\n]*\n(.*?)(?=\n##\s|\Z)"
         match = re.search(pattern, md_text, re.DOTALL | re.IGNORECASE)

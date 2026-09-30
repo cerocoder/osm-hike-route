@@ -508,3 +508,26 @@ def test_the_panel_shows_the_explicit_activity_label():
 def test_the_activity_label_is_escaped():
     assert "<b>" not in route_stats_html({"mode": "<b>", "style": None}, user_lang="en")
 
+
+
+# ---- fixed notes.md headings are found by name, legacy wording by alias ------------------------------------------------
+
+from render_map import NOTES_HEADINGS, extract_md_section
+
+
+@pytest.mark.parametrize("lang", sorted(NOTES_HEADINGS["access"]))
+def test_the_fixed_headings_of_every_language_are_found_by_name(lang):
+    notes = (f"## {NOTES_HEADINGS['request'][lang]}\n- r\n\n## {NOTES_HEADINGS['access'][lang]}\n- a {lang}\n\n"
+             f"## {NOTES_HEADINGS['interest'][lang]}\n- i {lang}\n\n## {NOTES_HEADINGS['distance'][lang]}\n- d\n")
+    assert extract_md_section(notes, "access") == f"- a {lang}"
+    assert extract_md_section(notes, "confidence") == f"- i {lang}"
+
+
+def test_the_exact_heading_wins_over_an_alias_written_earlier():
+    notes = "## Interest layers\n- legacy\n\n## Точки интереса\n- fixed\n"
+    assert extract_md_section(notes, "confidence") == "- fixed"
+
+
+def test_legacy_wording_still_works_through_the_aliases():
+    assert extract_md_section("## Как добраться (Екатеринбург)\n- x\n", "access") == "- x"
+    assert extract_md_section("## 8 точек интереса\n- y\n", "confidence") == "- y"

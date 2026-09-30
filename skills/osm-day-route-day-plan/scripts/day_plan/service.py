@@ -65,6 +65,7 @@ def run_plugins(ctx, plugins: list, progress=None):
     step per plugin: its name in the user's language, then how long it took or why it failed."""
     _validate_registration(plugins)
     progress = progress or NullProgress()
+    ctx.progress = progress                     # plugins that wait on a network (Overpass) say why it takes long
     shared, failures, by_id = {}, [], {}
     for plugin in _ordered(plugins):
         deps = {d: shared[d] for d in plugin.depends_on if d in shared}

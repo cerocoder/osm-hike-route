@@ -126,7 +126,8 @@ class OsmFeaturesPlugin(SectionPlugin):
             features = [OsmFeature(**f) for f in cached[0]]
             return self._section(features, samples, None)
         try:
-            features = parse_features(run(ctx.http, features_query(bbox)))
+            features = parse_features(run(ctx.http, features_query(bbox), health=ctx.overpass_health,
+                                          progress=ctx.progress))
         except OverpassError as e:
             return self._section([], samples, str(e))
         ctx.cache.put(key, [asdict(f) for f in features])

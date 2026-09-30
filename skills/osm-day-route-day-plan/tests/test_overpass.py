@@ -129,3 +129,103 @@ def test_an_empty_answer_is_cached_for_a_day_and_a_non_empty_one_for_a_week(make
         clock[0] = start + ttl + 60
         routes_near(ctx, 40.4247, -3.7275)
         assert len(web.urls) == 2, name                 # expired just after it
+
+
+# ---- the mirrors a run has found dead are not asked first again; the reasons are reported --------------------------------
+
+from day_plan.overpass import MirrorHealth
+
+
+class Recorder:
+    def __init__(self):
+        self.events = []
+
+    def note(self, key, **params):
+        self.events.append(("note", key, params))
+
+    def warn(self, key, **params):
+        self.events.append(("warn", key, params))
+
+
+def test_a_failed_mirror_is_asked_last_by_the_next_call_and_the_last_good_one_first():
+    health = MirrorHealth()
+    web = Web(HttpError("timed out"), GOOD, GOOD)
+    run(web, "A", sleep=lambda s: None, health=health)                   # mirror 0 fails, mirror 1 answers
+    run(web, "B", sleep=lambda s: None, health=health)                   # starts with mirror 1
+    assert [u.split("?")[0] for u in web.urls] == [MIRRORS[0], MIRRORS[1], MIRRORS[1]]
+
+
+def test_without_health_the_order_is_unchanged():
+    web = Web(HttpError("x"), GOOD, HttpError("x"), GOOD)
+    run(web, "A", sleep=lambda s: None)
+    run(web, "B", sleep=lambda s: None)
+    assert [u.split("?")[0] for u in web.urls] == [MIRRORS[0], MIRRORS[1], MIRRORS[0], MIRRORS[1]]
+
+
+def test_health_ordering_rules():
+    health = MirrorHealth()
+    assert health.ordered(MIRRORS) == list(MIRRORS)
+    health.failed(MIRRORS[0])
+    assert health.ordered(MIRRORS) == [MIRRORS[1], MIRRORS[2], MIRRORS[0]]
+    health.worked(MIRRORS[2])
+    assert health.ordered(MIRRORS) == [MIRRORS[2], MIRRORS[1], MIRRORS[0]]
+    health.failed(MIRRORS[2])                                              # the favourite dies: back to the order
+    assert health.ordered(MIRRORS) == [MIRRORS[1], MIRRORS[0], MIRRORS[2]]
+    health.worked(MIRRORS[0])                                              # a recovered mirror leaves the failed set
+    assert health.ordered(MIRRORS) == [MIRRORS[0], MIRRORS[1], MIRRORS[2]]
+
+
+def test_all_mirrors_dead_behaves_as_before_with_health_and_progress():
+    naps, recorder = [], Recorder()
+    web = Web(*[HttpError("504")] * 6)
+    with pytest.raises(OverpassError, match="504"):
+        run(web, "QL", sleep=naps.append, backoff=3.0, health=MirrorHealth(), progress=recorder)
+    assert len(web.urls) == 6 and naps == [3.0]
+    warns = [e for e in recorder.events if e[0] == "warn"]
+    assert len(warns) == 6 and warns[0][1] == "overpass_failed" and warns[0][2]["endpoint"] == "overpass-api.de"
+    assert ("note", "overpass_attempt", {"endpoint": "overpass-api.de", "n": 2, "m": 2}) in recorder.events
+
+
+def test_every_kind_of_skipped_mirror_is_reported():
+    recorder = Recorder()
+    web = Web(HttpError("timed out"), {"remark": "runtime error: Query timed out", "elements": []}, {"unexpected": 1}, GOOD)
+    run(web, "QL", mirrors=MIRRORS + ("https://x/api",), sleep=lambda s: None, progress=recorder)
+    assert [(e[1], e[2]["endpoint"], e[2]["reason"][:20]) for e in recorder.events] == [
+        ("overpass_failed", "overpass-api.de", "timed out"),
+        ("overpass_failed", "overpass.kumi.systems", "runtime error: Query"),
+        ("overpass_failed", "overpass.private.coffee", "unexpected response")]
+
+
+def test_routes_near_uses_the_shared_health_of_the_run(make_route, fixed_now):
+    import datetime
+    from day_plan.context import build_context
+    route_dir = make_route()
+    web = Web(HttpError("timed out"), MADRID, MADRID)
+    ctx = build_context(route_dir, datetime.date(2026, 6, 27), http=web, now=fixed_now)
+    routes_near(ctx, 40.4247, -3.7275)
+    routes_near(ctx, 40.5, -3.8)
+    assert [u.split("?")[0] for u in web.urls] == [MIRRORS[0], MIRRORS[1], MIRRORS[1]]
+
+
+def test_run_plugins_hands_its_progress_to_the_plugins_through_the_context(make_route, fixed_now):
+    import datetime
+    from day_plan.base import SectionPlugin
+    from day_plan.context import build_context
+    from day_plan.service import run_plugins
+
+    seen = []
+
+    class Probe(SectionPlugin):
+        plugin_id, section_id = "light", "light"
+
+        def run(self, ctx, shared):
+            seen.append(ctx.progress)
+            from day_plan.base import Section
+            return Section("light", "x", "derived")
+
+    import io
+    from day_plan.progress import Progress
+    marker = Progress(stream=io.StringIO())
+    ctx = build_context(make_route(), datetime.date(2026, 6, 27), http=lambda u: {}, now=fixed_now)
+    run_plugins(ctx, [Probe()], progress=marker)
+    assert seen == [marker]

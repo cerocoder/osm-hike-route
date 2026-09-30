@@ -10,6 +10,8 @@ from typing import Callable
 from .cache import JsonCache
 from .facts import load_facts
 from .http import get_json, get_text
+from .overpass import MirrorHealth
+from .progress import NullProgress
 
 
 @dataclass
@@ -50,6 +52,8 @@ class PlanContext:
     interest_points: list = field(default_factory=list)  # [RoutePoint], every other Point feature
     style: str | None = None                             # "leisure" | "sport" for a bicycle, else None
     segments: list | None = None                         # which road each part of the route runs on (route.geojson); None in an older archive
+    overpass_health: object = field(default_factory=MirrorHealth)   # which Overpass mirrors failed during this run
+    progress: object = field(default_factory=NullProgress)          # set by run_plugins; plugins may report to it
 
     def __post_init__(self):
         self.today = self.now.date()

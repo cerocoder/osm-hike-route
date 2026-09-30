@@ -11,6 +11,7 @@ Confidence is always `derived` (model output). Wind direction is reported as
 the direction the wind blows FROM. Open-Meteo applies no elevation
 correction to wind, so mountain gusts are likely underestimated."""
 import datetime
+import hashlib
 import math
 from collections import Counter
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -30,16 +31,19 @@ FORECAST_TTL_S = 3 * 3600
 FORECAST_VARS = (
     "temperature_2m", "apparent_temperature", "precipitation", "precipitation_probability",
     "cloud_cover", "visibility", "weather_code", "wind_speed_10m", "wind_direction_10m",
-    "wind_gusts_10m", "snow_depth",
+    "wind_gusts_10m", "snow_depth", "relative_humidity_2m", "dew_point_2m", "freezing_level_height", "cape",
 )
-ARCHIVE_VARS = tuple(v for v in FORECAST_VARS if v not in ("precipitation_probability", "visibility"))
+# The archive has no probability, visibility, freezing level or CAPE.
+ARCHIVE_VARS = tuple(v for v in FORECAST_VARS if v not in (
+    "precipitation_probability", "visibility", "freezing_level_height", "cape"))
 
 # Row keys <- Open-Meteo hourly variable names
 _ROW_KEYS = {
     "temperature_2m": "temp", "apparent_temperature": "feels", "precipitation": "precip",
     "precipitation_probability": "prob", "cloud_cover": "cloud", "visibility": "vis_m",
     "weather_code": "code", "wind_speed_10m": "wind", "wind_direction_10m": "wdir",
-    "wind_gusts_10m": "gust", "snow_depth": "snow_m",
+    "wind_gusts_10m": "gust", "snow_depth": "snow_m", "relative_humidity_2m": "rh", "dew_point_2m": "dew",
+    "freezing_level_height": "fzl", "cape": "cape",
 }
 
 THRESHOLDS = {
@@ -75,7 +79,7 @@ def _url(base: str, variables, lat: float, lon: float, date: datetime.date) -> s
 def parse_hourly(response: dict) -> list[dict]:
     """Open-Meteo response -> list of 24 row dicts (missing variables are
     None). Row keys: hour (int), temp, feels, precip, prob, cloud, vis_m,
-    code, wind, wdir, gust, snow_m."""
+    code, wind, wdir, gust, snow_m, rh, dew, fzl (freezing level, m), cape."""
     hourly = response["hourly"]
     times = hourly["time"]
     rows = []
@@ -104,7 +108,8 @@ def average_rows(per_year_rows: list[list[dict]]) -> list[dict]:
     for hour in range(24):
         samples = [r for rows in per_year_rows for r in rows if r["hour"] == hour]
         row = {"hour": hour}
-        for key in ("temp", "feels", "precip", "cloud", "wind", "gust", "snow_m", "vis_m", "prob"):
+        for key in ("temp", "feels", "precip", "cloud", "wind", "gust", "snow_m", "vis_m", "prob",
+                    "rh", "dew", "fzl", "cape"):
             values = [s[key] for s in samples if s.get(key) is not None]
             row[key] = sum(values) / len(values) if values else None
         codes = [s["code"] for s in samples if s.get("code") is not None]
@@ -137,31 +142,41 @@ def _same_day_in_year(date: datetime.date, year: int) -> datetime.date:
         return date.replace(year=year, day=28)
 
 
+def _vars_id(variables) -> str:
+    """Short id of a variable set: part of the cache key, so adding a variable
+    never reuses an entry that was cached without it."""
+    return hashlib.sha1(",".join(variables).encode("utf-8")).hexdigest()[:8]
+
+
 def _fetch(ctx, source: str, lat: float, lon: float):
-    """Returns (rows, utc_offset_seconds, fetched_at_epoch)."""
-    key = f"weather|{source}|{lat:.3f}|{lon:.3f}|{ctx.date_iso}"
+    """Returns (rows, utc_offset_seconds, fetched_at_epoch, model_elevation_m)."""
+    variables = FORECAST_VARS if source == "forecast" else ARCHIVE_VARS
+    key = f"weather|{source}|{_vars_id(variables)}|{lat:.3f}|{lon:.3f}|{ctx.date_iso}"
     max_age = FORECAST_TTL_S if source == "forecast" else None
     cached = ctx.cache.get_entry(key, max_age)
     if cached is not None:
         value, stored_at = cached
-        return value["rows"], value["utc_offset_seconds"], stored_at
+        return value["rows"], value["utc_offset_seconds"], stored_at, value.get("elevation")
 
     if source == "forecast":
         response = ctx.http(_url(FORECAST_URL, FORECAST_VARS, lat, lon, ctx.date))
         rows, offset = parse_hourly(response), utc_offset_for(response, ctx.date)
+        elevation = response.get("elevation")
     elif source == "archive":
         response = ctx.http(_url(ARCHIVE_URL, ARCHIVE_VARS, lat, lon, ctx.date))
         rows, offset = parse_hourly(response), utc_offset_for(response, ctx.date)
+        elevation = response.get("elevation")
     else:
-        per_year, offset = [], None
+        per_year, offset, elevation = [], None, None
         for back in range(1, CLIMATE_YEARS + 1):
             past = _same_day_in_year(ctx.date, ctx.today.year - back)
             response = ctx.http(_url(ARCHIVE_URL, ARCHIVE_VARS, lat, lon, past))
             per_year.append(parse_hourly(response))
             offset = offset if offset is not None else utc_offset_for(response, ctx.date)
+            elevation = elevation if elevation is not None else response.get("elevation")
         rows = average_rows(per_year)
-    stored_at = ctx.cache.put(key, {"rows": rows, "utc_offset_seconds": offset})
-    return rows, offset, stored_at
+    stored_at = ctx.cache.put(key, {"rows": rows, "utc_offset_seconds": offset, "elevation": elevation})
+    return rows, offset, stored_at, elevation
 
 
 def daytime_rows(rows: list[dict], date: datetime.date, lat: float, lon: float,
@@ -298,7 +313,7 @@ class WeatherPlugin(SectionPlugin):
         lat, lon = ctx.centroid
         source = choose_source(ctx.date, ctx.today)
         try:
-            rows, offset, fetched_at = _fetch(ctx, source, lat, lon)
+            rows, offset, fetched_at, elevation = _fetch(ctx, source, lat, lon)
         except (HttpError, KeyError, IndexError, ValueError, TypeError) as e:
             return Section("weather", tr("w_unavailable", ctx.lang, reason=str(e) or type(e).__name__),
                            "no-data")
@@ -316,6 +331,6 @@ class WeatherPlugin(SectionPlugin):
             "weather", markdown, "derived", sources=["https://open-meteo.com/"],
             warnings=warnings_for(day, ctx.lang, source),
             shared={"utc_offset_seconds": offset, "rows": rows, "daytime_rows": day, "source": source,
-                    "fetched_at": fetched_at,
+                    "fetched_at": fetched_at, "elevation_m": elevation,
                     "daily_mean_temp": sum(means) / len(means) if means else None},
         )

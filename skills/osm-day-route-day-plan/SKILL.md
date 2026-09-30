@@ -109,9 +109,10 @@ python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all> --plugin <transit|poi
   interest for that date (closed for an event, free days, reservations).
 - `--plugin calendar` with `--day-type`: the real kind of day when the free
   holiday list is wrong. **For Russia and neighbouring countries always check
-  the date** (official calendar, `consultant.ru` or similar): Nager.Date lists
-  only the fixed holidays, so transferred days off (for example 9 March or
-  11 May 2026) and working Saturdays are missing. Record `holiday`, `weekend`
+  the date** (official calendar, `consultant.ru` or similar): the free list
+  is incomplete for Russia: it misses 8 January and the transferred days off
+  (for example 9 March and 11 May 2026), and working Saturdays are not marked.
+  Record `holiday`, `weekend`
   or `workday`; it overrides the list and feeds the opening-hours rules (`PH`).
 - Every fact needs at least one `http(s)` source, or it is refused (and, if
   found in the file, ignored). Say only what the source says.
@@ -119,6 +120,8 @@ python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all> --plugin <transit|poi
   meant to be forwarded. Places at city, station or stop level only — never a
   street address, phone number or anything personal.
 - `--date all` applies to every date without a dated entry; a dated entry wins.
+  It does not apply to `calendar` facts: those need a specific date and
+  `record_fact.py` refuses `--plugin calendar --date all`.
 
 ## Confidence and honesty
 

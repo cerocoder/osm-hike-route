@@ -151,3 +151,45 @@ def test_facts_json_with_bad_encoding_does_not_break_the_plan(make_route_with_po
     assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), now=fixed_now) == 0
     out = capsys.readouterr().out
     assert "hint: no web-sourced facts recorded for transit" in out
+
+
+def _web_country(weather_response, country):
+    def http(url):
+        if "nominatim" in url:
+            return {"address": {"country_code": country}}
+        if "date.nager.at" in url:
+            return []
+        if "overpass" in url:
+            return {"elements": []}
+        return weather_response()
+    return http
+
+
+def test_russian_route_hint_asks_for_a_calendar_fact_until_one_is_recorded(make_route, weather_response, fixed_now, capsys):
+    route_dir = make_route()
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=_web_country(weather_response, "ru"), now=fixed_now)
+    out = capsys.readouterr().out
+    assert "recorded for transit, calendar on 2026-06-21" in out
+    assert ("calendar: check in the official calendar whether the date is a public holiday, a transferred day off "
+            "or a working Saturday, and record it with --plugin calendar --day-type ...") in out
+
+    import record_fact
+    record_fact.record(route_dir, "2026-06-21", "calendar", "", ["https://example.org/x"], day_type="weekend")
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=_web_country(weather_response, "ru"), now=fixed_now)
+    out2 = capsys.readouterr().out
+    assert "recorded for transit on" in out2 and "calendar" not in out2
+
+
+def test_an_all_scope_calendar_fact_does_not_silence_the_russian_hint(make_route, weather_response, fixed_now, capsys):
+    import json
+    route_dir = make_route()
+    (route_dir / "facts.json").write_text(json.dumps({"all": {"calendar": {
+        "day_type": "workday", "sources": ["https://example.org/x"]}}}), encoding="utf-8")
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=_web_country(weather_response, "ru"), now=fixed_now)
+    assert "calendar: check in the official calendar" in capsys.readouterr().out
+
+
+def test_a_route_outside_russia_never_mentions_the_calendar(make_route, weather_response, fixed_now, capsys):
+    route_dir = make_route()
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=_web_country(weather_response, "es"), now=fixed_now)
+    assert "calendar" not in capsys.readouterr().out

@@ -14,7 +14,7 @@
 
 **Decisions taken from live checks while writing this plan** (each verified against the real service):
 - OSM route relations almost never carry `interval` or `opening_hours` (Madrid buses: none; Moscow: some), so timetables must come from recorded web facts; OSM data is shown as-is with "not stated in OSM".
-- Nager.Date returns 200 for RU/ES/DE/BY/UA/KZ/FR, but for Russia (2026) it lists only fixed holidays: 8–11 January, 9 March and 11 May are missing. A `calendar` fact with `day_type` overrides the list, and the day-plan SKILL.md tells Claude to always check Russian dates.
+- Nager.Date returns 200 for RU/ES/DE/BY/UA/KZ/FR, but for Russia the free list is incomplete: it misses 8 January and the transferred days off (for example 9 March and 11 May 2026). A `calendar` fact with `day_type` overrides the list, and the day-plan SKILL.md tells Claude to always check Russian dates.
 - Overpass answered 429 and 504 under load and one mirror returned HTML: mirrors plus one retry, and a failure degrades to a note.
 - Real `opening_hours` (Madrid, Yekaterinburg, Moscow; 531 distinct strings) use a comma between rules (`Su-Th 12:30-24:00, Fr,Sa 12:30-00:30`), overnight ranges, single-digit hours, `19:30+`; 20 of them (point dates like `Jan 01`, comments, typos) are unsupported and must show as "not read".
 
@@ -1918,8 +1918,8 @@ Expected: FAIL at collection with `ModuleNotFoundError: No module named 'day_pla
 
 Sources, in order: a `calendar` entry in facts.json with a `day_type` (Claude
 looked it up on the web — the way to cover transferred days off, which the
-free list misses for Russia: checked for 2026, Nager.Date lists only the fixed
-holidays, not e.g. 9 Mar or 11 May); otherwise the route's country from
+free list is incomplete for Russia: it misses 8 January and the transferred
+days off, for example 9 March and 11 May 2026); otherwise the route's country from
 Nominatim (cached for good — a country does not move; one request per route)
 and the public-holiday list from Nager.Date (keyless, cached 30 days). When
 neither is available the holiday status is None (unknown), never assumed."""
@@ -4109,9 +4109,10 @@ python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all> --plugin <transit|poi
   interest for that date (closed for an event, free days, reservations).
 - `--plugin calendar` with `--day-type`: the real kind of day when the free
   holiday list is wrong. **For Russia and neighbouring countries always check
-  the date** (official calendar, `consultant.ru` or similar): Nager.Date lists
-  only the fixed holidays, so transferred days off (for example 9 March or
-  11 May 2026) and working Saturdays are missing. Record `holiday`, `weekend`
+  the date** (official calendar, `consultant.ru` or similar): the free list
+  is incomplete for Russia: it misses 8 January and the transferred days off
+  (for example 9 March and 11 May 2026), and working Saturdays are not marked.
+  Record `holiday`, `weekend`
   or `workday`; it overrides the list and feeds the opening-hours rules (`PH`).
 - Every fact needs at least one `http(s)` source, or it is refused (and, if
   found in the file, ignored). Say only what the source says.

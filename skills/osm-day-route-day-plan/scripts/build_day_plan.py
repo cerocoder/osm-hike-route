@@ -16,6 +16,7 @@ import re
 import sys
 from pathlib import Path
 
+from day_plan import calendar_info
 from day_plan.context import build_context
 from day_plan.facts import lookup
 from day_plan.http import get_json
@@ -33,7 +34,12 @@ def default_plugins() -> list:
 def missing_web_facts(ctx) -> list:
     """Plugin ids whose web-sourced facts Claude has not recorded yet for this date."""
     wanted = ["transit"] + (["poi_hours"] if ctx.interest_points else [])
-    return [pid for pid in wanted if lookup(ctx.facts, ctx.date_iso, pid) is None]
+    missing = [pid for pid in wanted if lookup(ctx.facts, ctx.date_iso, pid) is None]
+    if calendar_info.country_code(ctx) == "RU":
+        fact = lookup(ctx.facts, ctx.date_iso, "calendar", allow_all=False)
+        if not (fact and fact.get("day_type")):
+            missing.append("calendar")
+    return missing
 
 
 def coarse_departure(text: str | None) -> tuple[str | None, bool]:
@@ -82,7 +88,10 @@ def main(argv=None, http=get_json, now=None, plugins=None) -> int:
     if missing:
         print(f"hint: no web-sourced facts recorded for {', '.join(missing)} on {date.isoformat()}: search the "
               f"web (timetables, directions from the departure point, opening days), record what you find with "
-              f"record_fact.py, then run this command again")
+              f"record_fact.py, then run this command again"
+              + (". calendar: check in the official calendar whether the date is a public holiday, a "
+                 "transferred day off or a working Saturday, and record it with --plugin calendar "
+                 "--day-type ..." if "calendar" in missing else ""))
     return 0
 
 

@@ -41,6 +41,8 @@ def record(route_dir, date: str, plugin: str, markdown: str, sources: list, last
             datetime.date.fromisoformat(date)
         except ValueError:
             raise ValueError(f"bad date {date!r}: use YYYY-MM-DD or 'all'") from None
+    if plugin == "calendar" and date == "all":
+        raise ValueError("a calendar fact needs a specific date (--date YYYY-MM-DD), not 'all'")
     entry = {"markdown": markdown, "sources": sources}
     for key, value in (("last_departure_local", last_departure), ("first_departure_local", first_departure),
                        ("day_type", day_type)):

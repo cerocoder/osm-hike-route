@@ -71,10 +71,10 @@ def normalize_entry(entry) -> dict | None:
     return clean
 
 
-def lookup(facts: dict, date_iso: str, plugin_id: str) -> dict | None:
+def lookup(facts: dict, date_iso: str, plugin_id: str, allow_all: bool = True) -> dict | None:
     """The usable entry for this date and plugin: the dated one if it is valid,
-    else the "all" one, else None."""
-    for scope in (date_iso, "all"):
+    else the "all" one (unless allow_all is False), else None."""
+    for scope in ((date_iso, "all") if allow_all else (date_iso,)):
         plugins = facts.get(scope)
         if not isinstance(plugins, dict):
             continue

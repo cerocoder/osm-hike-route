@@ -98,11 +98,11 @@ def test_a_web_sourced_calendar_fact_overrides_the_list(make_route, fixed_now):
     day = resolve_day_type(ctx)
     assert day.holiday is True and day.source == "facts" and day.sources == ["https://consultant.ru/x"]
     assert web.calls == []                       # no network needed when Claude recorded the day type
-    assert "(web-sourced)" in describe(day, ctx)
+    assert "(web-sourced: [consultant.ru](https://consultant.ru/x))" in describe(day, ctx)
 
 
 def test_working_saturday_fact(make_route, fixed_now):
-    facts = {"all": {"calendar": {"day_type": "workday", "sources": ["https://consultant.ru/x"]}}}
+    facts = {"2026-06-27": {"calendar": {"day_type": "workday", "sources": ["https://consultant.ru/x"]}}}
     ctx = _ctx(make_route, fixed_now, FakeWeb(), datetime.date(2026, 6, 27), facts=facts)
     day = resolve_day_type(ctx)
     assert day.is_weekend is False and day.holiday is False
@@ -118,7 +118,7 @@ def test_weekend_fact_does_not_claim_the_day_is_not_a_public_holiday(make_route,
     assert web.calls == []                       # no network calls for a fact
     text = describe(day, ctx)
     assert "public-holiday status unknown" in text
-    assert "(web-sourced)" in text
+    assert "(web-sourced: [consultant.ru](https://consultant.ru/x))" in text
     assert "not a public holiday" not in text
 
 
@@ -138,3 +138,40 @@ def test_russian_line_and_caveat(make_route, fixed_now):
 def test_the_nominatim_request_identifies_the_app(make_route, fixed_now):
     from day_plan.http import USER_AGENT
     assert "osm-day-route-day-plan" in USER_AGENT and "github.com/cerocoder/osm-hike-route" in USER_AGENT
+
+
+def test_a_calendar_fact_for_all_dates_is_ignored(make_route, fixed_now):
+    facts = {"all": {"calendar": {"day_type": "workday", "sources": ["https://consultant.ru/x"]}}}
+    web = FakeWeb()
+    ctx = _ctx(make_route, fixed_now, web, datetime.date(2026, 6, 27), facts=facts)
+    day = resolve_day_type(ctx)
+    assert day.source == "nager" and day.is_weekend is True      # the "all" entry did not turn Saturday into a workday
+
+
+def test_holiday_fact_on_a_weekday_reads_as_a_day_off_with_its_source_link(make_route, fixed_now):
+    facts = {"2026-10-09": {"calendar": {"day_type": "holiday", "sources": ["https://www.consultant.ru/law/(x)"]}}}
+    ctx = _ctx(make_route, fixed_now, FakeWeb(), datetime.date(2026, 10, 9), facts=facts)     # a Friday
+    text = describe(resolve_day_type(ctx), ctx)
+    assert text == ("Date: Friday 2026-10-09 — day off; public holiday "
+                    "(web-sourced: [www.consultant.ru](https://www.consultant.ru/law/%28x%29))")
+    assert "working day" not in text and "?" not in text
+
+
+def test_holiday_fact_in_russian(make_route, fixed_now):
+    facts = {"2026-10-09": {"calendar": {"day_type": "holiday", "sources": ["https://consultant.ru/x"]}}}
+    ctx = _ctx(make_route, fixed_now, FakeWeb(), datetime.date(2026, 10, 9), facts=facts, lang="ru")
+    text = describe(resolve_day_type(ctx), ctx)
+    assert text == ("Дата: пятница 2026-10-09 — выходной день; государственный праздник "
+                    "(по веб-источнику: [consultant.ru](https://consultant.ru/x))")
+
+
+def test_a_named_holiday_keeps_its_name_and_a_holiday_on_a_weekend_stays_weekend(make_route, fixed_now):
+    ctx = _ctx(make_route, fixed_now, FakeWeb(), datetime.date(2026, 8, 15))     # a Saturday
+    assert "weekend; public holiday: Asunción" in describe(resolve_day_type(ctx), ctx)
+
+
+def test_markdown_link_helper_encodes_parentheses():
+    from day_plan.plugins.common import md_link, sources_line
+    url = "https://en.wikipedia.org/wiki/Foo_(bar)"
+    assert md_link(url) == "[en.wikipedia.org](https://en.wikipedia.org/wiki/Foo_%28bar%29)"
+    assert sources_line([url], "en") == "Sources: " + md_link(url)

@@ -1,9 +1,10 @@
 """What kind of day is the plan for: weekday, weekend, public holiday.
 
 Sources, in order: a `calendar` entry in facts.json with a `day_type` (Claude
-looked it up on the web — the way to cover transferred days off, which the
-free list misses for Russia: checked for 2026, Nager.Date lists only the fixed
-holidays, not e.g. 9 Mar or 11 May); otherwise the route's country from
+looked it up on the web — the way to cover transferred days off; the free
+list is incomplete for Russia: it misses 8 January and the transferred days
+off, for example 9 March and 11 May 2026; a calendar fact is per date, an
+"all" entry is ignored); otherwise the route's country from
 Nominatim (cached for good — a country does not move; one request per route)
 and the public-holiday list from Nager.Date (keyless, cached 30 days). When
 neither is available the holiday status is None (unknown), never assumed."""
@@ -13,6 +14,7 @@ from dataclasses import dataclass, field
 from .facts import lookup
 from .http import HttpError
 from .i18n import tr
+from .plugins.common import md_link
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 NAGER_URL = "https://date.nager.at/api/v3/PublicHolidays"
@@ -68,7 +70,7 @@ def _holidays(ctx, code: str) -> list | None:
 def resolve_day_type(ctx) -> DayType:
     weekday = ctx.date.weekday()
     weekend = weekday >= 5
-    fact = lookup(ctx.facts, ctx.date_iso, "calendar")
+    fact = lookup(ctx.facts, ctx.date_iso, "calendar", allow_all=False)
     if fact and fact.get("day_type"):
         kind = fact["day_type"]
         is_weekend_val = True if kind == "weekend" else False if kind == "workday" else weekend
@@ -96,7 +98,8 @@ def describe(day: DayType, ctx) -> str:
     """One line for the plan: 'Date: Saturday 2026-06-27 — weekend; not a public holiday (Nager.Date, ES)'."""
     lang = ctx.lang
     if day.holiday is True:
-        holiday = tr("cal_holiday_yes", lang, name=day.holiday_name or "?")
+        holiday = (tr("cal_holiday_yes", lang, name=day.holiday_name) if day.holiday_name
+                   else tr("cal_holiday_yes_noname", lang))
     elif day.holiday is False:
         holiday = tr("cal_holiday_no", lang)
     elif day.regional_name:
@@ -106,10 +109,13 @@ def describe(day: DayType, ctx) -> str:
     if day.source == "nager":
         source = tr("cal_source_nager", lang, country=day.country)
     elif day.source == "facts":
-        source = tr("cal_source_facts", lang)
+        source = tr("cal_source_facts", lang, urls=", ".join(md_link(u) for u in day.sources))
     else:
         source = "(" + tr(day.note_key, lang, country=day.country or "?") + ")" if day.note_key else ""
-    kind = tr("cal_weekend" if day.is_weekend else "cal_workday", lang)
+    if day.is_weekend:
+        kind = tr("cal_weekend", lang)
+    else:
+        kind = tr("cal_dayoff" if day.holiday is True else "cal_workday", lang)
     line = tr("cal_line", lang, weekday=tr("weekday_names", lang)[day.weekday], date=ctx.date_iso,
               kind=kind, holiday=holiday, source=source).rstrip()
     if day.source == "nager":

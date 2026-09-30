@@ -43,9 +43,11 @@ def hours_on_date(spec: str | None, ctx, holiday, sun) -> tuple[str, OpeningResu
     return cell(text), result
 
 
+def md_link(url: str) -> str:
+    """`[host](url)`; parentheses in the URL are percent-encoded so they cannot cut the link."""
+    host = urllib.parse.urlparse(url).netloc or url
+    return f"[{host}]({url.replace('(', '%28').replace(')', '%29')})"
+
+
 def sources_line(urls: list, lang: str) -> str:
-    links = []
-    for url in urls:
-        host = urllib.parse.urlparse(url).netloc or url
-        links.append(f"[{host}]({url})")
-    return tr("tr_sources", lang, urls=", ".join(links))
+    return tr("tr_sources", lang, urls=", ".join(md_link(url) for url in urls))

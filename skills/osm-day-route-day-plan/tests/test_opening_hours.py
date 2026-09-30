@@ -133,3 +133,54 @@ def test_real_world_strings_never_raise_and_are_sane():
         if evaluate(spec, WED, False, sun).status == "unknown":
             unknown += 1
     assert unknown / len(strings) < 0.06, f"{unknown} of {len(strings)} real strings are unsupported"
+
+
+FRI = datetime.date(2026, 7, 3)
+
+
+def test_comma_rules_add_to_earlier_rules_on_the_same_day():
+    spec = "Mo-Sa 09:00-12:00, We 15:00-18:00"           # the OSM spec example
+    assert evaluate(spec, WED).intervals == [(hm("09:00"), hm("12:00")), (hm("15:00"), hm("18:00"))]
+    assert evaluate(spec, MON).intervals == [(hm("09:00"), hm("12:00"))]
+    assert evaluate("Mo-Fr 08:00-12:00, We 14:00-18:00", WED).intervals == [
+        (hm("08:00"), hm("12:00")), (hm("14:00"), hm("18:00"))]
+    real = "Mo-Su 12:00-24:00, Fr,Sa 00:00-02:00"        # real string from the fixture
+    assert real in json.loads((HERE / "fixtures" / "opening_hours_real.json").read_text(encoding="utf-8"))
+    assert evaluate(real, FRI).intervals == [(0, hm("02:00")), (hm("12:00"), 1440)]
+    assert evaluate(real, WED).intervals == [(hm("12:00"), 1440)]
+
+
+def test_an_additive_rule_with_off_still_closes_and_semicolon_still_overrides():
+    assert evaluate("Mo-Fr 09:00-18:00, We off", WED).status == "closed"
+    assert evaluate("Mo-Fr 09:00-18:00, We off", MON).intervals == [(hm("09:00"), hm("18:00"))]
+    assert evaluate("Mo-Sa 09:00-12:00; We 15:00-18:00", WED).intervals == [(hm("15:00"), hm("18:00"))]
+
+
+REAL_PINS = [
+    # (string, day, holiday, expected status, expected intervals) -- each checked by hand against the OSM meaning
+    ("Mo-Fr 07:30-18:00", WED, None, "open_hours", [(450, 1080)]),
+    ("Mo-Fr 07:30-18:00", SAT, None, "closed", []),
+    ("Mo-Fr 08:00-22:00,Sa 09:00-22:00,Su,PH 10:00-16:00", SAT, None, "open_hours", [(540, 1320)]),
+    ("Mo-Fr 08:00-22:00,Sa 09:00-22:00,Su,PH 10:00-16:00", SUN, False, "open_hours", [(600, 960)]),
+    ("Mo-Fr 08:00-22:00,Sa 09:00-22:00,Su,PH 10:00-16:00", WED, True, "open_hours", [(480, 1320)]),   # the PH rule adds 10-16, inside 08-22
+    ("Fr-Sa 12:00-02:00; Mo-Th,Su 12:00-24:00", SAT, None, "open_hours", [(0, 120), (720, 1560)]),
+    ("Fr-Sa 12:00-02:00; Mo-Th,Su 12:00-24:00", WED, None, "open_hours", [(720, 1440)]),
+    ("Mo-Su 10:00-05:00", WED, None, "open_hours", [(0, 300), (600, 1740)]),
+    ("Mo-Su 00:00-06:00,09:00-24:00", SAT, None, "open_hours", [(0, 360), (540, 1440)]),
+    ("Mo-Fr 08:30-14:00; PH off", WED, True, "closed", []),
+    ("Mo-Fr 08:30-14:00; PH off", WED, False, "open_hours", [(510, 840)]),
+    ("Apr-Sep Mo-Su,PH 10:00-20:00; Oct-Mar Mo-Su,PH 10:00-18:00", WED, False, "open_hours", [(600, 1200)]),
+    ("Apr-Sep Mo-Su,PH 10:00-20:00; Oct-Mar Mo-Su,PH 10:00-18:00", datetime.date(2026, 12, 2), False, "open_hours", [(600, 1080)]),
+    ("24/7", SAT, None, "open_all_day", [(0, 1440)]),
+    ("Mo,We,Fr 08:30-14:00; Tu,Th 16:30-18:30", WED, None, "open_hours", [(510, 840)]),
+    ("Mo,We,Fr 08:30-14:00; Tu,Th 16:30-18:30", SAT, None, "closed", []),
+    ("Su, We-Th 23:00-05:30; Fr-Sa 23:00-06:00", SAT, None, "open_hours", [(0, 360), (1380, 1800)]),
+]
+
+
+@pytest.mark.parametrize("spec,day,holiday,status,intervals", REAL_PINS)
+def test_real_strings_pinned_to_hand_checked_intervals(spec, day, holiday, status, intervals):
+    strings = json.loads((HERE / "fixtures" / "opening_hours_real.json").read_text(encoding="utf-8"))
+    assert spec in strings
+    result = evaluate(spec, day, holiday)
+    assert (result.status, result.intervals) == (status, intervals)

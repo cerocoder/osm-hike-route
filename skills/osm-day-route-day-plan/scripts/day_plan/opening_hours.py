@@ -1,15 +1,18 @@
 """A small evaluator for the OSM `opening_hours` tag, covering the syntax that
-real data actually uses (checked against ~570 strings pulled from Madrid,
+real data actually uses (checked against 531 strings pulled from Madrid,
 Yekaterinburg and Moscow): weekday lists and ranges (also wrapping, `Su-Th`),
 several time ranges per rule, overnight ranges (`12:00-05:00`, `8:00-2:30`,
 `24:00`), open-ended times (`19:30+`), `off`/`closed`, `24/7`, `PH`, month
 ranges (`Jun-Aug`), `sunrise`/`sunset` bounds, and rules separated by `;` or by
 a comma before a new weekday selector (`Su-Th 12:30-24:00, Fr,Sa 12:30-00:30`).
+A rule after a comma is an additional rule: on the days it matches its hours are
+open in addition to those of earlier rules (`Mo-Sa 09:00-12:00, We 15:00-18:00`
+is open on Wednesday 09:00-12:00 and 15:00-18:00).
 
 Anything else (`SH`, `week`, `[1]`, quoted comments, years, `easter`, `||`,
 offsets such as `(sunrise+01:00)`) gives status "unknown" with the reason —
-never a guess. A later rule overrides an earlier one on the days it matches
-(OSM semantics)."""
+never a guess. A later rule after `;` overrides an earlier one on the days it matches
+(OSM semantics); `off` always closes the day."""
 import datetime
 import re
 from dataclasses import dataclass, field
@@ -49,6 +52,7 @@ class _Rule:
     times: list = field(default_factory=list)   # [(start, end)]; a bound is minutes, or a name in SUN_BOUNDS, or end == "open_end"
     off: bool = False
     has_selector: bool = False
+    additive: bool = False                      # started by a comma after a finished rule: adds to earlier rules
 
     @property
     def finished(self) -> bool:
@@ -137,6 +141,7 @@ def _parse_chunk(tokens: list) -> list:
         elif value in WEEKDAYS or value in MONTHS or value == "PH":
             if cur.finished:              # a comma-separated new rule begins here
                 flush()
+                cur.additive = True
             cur.has_selector = True
             if value == "PH":
                 cur.ph = True
@@ -198,13 +203,17 @@ def _matches(rule: _Rule, day: datetime.date, holiday) -> bool:
 
 
 def _day_intervals(rules: list, day: datetime.date, holiday, sun) -> list:
-    state = None
+    times = []
     for rule in rules:
-        if _matches(rule, day, holiday):
-            state = rule                 # a later matching rule overrides
-    if state is None or state.off:
-        return []
-    return _resolve(state.times, sun)
+        if not _matches(rule, day, holiday):
+            continue
+        if rule.off:
+            times = []                   # closed
+        elif rule.additive and times:
+            times = times + rule.times      # a comma rule adds to the earlier ones
+        else:
+            times = list(rule.times)       # a later rule overrides
+    return _resolve(times, sun)
 
 
 def _merge(intervals: list) -> list:

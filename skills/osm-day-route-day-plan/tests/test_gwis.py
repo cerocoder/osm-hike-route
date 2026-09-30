@@ -1,4 +1,5 @@
 import datetime
+import math
 from pathlib import Path
 
 import pytest
@@ -29,7 +30,7 @@ def test_no_fwi_row_means_none(html):
 def test_fwi_url_is_latitude_first_https_dated_and_has_empty_styles():
     url = fwi_url(56.84, 60.6, datetime.date(2026, 9, 28))
     assert url.startswith("https://maps.effis.emergency.copernicus.eu/gwis?")
-    assert "bbox=56.3400,60.1000,57.3400,61.1000" in url          # lat, lon, lat, lon — not lon-first
+    assert "bbox=56.2400,59.5031,57.4400,61.6969" in url          # lat, lon, lat, lon — not lon-first
     assert "crs=EPSG:4326" in url and "version=1.3.0" in url and "styles=&" in url
     assert "info_format=text/html" in url and "time=2026-09-28" in url and "layers=ecmwf.query" in url
 
@@ -45,7 +46,16 @@ def test_parse_the_real_hotspot_blocks():
 def test_hotspots_url_has_a_time_range_a_feature_count_and_a_small_box():
     url = hotspots_url(43.2, -2.8, datetime.date(2026, 9, 27), datetime.date(2026, 9, 29))
     assert "layers=viirs.hs.query" in url and "time=2026-09-27/2026-09-29" in url and "feature_count=50" in url
-    assert "bbox=42.7000,-3.3000,43.7000,-2.3000" in url
+    assert "bbox=42.6000,-3.6231,43.8000,-1.9769" in url          # 0.6 deg of latitude, widened by 1/cos(lat) in longitude
+
+
+def test_the_hotspot_box_covers_the_stated_radius_on_both_axes_at_any_latitude():
+    for lat in (0.0, 43.2, 60.0, 70.0):
+        url = hotspots_url(lat, 10.0, datetime.date(2026, 9, 27), datetime.date(2026, 9, 29))
+        south, west, north, east = (float(v) for v in url.split("bbox=")[1].split("&")[0].split(","))
+        km_lat = (north - south) / 2 * 111.0
+        km_lon = (east - west) / 2 * 111.0 * math.cos(math.radians(lat))
+        assert km_lat == pytest.approx(km_lon, rel=0.01) and km_lat >= 60.0      # box half-size in km, same on both axes
 
 
 class Text:
@@ -109,6 +119,16 @@ def test_hotspots_are_deduplicated_across_query_points_and_limited_in_number(mak
     found = hotspots_near(ctx, samples, datetime.date(2026, 9, 27), datetime.date(2026, 9, 29))
     assert len(text.calls) <= 6
     assert len({(h.lat, h.lon, h.date, h.time) for h, _ in found}) == len(found)
+
+
+def test_the_last_route_sample_is_always_a_query_point(make_route, fixed_now):
+    text = Text(HOTSPOT_HTML)
+    ctx = _ctx(make_route, fixed_now, text)
+    samples = [(43.20 + i * 0.005, -2.77) for i in range(40)]
+    hotspots_near(ctx, samples, datetime.date(2026, 9, 27), datetime.date(2026, 9, 29))
+    last_lat = samples[-1][0]
+    assert len(text.calls) == 6 and f"bbox={last_lat - 0.6:.4f}," in text.calls[-1]
+    assert f"bbox={samples[0][0] - 0.6:.4f}," in text.calls[0]
 
 
 def test_hotspot_batches_are_cached_for_an_hour(make_route, fixed_now):

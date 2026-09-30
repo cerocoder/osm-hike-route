@@ -16,6 +16,7 @@ Checked live while writing this (2026-09-30):
 
 Model output is labelled `derived`; a detection list is `web-sourced`."""
 import datetime
+import math
 import re
 from dataclasses import asdict, dataclass
 
@@ -31,7 +32,8 @@ HOTSPOT_TTL_S = 3600
 HOTSPOT_RADIUS_KM = 15.0
 HOTSPOT_WINDOW_DAYS = 2          # detections of today and the two days before
 MAX_HOTSPOT_QUERIES = 6
-_HALF_DEG = 0.5                  # 1 degree box, 101 px: about 1.1 km per pixel
+_HALF_DEG = 0.6                  # 1.2 degree box, 101 px: about 1.3 km per pixel, so 13 px of tolerance exceed 15 km
+_MIN_COS = 0.2                   # the longitude span is widened by 1/cos(latitude), capped near the poles
 
 _ROW = re.compile(r"<tr>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*</tr>", re.S | re.I)
 _FWI_LABELS = (("(FWI)", "FWI"), ("(ISI)", "ISI"), ("(BUI)", "BUI"), ("(FFMC)", "FFMC"), ("(DMC)", "DMC"),
@@ -39,9 +41,10 @@ _FWI_LABELS = (("(FWI)", "FWI"), ("(ISI)", "ISI"), ("(BUI)", "BUI"), ("(FFMC)", 
 
 
 def _url(layer: str, lat: float, lon: float, time: str, extra: str = "") -> str:
+    half_lon = _HALF_DEG / max(_MIN_COS, math.cos(math.radians(lat)))      # a pixel is as many km wide as high
     return (f"{GWIS_URL}?service=WMS&version=1.3.0&request=GetFeatureInfo&layers={layer}&query_layers={layer}"
-            f"&styles=&crs=EPSG:4326&bbox={lat - _HALF_DEG:.4f},{lon - _HALF_DEG:.4f},{lat + _HALF_DEG:.4f},"
-            f"{lon + _HALF_DEG:.4f}&width=101&height=101&i=50&j=50&info_format=text/html&time={time}{extra}")
+            f"&styles=&crs=EPSG:4326&bbox={lat - _HALF_DEG:.4f},{lon - half_lon:.4f},{lat + _HALF_DEG:.4f},"
+            f"{lon + half_lon:.4f}&width=101&height=101&i=50&j=50&info_format=text/html&time={time}{extra}")
 
 
 def fwi_url(lat: float, lon: float, date: datetime.date) -> str:
@@ -109,8 +112,11 @@ def hotspots_near(ctx, samples: list, date_from: datetime.date, date_to: datetim
     (at most MAX_HOTSPOT_QUERIES points spread along the route); raises HttpError if a query fails."""
     step = max(1, len(samples) // MAX_HOTSPOT_QUERIES)
     query_points = samples[::step][:MAX_HOTSPOT_QUERIES]
-    if samples[-1] not in query_points and len(query_points) < MAX_HOTSPOT_QUERIES:
-        query_points.append(samples[-1])
+    if samples[-1] not in query_points:            # the end of the route is always searched
+        if len(query_points) < MAX_HOTSPOT_QUERIES:
+            query_points.append(samples[-1])
+        else:
+            query_points[-1] = samples[-1]
     seen, found = set(), []
     for lat, lon in query_points:
         key = f"gwis_hotspots|{lat:.2f}|{lon:.2f}|{date_from.isoformat()}|{date_to.isoformat()}"

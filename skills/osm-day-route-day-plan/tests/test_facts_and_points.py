@@ -123,3 +123,12 @@ def test_points_default_to_empty_lists_and_tolerate_odd_features(tmp_path, fixed
 def test_route_with_only_a_line_has_no_points(tmp_path, fixed_now):
     ctx = build_context(_write_route(tmp_path, [LINE]), datetime.date(2026, 6, 21), now=fixed_now)
     assert ctx.access_points == [] and ctx.interest_points == []
+
+
+# ---- a newline must not create structure -------------------------------------------------------
+
+def test_warning_text_whitespace_is_collapsed_and_headings_in_markdown_are_demoted():
+    entry = normalize_entry(_entry(markdown="## Hazards\ntext\n   # Title\n####### seven\n#nospace",
+                                   warnings=[{"severity": "caution", "text": "Line\n## Injected\t here"}]))
+    assert entry["warnings"] == [{"severity": "caution", "text": "Line ## Injected here"}]
+    assert entry["markdown"].splitlines() == ["**Hazards**", "text", "**Title**", "####### seven", "#nospace"]

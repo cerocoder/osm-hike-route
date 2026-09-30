@@ -110,3 +110,9 @@ def test_sun_bounds_use_the_light_data(make_route_with_points, fixed_now):
 def test_russian_headers(make_route_with_points, fixed_now):
     section = _run(make_route_with_points, fixed_now, [MUSEUM], lang="ru")
     assert section.markdown.splitlines()[0].startswith("| Точка | Вид | Часы работы в эту дату (OSM) | Примечание |")
+
+
+def test_a_point_name_with_a_newline_gives_a_one_line_warning(make_route_with_points, fixed_now):
+    cave = ("Cueva\n## Injected", "cave", -3.73, 40.44, {"opening_hours": "Mo-Fr 09:00-14:00"})
+    section = _run(make_route_with_points, fixed_now, [cave], date=SAT)
+    assert [w.text for w in section.warnings] == ["Cueva ## Injected is closed on this date."]

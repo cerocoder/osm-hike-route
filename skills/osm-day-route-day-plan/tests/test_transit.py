@@ -260,3 +260,12 @@ def test_partial_overpass_failure_shows_russian_note(make_route_with_points, fix
     md = section.markdown
     # The Russian partial warning is present
     assert "Маршруты для некоторых точек заброски не удалось загрузить" in md
+
+
+def test_a_point_name_with_a_newline_gives_a_one_line_warning(make_route_with_points, fixed_now):
+    import datetime as dt
+    end = ("Atocha\n## Injected", "access", -3.6906, 40.4065, {"role": "end", "opening_hours": "Mo-Su 05:30-22:00"})
+    section = _plugin_run(make_route_with_points, fixed_now, [end], start=dt.time(16, 0), duration=6.5,
+                          web=Web(overpass={"elements": []}))
+    assert len(section.warnings) == 1 and "\n" not in section.warnings[0].text
+    assert section.warnings[0].text.startswith("Atocha ## Injected closes at 22:00")

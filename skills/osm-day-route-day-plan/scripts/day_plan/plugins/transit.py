@@ -62,7 +62,7 @@ class TransitPlugin(SectionPlugin):
                     close = latest_close(result)
                     if close is not None and close < finish:
                         warnings.append(PlanWarning("caution", tr(
-                            "tr_warn_closed_before_return", lang, name=point.name, close=_clock(close),
+                            "tr_warn_closed_before_return", lang, name=cell(point.name), close=_clock(close),
                             finish=_clock(finish))))
             lines += ["", tr("tr_access_points", lang), "", *rows]
 

@@ -17,10 +17,15 @@ def _severity_label(severity: str, lang: str) -> str:
         return str(severity).capitalize()
 
 
+def _flat(text) -> str:
+    """One line: a newline in a warning must not start a heading or a list."""
+    return " ".join(str(text).split())
+
+
 def build_summary_section(sections: list, lang: str) -> Section:
     warnings = [w for s in sections for w in s.warnings]
     warnings.sort(key=lambda w: _SEVERITY_RANK.get(w.severity, 3))  # stable: keeps plugin order
-    lines = [f"- **{_severity_label(w.severity, lang)}:** {w.text}" for w in warnings[:MAX_ITEMS]]
+    lines = [f"- **{_severity_label(w.severity, lang)}:** {_flat(w.text)}" for w in warnings[:MAX_ITEMS]]
     if not lines:
         lines.append("- " + tr("summary_none", lang))
     missing = [s.title or tr("h_" + s.section_id, lang) for s in sections if s.confidence == "no-data"]

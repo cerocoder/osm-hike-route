@@ -102,3 +102,22 @@ def test_load_facts_tolerates_non_utf8_and_directory(tmp_path):
     other.mkdir()
     (other / "facts.json").mkdir()
     assert load_facts(other) == {}
+
+
+def test_summary_flattens_multiline_warning_text():
+    warnings = [PlanWarning("danger", "Line\n## Injected\n\n- more")]
+    summary = build_summary_section([Section("hazards", "x", "derived", warnings=warnings)], "en")
+    assert summary.markdown.splitlines() == ["- **Danger:** Line ## Injected - more"]
+
+
+def test_fact_warning_with_a_heading_never_opens_a_section_in_the_plan(make_route_with_points, fixed_now):
+    from day_plan.plugins.transit import TransitPlugin
+    route_dir = make_route_with_points([])
+    (route_dir / "facts.json").write_text(json.dumps({"all": {"transit": {
+        "markdown": "## Hazards\nbody", "sources": ["https://example.org/x"],
+        "warnings": [{"severity": "danger", "text": "Line\n## Injected"}]}}}), encoding="utf-8")
+    ctx = build_context(route_dir, datetime.date(2026, 6, 21), http=lambda u: {}, now=fixed_now)
+    md = build_plan(ctx, [TransitPlugin()]).markdown
+    assert "## Injected" in md and not any(line.startswith("## Injected") for line in md.splitlines())
+    assert not any(line.startswith("## Hazards") for line in md.splitlines())
+    assert "- **Danger:** Line ## Injected" in md

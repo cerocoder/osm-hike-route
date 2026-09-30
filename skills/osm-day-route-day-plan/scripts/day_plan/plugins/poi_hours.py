@@ -38,7 +38,7 @@ class PoiHoursPlugin(SectionPlugin):
                     without_hours.append(point.name)
                 has_osm = has_osm or result is not None
                 if result is not None and result.status == "closed" and not result.uncertain:
-                    warnings.append(PlanWarning("caution", tr("poi_warn_closed", lang, name=point.name)))
+                    warnings.append(PlanWarning("caution", tr("poi_warn_closed", lang, name=cell(point.name))))
                 note = point.note or ""
                 if len(note) > NOTE_LIMIT:
                     note = note[: NOTE_LIMIT - 1] + "…"

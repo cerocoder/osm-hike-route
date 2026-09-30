@@ -23,6 +23,7 @@ from .base import SEVERITIES
 
 DAY_TYPES = ("holiday", "weekend", "workday")
 _TIME = re.compile(r"^\d{1,2}:[0-5]\d$")
+_HEADING = re.compile(r"^ {0,3}#{1,6} +(\S.*?)\s*$", re.MULTILINE)
 
 
 def load_facts(route_dir) -> dict:
@@ -50,6 +51,7 @@ def normalize_entry(entry) -> dict | None:
         return None
     markdown = entry.get("markdown")
     markdown = markdown.strip() if isinstance(markdown, str) else ""
+    markdown = _HEADING.sub(r"**\1**", markdown)      # fact text must never open a real section
     day_type = entry.get("day_type") if entry.get("day_type") in DAY_TYPES else None
     if not markdown and not day_type:
         return None
@@ -63,7 +65,7 @@ def normalize_entry(entry) -> dict | None:
     for item in entry.get("warnings") if isinstance(entry.get("warnings"), list) else []:
         if (isinstance(item, dict) and item.get("severity") in SEVERITIES
                 and isinstance(item.get("text"), str) and item["text"].strip()):
-            warnings.append({"severity": item["severity"], "text": item["text"].strip()})
+            warnings.append({"severity": item["severity"], "text": " ".join(item["text"].split())})
     if warnings:
         clean["warnings"] = warnings
     return clean

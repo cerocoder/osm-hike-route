@@ -27,7 +27,7 @@ The project is a Claude Code plugin made of three skills: two that work as a pai
 |---|---|
 | `osm-day-route-planning` | Turns your request into a route and saves it in an archive folder. |
 | `osm-day-route-show` | Renders a saved route as an interactive map page. Needs a route from the planning skill. |
-| `osm-day-route-day-plan` | For a saved route and a date, writes a day plan: sunrise, sunset, daylight, hourly weather. Needs a route from the planning skill. |
+| `osm-day-route-day-plan` | For a saved route and a date, writes a day plan: sunrise, sunset, daylight, hourly weather, how to get to the access points, and whether the lines and points of interest work that day. Needs a route from the planning skill. |
 
 The archive folder is the hand-off between them, and it is also your history: every request you made is logged, so you can come back and say "swap that viewpoint for a café" instead of starting over.
 
@@ -63,12 +63,15 @@ What you get, as `day-plan-<YYYY-MM-DD>.md` in the route folder:
 - **Summary:** the most important warnings first (thunderstorm, strong gusts, finish after sunset, fog, cold, heavy rain).
 - **Daylight:** sunrise, sunset and day length, and how much daylight is left after the route's estimated finish (or the latest start that still finishes an hour before sunset).
 - **Weather by hour:** temperature and feels-like, precipitation and its probability, cloud cover, visibility, **wind speed and the direction it blows from**, gusts, snow cover, and a plain-language sky description.
+- **Getting there:** what kind of day it is (weekday, weekend, public holiday), the opening hours of your access points on that date, the bus / train / metro lines that stop there (from OpenStreetMap, which rarely has schedules), and — when Claude has looked them up on the web and recorded them with sources — timetables and directions from where you start. If the last departure home is before your estimated return, the summary says so.
+- **Points of interest:** whether each one is open on that date (from its OpenStreetMap opening hours), your notes, and web-sourced opening days and special features when recorded.
 
 Good to know:
 - Forecasts reach about 15 days ahead. For a later date you get the average of that date over the last five years, clearly labelled as *not a forecast*. Dates older than a week use recorded weather; the last week uses model data.
 - Ask for a plan for several dates: each gets its own file, and re-running a date overwrites only that date.
 - The plan records where you start from only as a city or station, never a street address, because the file is embedded in `map.html`, which is meant to be forwarded.
-- This is the first version: daylight, weather and the summary. Transit and opening hours, hazards (ticks, mosquitoes, mountains, air, radiation, fire) and mobile coverage are planned next.
+- Everything that comes from the web rather than from OpenStreetMap is labelled *web-sourced* and carries its sources; a fact without a source is refused. For Russia and its neighbours, Claude checks the date against the official calendar, because the free holiday list misses transferred days off.
+- Hazards (ticks, mosquitoes, mountains, air, radiation, fire) and mobile coverage are planned next.
 
 ## Skill: osm-day-route-show
 
@@ -112,7 +115,8 @@ Each route gets its own folder, `routes/<place>-<date>/`:
 | `notes.md` | Human-readable summary: how to get there, points of interest, caveats. |
 | `weights.json` | Your preferences and budget as they were used. |
 | `requests.md` | Every request you made for this route, in order. |
-| `day-plan-<YYYY-MM-DD>.md` | A day plan for one date (daylight, hourly weather). One file per planned date. |
+| `day-plan-<YYYY-MM-DD>.md` | A day plan for one date (daylight, hourly weather, transport, opening hours). One file per planned date. |
+| `facts.json` | Web-sourced facts Claude recorded for your day plans (timetables, directions, opening days), each with its sources. |
 | `map.html` | The rendered map (after the show step); contains every day plan. |
 
 ## Usage examples

@@ -86,7 +86,7 @@ class BioHazardsPlugin(SectionPlugin):
 
         # ticks
         mean = weather.get("daily_mean_temp")
-        if mean is not None and in_season(month, TICK_MONTHS, lat):
+        if mean is not None and mean >= 0.0 and in_season(month, TICK_MONTHS, lat):      # no tick line on a freezing day
             band = tick_band(mean)
             lines.append("- " + tr("bio_tick", lang, band=tr("bio_band", lang)[_BANDS[band]], temp=f"{mean:.0f}"))
             if band >= 1:

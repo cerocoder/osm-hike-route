@@ -128,7 +128,7 @@ class MountainPlugin(SectionPlugin):
             if estimate <= 0:
                 warnings.append(PlanWarning("caution", tr("mt_warn_top_cold", lang, temp=f"{estimate:.0f}")))
         cape = max(_values(rows, "cape"), default=0.0)
-        forecast_thunder = any(r.get("code") in _THUNDER_CODES for r in rows)
+        forecast_thunder = weather.get("source") != "climate" and any(r.get("code") in _THUNDER_CODES for r in rows)
         if forecast_thunder:
             lines.append("- " + tr("mt_thunder_forecast", lang))
         if cape >= CAPE_THUNDER or forecast_thunder:

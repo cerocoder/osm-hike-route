@@ -118,6 +118,8 @@ class FirePlugin(SectionPlugin):
                         elevated = True
                         warnings.append(PlanWarning("caution" if cls == 4 else "danger", tr(
                             "fire_warn_kpo", lang, roman=ROMAN[cls - 1], name=name)))
+                else:
+                    lines.append("- " + tr("fire_kpo_beyond", lang))
 
         # 3. active fires near the route (only meaningful around today)
         hotspots = []

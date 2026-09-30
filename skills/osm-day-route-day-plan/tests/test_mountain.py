@@ -21,14 +21,15 @@ def rows(**over):
 
 
 def run(make_route, fixed_now, elevations, weather_rows=None, features=None, osm_error=None, date=SUMMER, lang="en",
-        facts=None, elevation_m=None, folder="route", with_osm=True):
+        facts=None, elevation_m=None, folder="route", with_osm=True, weather_source=None):
     route_dir = make_route(coords=coords(*elevations), folder=folder)
     if facts is not None:
         (route_dir / "facts.json").write_text(json.dumps(facts), encoding="utf-8")
     ctx = build_context(route_dir, date, lang=lang, http=lambda u: {}, now=fixed_now)
     shared = {}
     if weather_rows is not None:
-        shared["weather"] = {"daytime_rows": weather_rows, "rows": weather_rows, "elevation_m": elevation_m}
+        shared["weather"] = {"daytime_rows": weather_rows, "rows": weather_rows, "elevation_m": elevation_m,
+                             **({"source": weather_source} if weather_source else {})}
     if with_osm:
         shared["osm_features"] = {"features": features or [], "samples": [(c[1], c[0]) for c in ctx.coords],
                                   "error": osm_error}
@@ -211,3 +212,12 @@ def test_a_regional_fact_is_shown_even_without_elevation_data(make_route, fixed_
     section = run(make_route, fixed_now, (None, None), facts={"all": {"mountain": fact}})
     assert "no elevation data" in section.markdown and "avalanche bulletin for the Caucasus" in section.markdown
     assert section.confidence == "web-sourced" and "Sources: [example.org](https://example.org/aval)" in section.markdown
+
+
+def test_thunder_weather_codes_of_a_climatology_day_are_not_a_forecast(make_route, fixed_now):
+    climate = run(make_route, fixed_now, (900.0, 1700.0), weather_rows=rows(code=95), folder="climate",
+                  weather_source="climate")
+    assert "Thunderstorms are forecast" not in climate.markdown and not any("Thunderstorm" in w.text for w in climate.warnings)
+    forecast = run(make_route, fixed_now, (900.0, 1700.0), weather_rows=rows(code=95), folder="forecast",
+                   weather_source="forecast")
+    assert "Thunderstorms are forecast" in forecast.markdown

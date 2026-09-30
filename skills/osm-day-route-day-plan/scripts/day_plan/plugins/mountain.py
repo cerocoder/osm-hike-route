@@ -26,6 +26,7 @@ HIGH_M, AMS_M, AMS_STRONG_M = 1500, 2500, 3500
 TRACK_RADIUS_M = 300.0
 GLACIER_RADIUS_M = 1000.0
 LAPSE_C_PER_KM = 6.5
+FREEZING_MARGIN_M = 300.0      # a freezing level this close above the top still allows ice and snow there
 CAPE_THUNDER = 1000.0
 HEAVY_RAIN_MM = 10.0
 SNOW_M = 0.10
@@ -96,21 +97,26 @@ class MountainPlugin(SectionPlugin):
                 warnings.append(PlanWarning("caution", tr("mt_warn_glacier", lang, m=metres)))
 
         # weather at altitude
-        fzl = _values(rows, "fzl")
-        if fzl:
-            lowest = min(fzl)
-            below = lowest < top
-            lines.append("- " + tr("mt_freezing", lang, fzl=f"{lowest:.0f}", top=f"{top:.0f}",
-                                   relation=tr("mt_freezing_below" if below else "mt_freezing_above", lang),
-                                   effect=tr("mt_freezing_below_effect" if below else "mt_freezing_above_effect", lang)))
-            if lowest < top - 200:
-                warnings.append(PlanWarning("caution", tr("mt_warn_freezing", lang, fzl=f"{lowest:.0f}", top=f"{top:.0f}")))
         temps = _values(rows, "temp")
+        estimate = None
         if temps:
             reference = weather.get("elevation_m")
             if reference is None:
                 reference = next((c[2] for c in ctx.coords if len(c) > 2 and c[2] is not None), low)
             estimate = min(temps) - LAPSE_C_PER_KM * max(0.0, top - reference) / 1000.0
+        fzl = _values(rows, "fzl")
+        if fzl:
+            lowest = min(fzl)
+            below = lowest < top
+            cautious = below or lowest < top + FREEZING_MARGIN_M or (estimate is not None and estimate <= 0)
+            effect = "mt_freezing_above_effect" if not cautious else "mt_freezing_below_effect" if below \
+                else "mt_freezing_near_effect"
+            lines.append("- " + tr("mt_freezing", lang, fzl=f"{lowest:.0f}", top=f"{top:.0f}",
+                                   relation=tr("mt_freezing_below" if below else "mt_freezing_above", lang),
+                                   effect=tr(effect, lang)))
+            if lowest < top - 200:
+                warnings.append(PlanWarning("caution", tr("mt_warn_freezing", lang, fzl=f"{lowest:.0f}", top=f"{top:.0f}")))
+        if estimate is not None:
             lines.append("- " + tr("mt_top_temp", lang, temp=f"{estimate:.0f}", top=f"{top:.0f}"))
             if estimate <= 0:
                 warnings.append(PlanWarning("caution", tr("mt_warn_top_cold", lang, temp=f"{estimate:.0f}")))

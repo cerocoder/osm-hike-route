@@ -174,3 +174,17 @@ def test_russian_text(make_route, fixed_now):
 
 def test_the_plugin_declares_its_group_title_and_dependencies():
     assert MountainPlugin.title_key == "hz_mountain" and MountainPlugin.depends_on == ("weather", "osm_features")
+
+
+def test_freezing_level_above_the_top_never_claims_no_snow_or_ice(make_route, fixed_now):
+    warm = run(make_route, fixed_now, (1000.0, 2400.0), weather_rows=rows(fzl=3500.0, temp=15.0), folder="w")
+    assert "the model keeps the air above 0 °C at the highest point" in warm.markdown
+    assert "no snow or ice" not in warm.markdown
+    cold_top = run(make_route, fixed_now, (500.0, 2500.0), weather_rows=rows(fzl=3500.0, temp=12.0), elevation_m=500.0,
+                   folder="c")                                  # lapse rate: about -1 C at the top
+    assert "About **-1 °C**" in cold_top.markdown
+    assert "ice and snow are still possible" in cold_top.markdown and "keeps the air above" not in cold_top.markdown
+    near_top = run(make_route, fixed_now, (1000.0, 2400.0), weather_rows=rows(fzl=2600.0, temp=15.0), folder="n")
+    assert "ice and snow are still possible" in near_top.markdown and "keeps the air above" not in near_top.markdown
+    ru = run(make_route, fixed_now, (1000.0, 2400.0), weather_rows=rows(fzl=3500.0, temp=15.0), folder="r", lang="ru")
+    assert "снега и льда не ожидается" not in ru.markdown and "выше 0 °C" in ru.markdown

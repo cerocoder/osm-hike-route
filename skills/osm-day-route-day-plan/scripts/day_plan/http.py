@@ -16,6 +16,17 @@ def _open(req, timeout):
     return urllib.request.urlopen(req, timeout=timeout)
 
 
+def get_text(url: str, timeout: float = 10.0) -> str:
+    """The body of a GET as text (for services that answer HTML, such as the
+    GWIS WMS GetFeatureInfo). Same failure contract as get_json."""
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with _open(req, timeout) as resp:
+            return resp.read().decode("utf-8", "replace")
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        raise HttpError(str(e)) from e
+
+
 def get_json(url: str, timeout: float = 10.0) -> dict:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:

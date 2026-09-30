@@ -9,7 +9,7 @@ from typing import Callable
 
 from .cache import JsonCache
 from .facts import load_facts
-from .http import get_json
+from .http import get_json, get_text
 
 
 @dataclass
@@ -45,6 +45,7 @@ class PlanContext:
     cache: JsonCache
     now: datetime.datetime  # timezone-aware UTC
     today: datetime.date = field(init=False)
+    http_text: Callable = get_text                        # GET -> text, for services that answer HTML
     access_points: list = field(default_factory=list)    # [RoutePoint] with type == "access"
     interest_points: list = field(default_factory=list)  # [RoutePoint], every other Point feature
 
@@ -98,7 +99,7 @@ def _points(geojson: dict) -> tuple[list, list]:
 
 
 def build_context(route_dir, date: datetime.date, lang: str = "en", departure: str | None = None,
-                  start_time: datetime.time | None = None, http: Callable = get_json,
+                  start_time: datetime.time | None = None, http: Callable = get_json, http_text: Callable = get_text,
                   cache: JsonCache | None = None, now: datetime.datetime | None = None) -> PlanContext:
     route_dir = Path(route_dir)
     geojson = json.loads((route_dir / "route.geojson").read_text(encoding="utf-8"))
@@ -126,7 +127,7 @@ def build_context(route_dir, date: datetime.date, lang: str = "en", departure: s
         duration_hours=props.get("duration_estimate_hours"),
         centroid=centroid,
         facts=load_facts(route_dir),
-        http=http,
+        http=http, http_text=http_text,
         cache=cache if cache is not None else JsonCache(route_dir / "day_plan_cache.json", now=now.timestamp),
         now=now,
         access_points=access_points, interest_points=interest_points,

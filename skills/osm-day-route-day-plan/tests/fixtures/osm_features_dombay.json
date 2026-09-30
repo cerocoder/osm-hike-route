@@ -1,0 +1,770 @@
+{
+ "elements": [
+  {
+   "type": "way",
+   "id": 34124548,
+   "center": {
+    "lat": 43.2669466,
+    "lon": 41.7684175
+   },
+   "tags": {
+    "boat": "yes",
+    "name": "Буульген",
+    "name:en": "Buulgen",
+    "source": "landsat",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 67264610,
+   "center": {
+    "lat": 43.252743,
+    "lon": 41.6898036
+   },
+   "tags": {
+    "name": "Птыш",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 82488581,
+   "center": {
+    "lat": 43.2659704,
+    "lon": 41.6763387
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 82488582,
+   "center": {
+    "lat": 43.2649817,
+    "lon": 41.69665
+   },
+   "tags": {
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 82488583,
+   "center": {
+    "lat": 43.2439903,
+    "lon": 41.7008588
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 82488584,
+   "center": {
+    "lat": 43.2389384,
+    "lon": 41.6922488
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 288745283,
+   "center": {
+    "lat": 43.28373,
+    "lon": 41.6551223
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 288745297,
+   "center": {
+    "lat": 43.272702,
+    "lon": 41.6918902
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 288745303,
+   "center": {
+    "lat": 43.2784549,
+    "lon": 41.6773852
+   },
+   "tags": {
+    "intermittent": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 288745304,
+   "center": {
+    "lat": 43.2787764,
+    "lon": 41.6710558
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 288745306,
+   "center": {
+    "lat": 43.2786847,
+    "lon": 41.6684607
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 291228221,
+   "center": {
+    "lat": 43.248601,
+    "lon": 41.7521072
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 291228223,
+   "center": {
+    "lat": 43.2566613,
+    "lon": 41.7446286
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 291228225,
+   "center": {
+    "lat": 43.2451324,
+    "lon": 41.7557949
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 291488216,
+   "center": {
+    "lat": 43.2589599,
+    "lon": 41.7524938
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 291488226,
+   "center": {
+    "lat": 43.2319591,
+    "lon": 41.7326245
+   },
+   "tags": {
+    "natural": "glacier"
+   }
+  },
+  {
+   "type": "way",
+   "id": 297052727,
+   "center": {
+    "lat": 43.2772685,
+    "lon": 41.6565892
+   },
+   "tags": {
+    "name": "Домбай-Ульген",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 299803678,
+   "center": {
+    "lat": 43.2694423,
+    "lon": 41.6905146
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 319460527,
+   "center": {
+    "lat": 43.2733693,
+    "lon": 41.6783767
+   },
+   "tags": {
+    "intermittent": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 319460530,
+   "center": {
+    "lat": 43.3082664,
+    "lon": 41.6809679
+   },
+   "tags": {
+    "highway": "path",
+    "informal": "yes",
+    "note": "Notify rescue team at chairlifts before  going to this route",
+    "sac_scale": "demanding_alpine_hiking",
+    "surface": "bare_rock",
+    "trail_visibility": "bad"
+   }
+  },
+  {
+   "type": "way",
+   "id": 411097851,
+   "center": {
+    "lat": 43.277069,
+    "lon": 41.6608271
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 448857822,
+   "center": {
+    "lat": 43.267054,
+    "lon": 41.7205542
+   },
+   "tags": {
+    "natural": "water"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703156422,
+   "center": {
+    "lat": 43.2618897,
+    "lon": 41.6640374
+   },
+   "tags": {
+    "natural": "glacier"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703401754,
+   "center": {
+    "lat": 43.2363553,
+    "lon": 41.6850123
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703401755,
+   "center": {
+    "lat": 43.2484811,
+    "lon": 41.6779125
+   },
+   "tags": {
+    "intermittent": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703401756,
+   "center": {
+    "lat": 43.242737,
+    "lon": 41.684762
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703401757,
+   "center": {
+    "lat": 43.2476674,
+    "lon": 41.6847123
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703401758,
+   "center": {
+    "lat": 43.2398354,
+    "lon": 41.6802272
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703401759,
+   "center": {
+    "lat": 43.2404216,
+    "lon": 41.6848057
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703401760,
+   "center": {
+    "lat": 43.2394875,
+    "lon": 41.6872224
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703401761,
+   "center": {
+    "lat": 43.2446371,
+    "lon": 41.6846207
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862907,
+   "center": {
+    "lat": 43.2676517,
+    "lon": 41.7159529
+   },
+   "tags": {
+    "intermittent": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862908,
+   "center": {
+    "lat": 43.2676192,
+    "lon": 41.7183562
+   },
+   "tags": {
+    "natural": "water"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862909,
+   "center": {
+    "lat": 43.2661849,
+    "lon": 41.7111994
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862910,
+   "center": {
+    "lat": 43.2653987,
+    "lon": 41.7075737
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862911,
+   "center": {
+    "lat": 43.2657273,
+    "lon": 41.6979155
+   },
+   "tags": {
+    "intermittent": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862912,
+   "center": {
+    "lat": 43.2655481,
+    "lon": 41.6982396
+   },
+   "tags": {
+    "natural": "water"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862921,
+   "center": {
+    "lat": 43.2480337,
+    "lon": 41.7031372
+   },
+   "tags": {
+    "intermittent": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862922,
+   "center": {
+    "lat": 43.2495107,
+    "lon": 41.716826
+   },
+   "tags": {
+    "natural": "glacier"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862923,
+   "center": {
+    "lat": 43.2454802,
+    "lon": 41.7015722
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862924,
+   "center": {
+    "lat": 43.2403376,
+    "lon": 41.7082912
+   },
+   "tags": {
+    "natural": "glacier"
+   }
+  },
+  {
+   "type": "way",
+   "id": 703862925,
+   "center": {
+    "lat": 43.2334834,
+    "lon": 41.6965863
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 704534968,
+   "center": {
+    "lat": 43.2309305,
+    "lon": 41.7262502
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 860031001,
+   "center": {
+    "lat": 43.2906373,
+    "lon": 41.7591625
+   },
+   "tags": {
+    "boat": "yes",
+    "name": "Буульген",
+    "name:en": "Buulgen",
+    "source": "landsat",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 860031002,
+   "center": {
+    "lat": 43.2855967,
+    "lon": 41.7580959
+   },
+   "tags": {
+    "boat": "yes",
+    "name": "Буульген",
+    "name:en": "Buulgen",
+    "source": "landsat",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1232396853,
+   "center": {
+    "lat": 43.2613482,
+    "lon": 41.7391829
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 3869132,
+   "center": {
+    "lat": 43.2379373,
+    "lon": 41.6719043
+   },
+   "tags": {
+    "name": "Агбек",
+    "name:en": "Ageyek Glacier",
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 3869137,
+   "center": {
+    "lat": 43.2490282,
+    "lon": 41.667873
+   },
+   "tags": {
+    "natural": "bare_rock",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 4437739,
+   "center": {
+    "lat": 43.225919,
+    "lon": 41.7200714
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6660525,
+   "center": {
+    "lat": 43.2471828,
+    "lon": 41.7364003
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6660529,
+   "center": {
+    "lat": 43.2868501,
+    "lon": 41.7173191
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6660531,
+   "center": {
+    "lat": 43.2841323,
+    "lon": 41.7140683
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6660535,
+   "center": {
+    "lat": 43.2858192,
+    "lon": 41.7061504
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6660539,
+   "center": {
+    "lat": 43.2606152,
+    "lon": 41.7330422
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6660542,
+   "center": {
+    "lat": 43.2528774,
+    "lon": 41.7315686
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6660543,
+   "center": {
+    "lat": 43.2461444,
+    "lon": 41.7174643
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6660545,
+   "center": {
+    "lat": 43.2291726,
+    "lon": 41.7706955
+   },
+   "tags": {
+    "name": "Буульген",
+    "name:en": "Buulgen Glacier",
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6660547,
+   "center": {
+    "lat": 43.2277229,
+    "lon": 41.6971895
+   },
+   "tags": {
+    "name": "Птыш",
+    "name:en": "Ptish Glacier",
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6663998,
+   "center": {
+    "lat": 43.2264334,
+    "lon": 41.6723764
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6663999,
+   "center": {
+    "lat": 43.2309767,
+    "lon": 41.6580012
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6664002,
+   "center": {
+    "lat": 43.2536812,
+    "lon": 41.668528
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 6664005,
+   "center": {
+    "lat": 43.2540443,
+    "lon": 41.6509837
+   },
+   "tags": {
+    "name": "Северный Джугутурлючат",
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 9774320,
+   "center": {
+    "lat": 43.2462913,
+    "lon": 41.661956
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 9786905,
+   "center": {
+    "lat": 43.2653704,
+    "lon": 41.7179793
+   },
+   "tags": {
+    "natural": "water",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 9786906,
+   "center": {
+    "lat": 43.2586625,
+    "lon": 41.7187303
+   },
+   "tags": {
+    "natural": "glacier",
+    "type": "multipolygon"
+   }
+  }
+ ]
+}

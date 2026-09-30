@@ -1,0 +1,1410 @@
+{
+ "elements": [
+  {
+   "type": "node",
+   "id": 13760335456,
+   "lat": 40.4109054,
+   "lon": -3.7382121,
+   "tags": {
+    "communication:mobile_phone": "yes",
+    "man_made": "tower",
+    "tower:type": "communication"
+   }
+  },
+  {
+   "type": "node",
+   "id": 13760335457,
+   "lat": 40.4103373,
+   "lon": -3.7387971,
+   "tags": {
+    "communication:mobile_phone": "yes",
+    "man_made": "tower",
+    "tower:type": "communication"
+   }
+  },
+  {
+   "type": "way",
+   "id": 8820665,
+   "center": {
+    "lat": 40.4381631,
+    "lon": -3.7383476
+   },
+   "tags": {
+    "name": "Río Manzanares",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 121098528,
+   "center": {
+    "lat": 40.4340002,
+    "lon": -3.7460888
+   },
+   "tags": {
+    "barrier": "fence",
+    "designation": "Estanque del Repartidor",
+    "name": "Estanque del Repartidor",
+    "natural": "water",
+    "url": "http://www.monumentamadrid.es/AM_Monumentos5/AM_Monumentos5_WEB/pdf/pdfP/mon5/8619.pdf",
+    "water": "pond",
+    "wikidata": "Q110746795"
+   }
+  },
+  {
+   "type": "way",
+   "id": 122057547,
+   "center": {
+    "lat": 40.4342726,
+    "lon": -3.7260197
+   },
+   "tags": {
+    "highway": "path",
+    "sac_scale": "hiking",
+    "smoothness": "bad",
+    "surface": "cobblestone"
+   }
+  },
+  {
+   "type": "way",
+   "id": 122057583,
+   "center": {
+    "lat": 40.4348343,
+    "lon": -3.7242736
+   },
+   "tags": {
+    "highway": "path",
+    "sac_scale": "hiking",
+    "surface": "paving_stones"
+   }
+  },
+  {
+   "type": "way",
+   "id": 122057688,
+   "center": {
+    "lat": 40.434301,
+    "lon": -3.7258434
+   },
+   "tags": {
+    "name": "Arroyo de San Bernardino",
+    "waterway": "canal",
+    "wikidata": "Q30071168",
+    "wikipedia": "es:Manantial de la Salud del arroyo de San Bernardino"
+   }
+  },
+  {
+   "type": "way",
+   "id": 122099420,
+   "center": {
+    "lat": 40.4293783,
+    "lon": -3.7285465
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 129804508,
+   "center": {
+    "lat": 40.4156774,
+    "lon": -3.7704505
+   },
+   "tags": {
+    "intermittent": "yes",
+    "name": "Arroyo de la Zorra",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 129804516,
+   "center": {
+    "lat": 40.4140411,
+    "lon": -3.7484285
+   },
+   "tags": {
+    "name": "Arroyo de los Meaques",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 129805207,
+   "center": {
+    "lat": 40.420525,
+    "lon": -3.7625664
+   },
+   "tags": {
+    "intermittent": "yes",
+    "name": "Arroyo de la Zarza",
+    "seasonal": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 129805208,
+   "center": {
+    "lat": 40.4280431,
+    "lon": -3.7503346
+   },
+   "tags": {
+    "name": "Arroyo de Valdeza",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 129908806,
+   "center": {
+    "lat": 40.4272674,
+    "lon": -3.7618932
+   },
+   "tags": {
+    "name": "Arroyo de Valdeza",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 129908807,
+   "center": {
+    "lat": 40.4257935,
+    "lon": -3.7446464
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 129908808,
+   "center": {
+    "lat": 40.4227428,
+    "lon": -3.7440162
+   },
+   "tags": {
+    "intermittent": "yes",
+    "name": "Barranco de los Romeros",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 129909147,
+   "center": {
+    "lat": 40.4234813,
+    "lon": -3.7488424
+   },
+   "tags": {
+    "intermittent": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 130669458,
+   "center": {
+    "lat": 40.4407059,
+    "lon": -3.7547989
+   },
+   "tags": {
+    "highway": "path",
+    "sac_scale": "hiking",
+    "surface": "ground",
+    "trail_visibility": "excellent"
+   }
+  },
+  {
+   "type": "way",
+   "id": 223118485,
+   "center": {
+    "lat": 40.4130533,
+    "lon": -3.7484602
+   },
+   "tags": {
+    "name": "Aserradero",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 223118486,
+   "center": {
+    "lat": 40.4129769,
+    "lon": -3.7484554
+   },
+   "tags": {
+    "bridge": "aqueduct",
+    "name": "Aserradero",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 223118487,
+   "center": {
+    "lat": 40.4129083,
+    "lon": -3.7481661
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Aserradero",
+    "tunnel": "yes",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 223118488,
+   "center": {
+    "lat": 40.4129894,
+    "lon": -3.748384
+   },
+   "tags": {
+    "name": "Aserradero",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 223118491,
+   "center": {
+    "lat": 40.4110759,
+    "lon": -3.7526471
+   },
+   "tags": {
+    "bridge": "aqueduct",
+    "layer": "1",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 223118492,
+   "center": {
+    "lat": 40.4108344,
+    "lon": -3.7521075
+   },
+   "tags": {
+    "name": "Los Fiordos",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 223118493,
+   "center": {
+    "lat": 40.4118856,
+    "lon": -3.7527006
+   },
+   "tags": {
+    "name": "Los Rápidos",
+    "tunnel": "yes",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 223118494,
+   "center": {
+    "lat": 40.412244,
+    "lon": -3.7521663
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Los Rápidos",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 309666645,
+   "center": {
+    "lat": 40.4136918,
+    "lon": -3.7532762
+   },
+   "tags": {
+    "natural": "water",
+    "water": "reservoir"
+   }
+  },
+  {
+   "type": "way",
+   "id": 309666646,
+   "center": {
+    "lat": 40.4129166,
+    "lon": -3.7541667
+   },
+   "tags": {
+    "natural": "water",
+    "water": "reservoir"
+   }
+  },
+  {
+   "type": "way",
+   "id": 309666647,
+   "center": {
+    "lat": 40.414104,
+    "lon": -3.7521044
+   },
+   "tags": {
+    "natural": "water",
+    "water": "reservoir"
+   }
+  },
+  {
+   "type": "way",
+   "id": 309666648,
+   "center": {
+    "lat": 40.4159329,
+    "lon": -3.7451342
+   },
+   "tags": {
+    "natural": "water",
+    "water": "reservoir"
+   }
+  },
+  {
+   "type": "way",
+   "id": 309666650,
+   "center": {
+    "lat": 40.4160074,
+    "lon": -3.744537
+   },
+   "tags": {
+    "natural": "water",
+    "water": "reservoir"
+   }
+  },
+  {
+   "type": "way",
+   "id": 309764875,
+   "center": {
+    "lat": 40.4179345,
+    "lon": -3.7285232
+   },
+   "tags": {
+    "access": "yes",
+    "alt_name": "Acueducto de Sabatini",
+    "architect": "Francisco Sabatini",
+    "bridge": "aqueduct",
+    "historic": "ruins",
+    "historic:civilization": "modern",
+    "inscription": "Francisco Sabatini siglo XVIII",
+    "name": "Acueducto del Canal de La Partida",
+    "ruins": "wall",
+    "start_date": "1778",
+    "waterway": "stream",
+    "wikidata": "Q47798997",
+    "wikipedia": "es:Acueducto de Sabatini"
+   }
+  },
+  {
+   "type": "way",
+   "id": 335246479,
+   "center": {
+    "lat": 40.4357628,
+    "lon": -3.7227061
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 432765281,
+   "center": {
+    "lat": 40.4342707,
+    "lon": -3.7258722
+   },
+   "tags": {
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 445382245,
+   "center": {
+    "lat": 40.4170615,
+    "lon": -3.7355064
+   },
+   "tags": {
+    "name": "Arroyo de los Meaques",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 445387931,
+   "center": {
+    "lat": 40.4174584,
+    "lon": -3.7343735
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Arroyo de los Meaques",
+    "tunnel": "culvert",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 445395055,
+   "center": {
+    "lat": 40.438365,
+    "lon": -3.7513198
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 445590408,
+   "center": {
+    "lat": 40.4181878,
+    "lon": -3.7265759
+   },
+   "tags": {
+    "layer": "-3",
+    "name": "Arroyo Meaques",
+    "tunnel": "culvert",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 450126606,
+   "center": {
+    "lat": 40.4353545,
+    "lon": -3.7228039
+   },
+   "tags": {
+    "highway": "path",
+    "lit": "yes",
+    "sac_scale": "hiking",
+    "surface": "dirt"
+   }
+  },
+  {
+   "type": "way",
+   "id": 548816611,
+   "center": {
+    "lat": 40.4295918,
+    "lon": -3.7241608
+   },
+   "tags": {
+    "amenity": "fountain",
+    "historic": "monument",
+    "name": "Fuente Juan de Villanueva",
+    "natural": "water",
+    "water": "basin",
+    "wikidata": "Q5870188",
+    "wikimedia_commons": "Category:Fountain of Juan de Villanueva",
+    "wikipedia": "es:Fuente de Juan de Villanueva"
+   }
+  },
+  {
+   "type": "way",
+   "id": 548819802,
+   "center": {
+    "lat": 40.4309553,
+    "lon": -3.7309192
+   },
+   "tags": {
+    "amenity": "fountain",
+    "natural": "water",
+    "water": "basin"
+   }
+  },
+  {
+   "type": "way",
+   "id": 561756313,
+   "center": {
+    "lat": 40.4108188,
+    "lon": -3.7500227
+   },
+   "tags": {
+    "amenity": "fountain",
+    "barrier": "wall",
+    "natural": "water"
+   }
+  },
+  {
+   "type": "way",
+   "id": 575488005,
+   "center": {
+    "lat": 40.4395693,
+    "lon": -3.7295018
+   },
+   "tags": {
+    "amenity": "fountain",
+    "barrier": "kerb",
+    "natural": "water"
+   }
+  },
+  {
+   "type": "way",
+   "id": 575501497,
+   "center": {
+    "lat": 40.4300564,
+    "lon": -3.7237262
+   },
+   "tags": {
+    "amenity": "fountain",
+    "barrier": "kerb",
+    "natural": "water"
+   }
+  },
+  {
+   "type": "way",
+   "id": 732747735,
+   "center": {
+    "lat": 40.428801,
+    "lon": -3.7512926
+   },
+   "tags": {
+    "natural": "water"
+   }
+  },
+  {
+   "type": "way",
+   "id": 764386652,
+   "center": {
+    "lat": 40.4341924,
+    "lon": -3.729445
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 788666908,
+   "center": {
+    "lat": 40.4109687,
+    "lon": -3.7521962
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 788839448,
+   "center": {
+    "lat": 40.4111988,
+    "lon": -3.7509254
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 825499894,
+   "center": {
+    "lat": 40.4274688,
+    "lon": -3.730294
+   },
+   "tags": {
+    "name": "Arroyo de Valdeza",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 825499895,
+   "center": {
+    "lat": 40.426294,
+    "lon": -3.7343376
+   },
+   "tags": {
+    "name": "Arroyo de Valdeza",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 825499896,
+   "center": {
+    "lat": 40.4260751,
+    "lon": -3.7351694
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Arroyo de Valdeza",
+    "tunnel": "culvert",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 825499897,
+   "center": {
+    "lat": 40.4269026,
+    "lon": -3.7321313
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Arroyo de Valdeza",
+    "tunnel": "culvert",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1019243608,
+   "center": {
+    "lat": 40.4358922,
+    "lon": -3.7567805
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1207550839,
+   "center": {
+    "lat": 40.4274248,
+    "lon": -3.7555472
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1207550840,
+   "center": {
+    "lat": 40.4240863,
+    "lon": -3.7555758
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1239195924,
+   "center": {
+    "lat": 40.4381521,
+    "lon": -3.7388225
+   },
+   "tags": {
+    "landuse": "industrial"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1239195940,
+   "center": {
+    "lat": 40.4330674,
+    "lon": -3.7289006
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1259162210,
+   "center": {
+    "lat": 40.4129717,
+    "lon": -3.7484883
+   },
+   "tags": {
+    "natural": "water",
+    "water": "lake"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1288951590,
+   "center": {
+    "lat": 40.4275835,
+    "lon": -3.7572924
+   },
+   "tags": {
+    "name": "Arroyo de Valdeza",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1288951591,
+   "center": {
+    "lat": 40.4275357,
+    "lon": -3.7574748
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Arroyo de Valdeza",
+    "tunnel": "culvert",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1306326450,
+   "center": {
+    "lat": 40.4264479,
+    "lon": -3.7220638
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1323358977,
+   "center": {
+    "lat": 40.4259254,
+    "lon": -3.7419142
+   },
+   "tags": {
+    "tunnel": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1323358978,
+   "center": {
+    "lat": 40.4261319,
+    "lon": -3.7413337
+   },
+   "tags": {
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1323359473,
+   "center": {
+    "lat": 40.4270827,
+    "lon": -3.7434083
+   },
+   "tags": {
+    "name": "Arroyo de Valdeza",
+    "tunnel": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1323359474,
+   "center": {
+    "lat": 40.4263486,
+    "lon": -3.7394669
+   },
+   "tags": {
+    "name": "Arroyo de Valdeza",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1330837898,
+   "center": {
+    "lat": 40.4339052,
+    "lon": -3.727421
+   },
+   "tags": {
+    "highway": "path",
+    "sac_scale": "hiking"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1332572097,
+   "center": {
+    "lat": 40.4274669,
+    "lon": -3.7579724
+   },
+   "tags": {
+    "name": "Arroyo de Valdeza",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1332572098,
+   "center": {
+    "lat": 40.4274215,
+    "lon": -3.7584383
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Arroyo de Valdeza",
+    "tunnel": "culvert",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1333033490,
+   "center": {
+    "lat": 40.4202325,
+    "lon": -3.7492465
+   },
+   "tags": {
+    "intermittent": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1335583525,
+   "center": {
+    "lat": 40.4356254,
+    "lon": -3.7228429
+   },
+   "tags": {
+    "name": "Arroyo de San Bernardino",
+    "waterway": "canal",
+    "wikidata": "Q30071168",
+    "wikipedia": "es:Manantial de la Salud del arroyo de San Bernardino"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1335583526,
+   "center": {
+    "lat": 40.4355615,
+    "lon": -3.7228668
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Arroyo de San Bernardino",
+    "tunnel": "culvert",
+    "waterway": "canal",
+    "wikidata": "Q30071168",
+    "wikipedia": "es:Manantial de la Salud del arroyo de San Bernardino"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1340233496,
+   "center": {
+    "lat": 40.4160275,
+    "lon": -3.722638
+   },
+   "tags": {
+    "name": "Río Manzanares",
+    "tunnel": "culvert",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1340233497,
+   "center": {
+    "lat": 40.4173276,
+    "lon": -3.7222985
+   },
+   "tags": {
+    "name": "Río Manzanares",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1340233501,
+   "center": {
+    "lat": 40.423766,
+    "lon": -3.7253442
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Río Manzanares",
+    "tunnel": "culvert",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1340233502,
+   "center": {
+    "lat": 40.4211824,
+    "lon": -3.7236119
+   },
+   "tags": {
+    "name": "Río Manzanares",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1340233504,
+   "center": {
+    "lat": 40.4314629,
+    "lon": -3.7347908
+   },
+   "tags": {
+    "name": "Río Manzanares",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1340233505,
+   "center": {
+    "lat": 40.4315574,
+    "lon": -3.734813
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Río Manzanares",
+    "tunnel": "culvert",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1340233506,
+   "center": {
+    "lat": 40.4276305,
+    "lon": -3.7301686
+   },
+   "tags": {
+    "name": "Río Manzanares",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1340233507,
+   "center": {
+    "lat": 40.4314978,
+    "lon": -3.7349881
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Río Manzanares",
+    "tunnel": "culvert",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1340233508,
+   "center": {
+    "lat": 40.4316588,
+    "lon": -3.7349114
+   },
+   "tags": {
+    "name": "Río Manzanares",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1340243110,
+   "center": {
+    "lat": 40.4116422,
+    "lon": -3.722383
+   },
+   "tags": {
+    "name": "Río Manzanares",
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1424653063,
+   "center": {
+    "lat": 40.4383496,
+    "lon": -3.7219425
+   },
+   "tags": {
+    "amenity": "fountain",
+    "barrier": "wall",
+    "height": "0.5",
+    "natural": "water",
+    "source": "Bing"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1424653072,
+   "center": {
+    "lat": 40.4378634,
+    "lon": -3.7212403
+   },
+   "tags": {
+    "natural": "water"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1489982296,
+   "center": {
+    "lat": 40.4339741,
+    "lon": -3.7273598
+   },
+   "tags": {
+    "highway": "path",
+    "sac_scale": "hiking",
+    "smoothness": "bad",
+    "surface": "cobblestone"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1500866914,
+   "center": {
+    "lat": 40.41655,
+    "lon": -3.7547743
+   },
+   "tags": {
+    "intermittent": "yes",
+    "name": "Arroyo de la Zarza",
+    "seasonal": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1500866915,
+   "center": {
+    "lat": 40.4184433,
+    "lon": -3.7583526
+   },
+   "tags": {
+    "intermittent": "yes",
+    "layer": "-1",
+    "name": "Arroyo de la Zarza",
+    "seasonal": "yes",
+    "tunnel": "culvert",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1501200019,
+   "center": {
+    "lat": 40.4130387,
+    "lon": -3.7580196
+   },
+   "tags": {
+    "intermittent": "yes",
+    "layer": "-1",
+    "name": "Arroyo de la Zorra",
+    "tunnel": "culvert",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1501200020,
+   "center": {
+    "lat": 40.4131723,
+    "lon": -3.7589007
+   },
+   "tags": {
+    "intermittent": "yes",
+    "name": "Arroyo de la Zorra",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1501200021,
+   "center": {
+    "lat": 40.4133522,
+    "lon": -3.7597584
+   },
+   "tags": {
+    "intermittent": "yes",
+    "layer": "-1",
+    "name": "Arroyo de la Zorra",
+    "tunnel": "culvert",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1501200022,
+   "center": {
+    "lat": 40.4124066,
+    "lon": -3.7571015
+   },
+   "tags": {
+    "intermittent": "yes",
+    "name": "Arroyo de la Zorra",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1501200023,
+   "center": {
+    "lat": 40.4197973,
+    "lon": -3.7352104
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Barranco de los Romeros",
+    "tunnel": "yes",
+    "waterway": "stream"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510283641,
+   "center": {
+    "lat": 40.4125019,
+    "lon": -3.7518672
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510283642,
+   "center": {
+    "lat": 40.412245,
+    "lon": -3.7517701
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510283643,
+   "center": {
+    "lat": 40.4124047,
+    "lon": -3.7519316
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510283646,
+   "center": {
+    "lat": 40.4118869,
+    "lon": -3.7521166
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510283649,
+   "center": {
+    "lat": 40.4119804,
+    "lon": -3.7525142
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Los Rápidos",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510283650,
+   "center": {
+    "lat": 40.4119861,
+    "lon": -3.7520951
+   },
+   "tags": {
+    "layer": "-1",
+    "name": "Los Rápidos",
+    "tunnel": "culvert",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510283651,
+   "center": {
+    "lat": 40.4121734,
+    "lon": -3.7524935
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510283664,
+   "center": {
+    "lat": 40.4122449,
+    "lon": -3.7521807
+   },
+   "tags": {
+    "natural": "water",
+    "water": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510283668,
+   "center": {
+    "lat": 40.4126425,
+    "lon": -3.7516438
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510283689,
+   "center": {
+    "lat": 40.4120195,
+    "lon": -3.750192
+   },
+   "tags": {
+    "natural": "water",
+    "water": "pond"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510551683,
+   "center": {
+    "lat": 40.4107685,
+    "lon": -3.7526195
+   },
+   "tags": {
+    "bridge": "aqueduct",
+    "layer": "1",
+    "name": "Los Fiordos",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510739618,
+   "center": {
+    "lat": 40.4118254,
+    "lon": -3.7487334
+   },
+   "tags": {
+    "name": "La Jungla",
+    "waterway": "canal"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1510739632,
+   "center": {
+    "lat": 40.4120914,
+    "lon": -3.7490141
+   },
+   "tags": {
+    "waterway": "river"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1550376429,
+   "center": {
+    "lat": 40.4352557,
+    "lon": -3.7233187
+   },
+   "tags": {
+    "highway": "path",
+    "lit": "yes",
+    "sac_scale": "hiking",
+    "surface": "dirt"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 3615910,
+   "center": {
+    "lat": 40.4153974,
+    "lon": -3.7175737
+   },
+   "tags": {
+    "natural": "water",
+    "type": "multipolygon",
+    "water": "river"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 4136921,
+   "center": {
+    "lat": 40.4144747,
+    "lon": -3.7494298
+   },
+   "tags": {
+    "natural": "water",
+    "type": "multipolygon",
+    "water": "reservoir"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 10966919,
+   "center": {
+    "lat": 40.4118053,
+    "lon": -3.7487393
+   },
+   "tags": {
+    "name": "La Jungla",
+    "natural": "water",
+    "type": "multipolygon",
+    "water": "canal"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 18080549,
+   "center": {
+    "lat": 40.4273253,
+    "lon": -3.7497076
+   },
+   "tags": {
+    "natural": "water",
+    "type": "multipolygon"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 18273245,
+   "center": {
+    "lat": 40.4188234,
+    "lon": -3.7319318
+   },
+   "tags": {
+    "name": "Lago de la Casa de Campo",
+    "natural": "water",
+    "type": "multipolygon",
+    "water": "lake",
+    "wikidata": "Q5968929",
+    "wikipedia": "es:Lago de la Casa de Campo"
+   }
+  }
+ ]
+}

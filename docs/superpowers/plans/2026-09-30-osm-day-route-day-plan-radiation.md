@@ -11,13 +11,13 @@
 **Spec:** `docs/superpowers/specs/2026-09-29-osm-day-route-day-plan-design.md`. Parts 1, 2 and 3a are merged. This is part **3b**, the last of the third plan.
 
 **Deviations from the spec (decided while researching):**
-- **A third tier, `info`, for advisory areas** (the Bavarian mushroom areas named by the German federal radiation protection office): an info line only when the route is inside, with the mushroom and game advice only, because the source itself calls moderate consumption harmless.
+- **A third tier, `info`, for advisory areas** (the Bavarian mushroom areas named by the German federal radiation protection office and the Norwegian mountain municipalities singled out by the Norwegian authority): an info line only when the route is inside, with the mushroom and game advice only, because the source itself calls moderate consumption harmless.
 - **Radiation severity per zone.** The spec gives a `danger` on any hit. Here a closed or heavily contaminated zone (the East Ural reserve, Mayak, Karachay, the Chernobyl zone, the Polesie reserve) gives `danger`, and a wide affected area (the East Urals trace, the Techa floodplain, south-western Bryansk, the Semipalatinsk site) gives `caution`, because most of a district or of a 18 000 km² test site is far cleaner than its worst spot. The mushroom, berry and spring advice is the same for both.
 - **Radiation comes first in the Hazards group** (the spec lists it after air) and its warnings are pinned in the Summary.
 - **People hazards: no fact means no section**, not `no-data` (which would put "People and access" in every plan's missing-data list). Animals need no new plugin: `bio_hazards` facts already carry them.
 - **Mobile coverage is info-only**: mast count from OpenStreetMap, advice and links, no terrain model. OpenStreetMap masts are sparse and a model without measured data would be a guess dressed as an estimate. Only nPerf and OpenCellID were confirmed to answer; the operators' own maps (MTS, MegaFon, Beeline, T2) could not be confirmed and are not linked.
 - **Registry area.** The registry covers rectangles for Europe with the Urals (north of 36 N), Siberia, northern Kazakhstan and the Far East north of 49 N, and Primorye. The spec excluded China, Mongolia and the Far East outside Russia; rectangles cannot follow borders, so a route just inside a box edge in China or Mongolia is a known limitation.
-- **The registry starts with twelve researched zones**, not the spec's whole list. Every zone has a source read during research and geometry from OpenStreetMap or from published figures. Totskoye, Novaya Zemlya, the Seversk 1993 trace and the peaceful underground explosions were researched and left out because the sources show only local plots, decayed contamination or no outline; Scandinavia, Wismut, Jáchymov, La Hague, Sellafield, Andreeva Bay and the Balkans are not researched yet. `data/README.md` and SKILL.md say why for each; a plan says so and never says "safe".
+- **The registry starts with thirteen researched zones**, not the spec's whole list. Every zone has a source read during research and geometry from OpenStreetMap or from published figures. Totskoye, Novaya Zemlya, the Seversk 1993 trace, the peaceful underground explosions, Sweden and Finland were researched and left out because the sources show only local plots, decayed or contradictory contamination, no outline, or no need for a warning; Wismut, Jáchymov, La Hague, Sellafield, Andreeva Bay and the Balkans are not researched yet. `data/README.md` and SKILL.md say why for each; a plan says so and never says "safe".
 
 ## Global Constraints
 
@@ -334,7 +334,7 @@ Modify `skills/osm-day-route-day-plan/scripts/day_plan/i18n.py` — apply this p
          "hz_air": "Air: pollen and pollution",
 +        "hz_radiation": "Radiation", "hz_people": "People and access",
 +        "rad_none": "No zone of the radiation registry lies within {km} km of the route or its points. The registry is curated by hand and incomplete (it covers: {areas}), so no entry does not mean the land is clean.",
-+        "rad_areas": "the East Urals trace, the Techa river, Mayak and Lake Karachay, the Chernobyl zones (Ukraine, Belarus, the Bryansk, Tula, Kaluga and Orel regions), the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-food areas in Bavaria",
++        "rad_areas": "the East Urals trace, the Techa river, Mayak and Lake Karachay, the Chernobyl zones (Ukraine, Belarus, the Bryansk, Tula, Kaluga and Orel regions), the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-mushroom areas in Bavaria and Norway",
 +        "rad_inside": "- **{name}** ({severity}): the route or one of its points is inside the zone. {contamination}. {status}",
 +        "rad_near": "- **{name}** ({severity}): the route passes about {km} km from the zone. {contamination}. {status}",
 +        "rad_approx": " *Approximate outline: {note}*",
@@ -370,7 +370,7 @@ Modify `skills/osm-day-route-day-plan/scripts/day_plan/i18n.py` — apply this p
          "hz_fire": "Пожарная опасность", "hz_air": "Воздух: пыльца и загрязнение",
 +        "hz_radiation": "Радиация", "hz_people": "Люди и доступ",
 +        "rad_none": "В радиус {km} км от маршрута и его точек не попадает ни одна зона реестра радиации. Реестр составлен вручную и неполон (в нём: {areas}), поэтому отсутствие записи не означает, что земля чистая.",
-+        "rad_areas": "Восточно-Уральский след, река Теча, «Маяк» и озеро Карачай, чернобыльские зоны (Украина, Беларусь, Брянская, Тульская, Калужская и Орловская области), Семипалатинский полигон, Енисей ниже Железногорска, районы Баварии с грибами",
++        "rad_areas": "Восточно-Уральский след, река Теча, «Маяк» и озеро Карачай, чернобыльские зоны (Украина, Беларусь, Брянская, Тульская, Калужская и Орловская области), Семипалатинский полигон, Енисей ниже Железногорска, районы Баварии и Норвегии с грибами",
 +        "rad_inside": "- **{name}** ({severity}): маршрут или одна из его точек внутри зоны. {contamination}. {status}",
 +        "rad_near": "- **{name}** ({severity}): маршрут проходит примерно в {km} км от зоны. {contamination}. {status}",
 +        "rad_approx": " *Приблизительный контур: {note}*",
@@ -621,7 +621,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ### Task 3: The radiation registry
 
-`data/radiation_zones.json` holds twelve zones, each with geometry, a bilingual name, contamination, status and event, an `approximate` flag with a bilingual note where the shape is not a published outline, and cited sources (each checked by reading the source while researching; see `data/README.md`, which also lists what was researched and left out and why). Geometry is taken from OpenStreetMap through Nominatim and simplified, or built from published figures; nothing comes from memory. `radiation.py` loads and validates the registry and finds the zones a route (by its segments, together with its access and interest points) is inside or within the margin of. Registry validation and known inside/outside places are pinned by tests.
+`data/radiation_zones.json` holds thirteen zones, each with geometry, a bilingual name, contamination, status and event, an `approximate` flag with a bilingual note where the shape is not a published outline, and cited sources (each checked by reading the source while researching; see `data/README.md`, which also lists what was researched and left out and why). Geometry is taken from OpenStreetMap through Nominatim and simplified, or built from published figures; nothing comes from memory. `radiation.py` loads and validates the registry and finds the zones a route (by its segments, together with its access and interest points) is inside or within the margin of. Registry validation and known inside/outside places are pinned by tests.
 
 **Files:**
 - Create: `skills/osm-day-route-day-plan/tests/test_radiation_registry.py`
@@ -629,7 +629,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Create: `skills/osm-day-route-day-plan/data/radiation_zones.json`
 - Create: `skills/osm-day-route-day-plan/data/README.md`
 
-- [ ] **Step 1: Add the tests** (55 tests in the file(s) below)
+- [ ] **Step 1: Add the tests** (62 tests in the file(s) below)
 
 Create `skills/osm-day-route-day-plan/tests/test_radiation_registry.py`:
 
@@ -659,6 +659,7 @@ EXPECTED_BBOX = {
     "ru-central-chernobyl-districts": (33.5, 52.9, 38.0, 54.4),
     "de-bavaria-wild-food-areas": (10.9, 47.3, 14.0, 49.4),
     "ru-yenisei-mcc-floodplain": (93.0, 56.0, 94.0, 57.2),
+    "no-wild-mushroom-municipalities": (8.6, 61.0, 14.7, 65.95),
 }
 
 
@@ -688,7 +689,8 @@ def test_approximate_zones_say_how_their_shape_was_made():
     approximate = [z for z in REGISTRY["zones"] if z["approximate"]]
     assert {z["id"] for z in approximate} == {
         "ural-eurt-trace", "ural-techa-river", "ural-mayak-site", "ural-karachay", "ru-bryansk-contaminated-districts",
-        "ru-central-chernobyl-districts", "de-bavaria-wild-food-areas", "ru-yenisei-mcc-floodplain"}
+        "ru-central-chernobyl-districts", "de-bavaria-wild-food-areas", "ru-yenisei-mcc-floodplain",
+        "no-wild-mushroom-municipalities"}
     assert all(len(z["geometry_note"]["en"]) > 40 and len(z["geometry_note"]["ru"]) > 40 for z in approximate)
 
 
@@ -724,6 +726,9 @@ KNOWN_INSIDE = {
     "Berchtesgaden": ((13.0, 47.63), "de-bavaria-wild-food-areas"),
     "Mittenwald": ((11.26, 47.44), "de-bavaria-wild-food-areas"),
     "Yenisei at the combine": ((93.5264, 56.3085), "ru-yenisei-mcc-floodplain"),
+    "Beitostølen (Øystre Slidre)": ((8.91, 61.25), "no-wild-mushroom-municipalities"),
+    "Lierne": ((13.6, 64.46), "no-wild-mushroom-municipalities"),
+    "Hattfjelldal": ((13.99, 65.6), "no-wild-mushroom-municipalities"),
     "Karachay": ((60.7997, 55.6783), "ural-karachay"),
     "Mayak": ((60.9, 55.7333), "ural-mayak-site"),
 }
@@ -731,7 +736,7 @@ KNOWN_CLEAN = {"Kyiv": (30.52, 50.45), "Moscow": (37.62, 55.75), "Madrid": (-3.7
                "Ekaterinburg": (60.60, 56.84), "Chelyabinsk": (61.40, 55.16), "Minsk": (27.56, 53.90),
                "Argayash (south of Mayak)": (60.87, 55.49), "Shadrinsk (east of the trace)": (63.63, 56.09),
                "Kyshtym (upwind, west of Mayak)": (60.56, 55.71), "Kaluga city": (36.26, 54.51),
-               "Munich": (11.58, 48.14), "Hamburg": (9.99, 53.55), "Krasnoyarsk city": (92.87, 56.01)}
+               "Oslo": (10.75, 59.91), "Trondheim": (10.40, 63.43), "Stockholm": (18.07, 59.33), "Munich": (11.58, 48.14), "Hamburg": (9.99, 53.55), "Krasnoyarsk city": (92.87, 56.01)}
 
 
 @pytest.mark.parametrize("name", sorted(KNOWN_INSIDE))
@@ -1603,6 +1608,51 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
     }
    ],
    "advice": "full"
+  },
+  {
+   "id": "no-wild-mushroom-municipalities",
+   "severity": "info",
+   "advice": "mushrooms",
+   "approximate": true,
+   "name": {
+    "en": "Norwegian mountain municipalities with the highest caesium in wild mushrooms",
+    "ru": "Горные коммуны Норвегии с самым высоким содержанием цезия в диких грибах"
+   },
+   "contamination": {
+    "en": "caesium-137 from the 1986 Chernobyl accident",
+    "ru": "цезий-137 после Чернобыльской аварии 1986 года"
+   },
+   "status": {
+    "en": "The Norwegian Radiation and Nuclear Safety Authority (DSA, report 2/2026) finds the highest caesium levels in wild mushrooms from the most contaminated areas of Innlandet, Trøndelag and Nordland (2017–2025: up to 17 000 Bq/kg in gypsy mushroom from Øystre Slidre, 12 000 Bq/kg in another edible species from Lierne) and no clear decline over the last decade. It advises against taking in more than 80 000 Bq of caesium a year, which concerns people who eat very large amounts of wild food from the hard-hit areas; the national limits were removed in 2025.",
+    "ru": "Норвежское управление радиационной и ядерной безопасности (DSA, доклад 2/2026) находит самое высокое содержание цезия в диких грибах из наиболее загрязнённых районов Иннландета, Трёнделага и Нурланна (в 2017–2025 годах до 17 000 Бк/кг в морщинистом кольцевике (норв. rimsopp) из Эйстре-Слидре, 12 000 Бк/кг в другом съедобном виде из Лирне) и не видит явного снижения за последнее десятилетие. Оно советует не получать более 80 000 Бк цезия в год, что касается людей, которые едят очень много дикой пищи из сильно пострадавших районов; национальные пределы отменены в 2025 году."
+   },
+   "event": {
+    "en": "Chernobyl accident, 1986",
+    "ru": "Чернобыльская авария 1986 года"
+   },
+   "geometry": {
+    "type": "polygons",
+    "rings": [
+     [[8.7215, 61.3987], [8.8271, 61.3364], [8.8253, 61.2892], [8.7994, 61.2944], [8.7457, 61.2674], [8.7677, 61.2516], [8.8, 61.2535], [8.8239, 61.2327], [8.8526, 61.2351], [8.8978, 61.2066], [8.8791, 61.1677], [9.0125, 61.1527], [9.0062, 61.1182], [9.0681, 61.0904], [9.069, 61.0755], [9.1703, 61.0509], [9.3743, 61.0946], [9.4197, 61.1272], [9.4219, 61.1761], [9.466, 61.2407], [9.3009, 61.2925], [9.2949, 61.3133], [9.1914, 61.3547], [9.1932, 61.3416], [9.1732, 61.3434], [9.1424, 61.3673], [9.0162, 61.4066], [8.7806, 61.4508], [8.7215, 61.3987]],
+     [[9.1121, 61.7183], [9.1382, 61.675], [9.115, 61.5919], [9.2112, 61.5604], [9.2943, 61.5859], [9.4011, 61.6492], [9.4374, 61.6383], [9.5552, 61.6705], [9.7464, 61.8249], [9.9254, 61.8333], [10.0155, 61.8844], [9.8044, 61.9123], [9.6659, 61.9132], [9.6245, 61.9483], [9.5774, 61.9574], [9.3689, 61.8863], [9.3158, 61.8891], [9.292, 61.8469], [9.3768, 61.832], [9.3834, 61.8217], [9.415, 61.8276], [9.4309, 61.8155], [9.3312, 61.7751], [9.2482, 61.7957], [9.2018, 61.7936], [9.2059, 61.776], [9.1195, 61.756], [9.1121, 61.7183]],
+     [[9.0103, 62.0472], [9.015, 62.0176], [9.1069, 61.9593], [9.1654, 61.9457], [9.2173, 61.9105], [9.3158, 61.8891], [9.3689, 61.8863], [9.5774, 61.9574], [9.6245, 61.9483], [9.6659, 61.9132], [9.8482, 61.9038], [9.8702, 61.9495], [9.8388, 62.0134], [9.8764, 62.0405], [9.9267, 62.0466], [9.9141, 62.0667], [9.866, 62.095], [9.7652, 62.1232], [9.6508, 62.1393], [9.5838, 62.1846], [9.612, 62.199], [9.6438, 62.1969], [9.7309, 62.2651], [9.7925, 62.2879], [9.6019, 62.2557], [9.4839, 62.2923], [9.2127, 62.3431], [9.3192, 62.2532], [9.2874, 62.1964], [9.0943, 62.1266], [9.0789, 62.1116], [9.1078, 62.1053], [9.104, 62.0892], [9.0576, 62.0516], [9.0103, 62.0472]],
+     [[9.5838, 62.1846], [9.6508, 62.1393], [9.7652, 62.1232], [9.866, 62.095], [9.9122, 62.0685], [9.928, 62.0475], [9.8764, 62.0405], [9.8388, 62.0134], [9.8702, 61.9495], [9.8482, 61.9038], [10.0155, 61.8844], [10.0134, 61.9101], [10.0861, 61.9066], [10.1317, 61.9495], [10.1626, 61.9515], [10.1221, 61.9716], [10.1657, 62.0416], [10.3916, 62.1967], [10.334, 62.2415], [10.339, 62.2884], [10.223, 62.3229], [10.2402, 62.376], [10.1661, 62.3911], [10.1655, 62.4034], [10.1058, 62.4006], [10.0976, 62.4278], [9.9518, 62.3972], [9.9342, 62.3552], [9.9003, 62.3444], [9.8393, 62.3621], [9.8214, 62.3428], [9.8548, 62.331], [9.8336, 62.3287], [9.8273, 62.2992], [9.7309, 62.2651], [9.6438, 62.1969], [9.612, 62.199], [9.5838, 62.1846]],
+     [[13.0695, 64.4338], [13.1263, 64.3529], [13.2176, 64.3127], [13.248, 64.253], [13.2111, 64.0954], [13.7154, 64.0463], [13.9675, 64.008], [14.1571, 64.1951], [14.1139, 64.4625], [14.0852, 64.4782], [13.8912, 64.5071], [13.6543, 64.5803], [13.9313, 64.8221], [13.5267, 64.7655], [13.3767, 64.7265], [13.3847, 64.6973], [13.3334, 64.6669], [13.2673, 64.5884], [13.091, 64.503], [13.0695, 64.4338]],
+     [[11.2719, 63.0038], [11.464, 62.9751], [11.5053, 62.9228], [11.5809, 62.88], [11.781, 62.8949], [11.8079, 62.8292], [12.1364, 62.7479], [12.0747, 62.9025], [12.2182, 63.0003], [12.0525, 63.1834], [11.932, 63.1942], [11.6308, 63.1807], [11.6318, 63.1446], [11.4862, 63.1113], [11.4345, 63.1135], [11.4148, 63.1021], [11.3712, 63.1099], [11.2719, 63.0038]],
+     [[13.6256, 65.7239], [13.6865, 65.6253], [13.7409, 65.5982], [13.7228, 65.5764], [13.769, 65.5546], [13.7137, 65.5231], [13.8073, 65.5137], [13.8766, 65.4871], [13.823, 65.4505], [13.8338, 65.4235], [13.8638, 65.4148], [13.8412, 65.3988], [13.7874, 65.3932], [13.7952, 65.3328], [13.76, 65.3158], [13.817, 65.2955], [13.7817, 65.2632], [13.8728, 65.2574], [13.7961, 65.229], [13.7964, 65.2092], [13.7106, 65.1607], [13.6611, 65.1083], [14.0122, 65.1295], [14.0639, 65.122], [14.1643, 65.1392], [14.2525, 65.1314], [14.2967, 65.1151], [14.326, 65.1189], [14.3788, 65.2476], [14.5068, 65.3097], [14.4988, 65.5213], [14.5415, 65.7008], [14.6255, 65.8118], [14.6023, 65.8622], [14.3733, 65.8617], [14.3064, 65.8916], [14.1584, 65.8561], [14.1626, 65.8357], [14.0817, 65.7849], [14.0066, 65.7763], [13.9416, 65.7853], [13.8708, 65.7658], [13.8298, 65.7844], [13.7937, 65.7837], [13.7808, 65.7711], [13.6746, 65.7643], [13.6256, 65.7239]]
+    ]
+   },
+   "geometry_note": {
+    "en": "Outline from OpenStreetMap (© OpenStreetMap contributors, ODbL), municipalities Øystre Slidre (relation 412431), Sel (412411), Dovre (412408), Folldal (412547), Lierne (407217), Tydal (406502) and Hattfjelldal (408200), simplified; these are the municipalities of the three counties where DSA samples mushrooms and that the report singles out as most contaminated or names among its sampling sites, whole municipalities; Orkland, also sampled, is not outlined because the report does not single it out",
+    "ru": "Контур из OpenStreetMap (© участники OpenStreetMap, ODbL), коммуны Øystre Slidre (relation 412431), Sel (412411), Dovre (412408), Folldal (412547), Lierne (407217), Tydal (406502) и Hattfjelldal (408200), упрощены; это коммуны трёх фюльке, где DSA берёт пробы грибов, которые доклад выделяет как самые загрязнённые или называет среди пунктов отбора, коммуны целиком; Orkland, где тоже берутся пробы, не оконтурена, потому что доклад её не выделяет"
+   },
+   "sources": [
+    {
+     "url": "https://www.dsa.no/publikasjoner/radioaktivitet-i-norsk-mat/DSA-rapport%2002-2026%20Radioaktivitet%20i%20norsk%20mat.pdf",
+     "title": "DSA report 2/2026: Radioaktivitet i norsk mat, results of the food monitoring 2017–2025",
+     "kind": "primary"
+    }
+   ]
   }
  ]
 }
@@ -1673,17 +1723,19 @@ A hand-curated list of contaminated or closed zones, read by
 | `kz-semipalatinsk-test-site` | OSM way 932505322 (boundary=hazard) | National Nuclear Center of Kazakhstan, radioecological surveys |
 | `ru-central-chernobyl-districts` | OSM boundaries of nine districts (Tula: Arsenyevsky, Belevsky, Plavsky, Chernsky, Shchekinsky; Kaluga: Zhizdra, Ulyanovo, Khvastovichi; Orel: Bolkhov) | Government decree No. 1074 of 8 Oct 2015 (the list itself, read at government.ru: zone of residence with the right to resettle) |
 | `de-bavaria-wild-food-areas` | OSM: Bayerischer Wald region, Landkreis Berchtesgadener Land, Mittenwald, Karlshuld (stands for the Donaumoos) | BfS press release of 10 Sep 2024 (regions, 600 Bq/kg, moderate consumption harmless) |
+| `no-wild-mushroom-municipalities` | OSM boundaries of seven municipalities (Innlandet: Øystre Slidre, Sel, Dovre, Folldal; Trøndelag: Lierne, Tydal; Nordland: Hattfjelldal); Orkland is sampled too but not singled out, so it is not outlined | DSA report 2/2026 (April 2026): highest caesium in wild mushrooms from the most contaminated areas of Innlandet, Trøndelag and Nordland, 17 000 Bq/kg at Øystre Slidre, no clear decline, advice 80 000 Bq a year |
 | `ru-yenisei-mcc-floodplain` | OSM relation 181988 (Yenisei), main channel, first 100 km below the vertex nearest to Zheleznogorsk, half-width 2 km assumed | Scientific Reports 7:11132 (2017): floodplain contaminated, particles from the combine to more than 800 km downstream |
 
 ## Researched and not added
 
 | Candidate | What the sources say | Why it is not in the registry |
 |---|---|---|
-| Totskoye 1954 (52°38′N 52°48′E) | The IAEA reference (read) lists the exercise but gives no contamination outline. A Radium Institute soil study of 1996–2000 (Radiochemistry, 2005) is reported, in the abstract seen in a search, to find plutonium of global-fallout composition; the full text was not read. | No outline to draw; read the study in full before deciding. |
+| Totskoye 1954 (52°38′N 52°48′E) | Read (abstracts; the full texts sit behind publishers): Dubasov et al., Radium Institute, Radiochemistry 46(6), 2004 — soil plutonium has the isotopic composition of global fallout, so either no long-lived fission products from the 1954 explosion or levels within the fluctuations of global fallout; induced cobalt-60 and europium-152 only at the epicentre. Boev et al. (Orenburg, 1994 data, 1996 symposium) — plutonium in topsoil 5–20 times background, strontium and caesium 1.5 times; Gig. Sanit. 1998 — caesium higher than in a control area. | The studies disagree, give no absolute levels or area, and the largest excess of caesium is a factor of 1.5: no basis for a warning or an outline. |
 | Novaya Zemlya | IAEA reference (read): raised dose rates only on small plots in three test areas (Chernaya Bay, Matochkin Shar, Sukhoy Nos); elsewhere caesium-137 about 3.3 kBq/m², the regional background. | Local plots of at most about 1 km² without published coordinates; the archipelago is a closed test site, which is an access note (`people_hazards`), not a contamination zone. |
 | Seversk (Tomsk-7), 1993 | IAEA report (read): the area above 0.2 µGy/h fell from 30 km² in May 1993 to nothing by January 1994. | No lasting outline. |
 | Peaceful underground explosions (Taiga 61.30°N 56.60°E, Kraton-3 65°N 112°E, Crystal 66.8°N 113.9°E, Globus-1 in the Ivanovo region) | Sites and local raised dose rates appear in search results and news (for Kraton-3 0.5–1.4 µSv/h in places against 0.08 in the forest); the survey papers were not read. | No published extents; read the surveys first. |
-| Norway and Sweden | The Norwegian authority (read) names north-western Eastern Norway, northern Trøndelag and southern Nordland, and gives no current levels. Five Swedish counties come from a search snippet only. | County-sized areas from general statements would warn far too many walkers; needs current per-area figures. |
+| Sweden and Finland | The Swedish National Food Agency (search result and press release) says berries, mushrooms and game can be eaten throughout Sweden without a health risk from caesium, levels being generally low; STUK (Finland, search results) puts Chernobyl food contamination at under 1 % of the average annual dose. | The authorities themselves see no need for an advisory; not added. |
+| Peaceful explosions, measured | Ramzaev et al., J. Environ. Radioact. 92 (2007): caesium-137 at the Crystal site (Yakutia) 1.3–64 kBq/m², at Kraton-3 1.7–6900 kBq/m² (the maximum on a decontaminated plot) against a background of about 0.84 kBq/m². | Confirms real local contamination, but the paper gives no extents or coordinates of the plots; no outline. |
 | Sellafield, La Hague, Andreeva Bay, Wismut, Jáchymov, Balkan depleted uranium | Not researched. | Operating or closed facilities and point hazards (radon in mine workings, penetrator fragments): access notes rather than land-contamination zones. |
 ````
 
@@ -1706,7 +1758,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Create: `skills/osm-day-route-day-plan/tests/test_radiation.py`
 - Create: `skills/osm-day-route-day-plan/scripts/day_plan/plugins/radiation.py`
 
-- [ ] **Step 1: Add the tests** (14 tests in the file(s) below)
+- [ ] **Step 1: Add the tests** (15 tests in the file(s) below)
 
 Create `skills/osm-day-route-day-plan/tests/test_radiation.py`:
 
@@ -1785,6 +1837,14 @@ def test_an_advisory_area_gets_an_info_line_and_only_the_mushroom_advice(make_ro
     assert [(w.severity, w.pinned) for w in section.warnings] == [("info", False)]
     assert "Consider changing the route" not in md and section.confidence == "tag-backed"
     assert "https://www.bfs.de/SharedDocs/Pressemitteilungen/BfS/DE/2024/013.html" in section.sources
+
+
+def test_the_norwegian_mountain_municipalities_are_an_info_line_with_the_dsa_source(make_route, fixed_now):
+    section = run(make_route, fixed_now, ((8.90, 61.24, 900.0), (8.93, 61.26, 950.0)), folder="no")
+    assert "Norwegian mountain municipalities with the highest caesium in wild mushrooms** (advisory area)" in section.markdown
+    assert "80 000 Bq of caesium a year" in section.markdown and [w.severity for w in section.warnings] == ["info"]
+    assert any("dsa.no/publikasjoner/radioaktivitet-i-norsk-mat" in u for u in section.sources)
+    assert section.confidence == "tag-backed"
 
 
 def test_being_near_an_advisory_area_says_nothing(make_route, fixed_now):
@@ -2423,7 +2483,7 @@ Modify `README.md` — apply this patch (`patch -p1`):
    - *Fire danger:* the official Fire Weather Index (Copernicus GWIS, up to 8 days ahead), the Russian Nesterov class for routes in Russia, and active fires detected near the route by satellite.
    - *Ticks and biting insects:* ticks, mosquitoes, blackflies and midges, horseflies, estimated from temperature, wind, humidity and water near the route. Especially useful for Siberia and the Urals.
    - *Air:* pollen (Europe up to about 45° E; for the rest of Russia the plan points to Yandex Weather) and pollution (European AQI, PM10, PM2.5, ozone), up to about 4 days ahead.
-+  - *Radiation*, listed first when it applies: the route and its points are checked against a hand-made registry of contaminated or closed areas (the East Urals trace and reserve, the Techa river, Mayak and Lake Karachay, the Chernobyl zones in Ukraine and Belarus, the Bryansk, Tula, Kaluga and Orel districts, the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-food areas in Bavaria). A hit gives a warning at the top of the plan: do not pick mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires. No hit means "no entry in the registry", not "safe". The registry is incomplete and some outlines are approximate; the plan says which.
++  - *Radiation*, listed first when it applies: the route and its points are checked against a hand-made registry of contaminated or closed areas (the East Urals trace and reserve, the Techa river, Mayak and Lake Karachay, the Chernobyl zones in Ukraine and Belarus, the Bryansk, Tula, Kaluga and Orel districts, the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-mushroom areas in Bavaria and Norway). A hit gives a warning at the top of the plan: do not pick mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires. No hit means "no entry in the registry", not "safe". The registry is incomplete and some outlines are approximate; the plan says which.
 +  - *People and access:* only sourced notes Claude recorded (permit or border zones, travel advisories, access restrictions). Animals are recorded with the insect notes.
    - Regional knowledge Claude finds on the web (fire bans, avalanche bulletins, insect seasons) is added with its sources when recorded.
 +- **Mobile coverage:** the masts OpenStreetMap knows near your route, practical advice (offline maps, tell someone your plan, power bank, 112) and links to coverage maps. OpenStreetMap lists only some masts, so this is not a signal forecast.
@@ -2529,7 +2589,7 @@ Modify `skills/osm-day-route-day-plan/SKILL.md` — apply this patch (`patch -p1
  - Every fact needs at least one `http(s)` source, or it is refused (and, if
    found in the file, ignored). Say only what the source says.
  - **Privacy:** facts end up in `day-plan-<date>.md`, embedded in a `map.html`
-@@ -196,8 +208,34 @@
+@@ -196,8 +208,35 @@
    map in Yandex Weather. The Nesterov class is a simplified computation and is
    shown for Russian routes only.
  - Insect levels are a weather and habitat estimate, not a measurement.
@@ -2543,13 +2603,14 @@ Modify `skills/osm-day-route-day-plan/SKILL.md` — apply this patch (`patch -p1
 +  regions (government decree No. 1074), the Semipalatinsk test site, the
 +  Yenisei floodplain below Zheleznogorsk (first 100 km) and, as an
 +  advisory-only tier, four Bavarian areas where wild mushrooms can still
-+  exceed the caesium limit (BfS). **Researched and left out on purpose**
-+  (the sources show only local plots, a contamination that has decayed away,
-+  or no outline): Totskoye 1954, Novaya Zemlya, the Seversk 1993 trace and
-+  the peaceful underground explosions. **Not researched yet:** Scandinavian
-+  hotspots (the Norwegian authority names regions only in general terms),
-+  Wismut, Jachymov, La Hague, Sellafield, Andreeva Bay and Balkan
-+  depleted-uranium sites; `data/README.md` says why for each. A route with no hit is told "no entry in
++  exceed the caesium limit (BfS) and seven Norwegian mountain municipalities
++  with the highest caesium in wild mushrooms (DSA). **Researched and left out
++  on purpose** (the sources show only local plots, a contamination that has
++  decayed away, contradict each other or say no warning is needed): Totskoye
++  1954, Novaya Zemlya, the Seversk 1993 trace, the peaceful underground
++  explosions, Sweden and Finland. **Not researched yet:** Wismut, Jachymov, La
++  Hague, Sellafield, Andreeva Bay and Balkan depleted-uranium sites;
++  `data/README.md` says why for each. A route with no hit is told "no entry in
 +  the registry", never "safe". Zones have three tiers: `danger` (closed or
 +  heavily contaminated land), `caution` (a wide affected area) and `info` (an
 +  advisory area, only mushroom and game advice, no pinned warning). The
@@ -2566,7 +2627,7 @@ Modify `skills/osm-day-route-day-plan/SKILL.md` — apply this patch (`patch -p1
  
  ## Common Mistakes
  
-@@ -211,6 +249,12 @@
+@@ -211,6 +250,12 @@
  - Editing `facts.json` by hand (use `record_fact.py`: it validates, refuses
    source-less facts and never overwrites a file it cannot parse).
  - Forgetting to re-render `map.html` after adding a plan.

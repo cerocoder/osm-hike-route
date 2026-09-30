@@ -176,3 +176,37 @@ def test_get_elevations_does_not_write_cache_for_batch_that_resolved_nothing(tmp
     assert result == [None] * 5
     mock_write.assert_not_called()
     assert not (tmp_path / "elevation.json").exists()
+
+
+class _Recorder:
+    def __init__(self):
+        self.ticks = []
+
+    def tick(self, done, total, key="tag_progress", **params):
+        self.ticks.append((done, total, key))
+
+
+def test_get_elevations_ticks_once_per_batch_and_remembers_the_cache_share(tmp_path):
+    points = [(55.0 + i * 0.001, 37.0) for i in range(5)]
+    provider = _FakeProvider("p1", max_batch=2, responses={p: 100.0 + i for i, p in enumerate(points)})
+    service = ElevationService([provider], cache_path=tmp_path / "elevation.json")
+    recorder = _Recorder()
+
+    service.get_elevations(points[:1], progress=recorder)                      # one point goes to the cache
+    recorder = _Recorder()
+    service.get_elevations(points, progress=recorder)
+
+    assert recorder.ticks == [(1, 2, "elevation_batch"), (2, 2, "elevation_batch")]     # 4 pending points, 2 per batch
+    assert service.last_request == {"points": 5, "cached": 1}
+
+
+def test_the_tick_total_grows_when_a_failover_needs_more_requests(tmp_path):
+    points = [(55.0 + i * 0.001, 37.0) for i in range(4)]
+    failing = _FakeProvider("p1", max_batch=4, fail=True)
+    working = _FakeProvider("p2", max_batch=2, responses={p: 1.0 for p in points})
+    service = ElevationService([failing, working], cache_path=tmp_path / "elevation.json")
+    recorder = _Recorder()
+
+    service.get_elevations(points, progress=recorder)
+
+    assert recorder.ticks == [(1, 1, "elevation_batch"), (2, 2, "elevation_batch"), (3, 3, "elevation_batch")]

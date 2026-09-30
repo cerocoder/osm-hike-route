@@ -16,8 +16,12 @@ class ElevationService:
         self._dataset = dataset
         self._cache = load_cache(self._cache_path)
         self._last_call_time: dict[str, float] = {}
+        self.last_request = {"points": 0, "cached": 0}       # of the latest get_elevations call, for a summary line
 
-    def get_elevations(self, locations: list[tuple[float, float]]) -> list[float | None]:
+    def get_elevations(self, locations: list[tuple[float, float]], progress=None) -> list[float | None]:
+        """Elevation per location (None where no provider knew it). `progress` (optional, see progress.py) gets a
+        tick per provider request: elevation_batch done/total (total counts the first provider's batches and grows
+        if a failover needs more)."""
         results: list[float | None] = [None] * len(locations)
         pending_indices = []
         for i, (lat, lon) in enumerate(locations):
@@ -26,6 +30,9 @@ class ElevationService:
                 results[i] = self._cache[key]["elevation"]
             else:
                 pending_indices.append(i)
+        self.last_request = {"points": len(locations), "cached": len(locations) - len(pending_indices)}
+        batches_done = 0
+        batches_total = -(-len(pending_indices) // self._providers[0].max_batch) if self._providers else 0
 
         for provider in self._providers:
             if not pending_indices:
@@ -34,6 +41,10 @@ class ElevationService:
             for batch_indices in self._chunk(pending_indices, provider.max_batch):
                 batch_locations = [locations[i] for i in batch_indices]
                 self._respect_rate_limit(provider)
+                batches_done += 1
+                batches_total = max(batches_total, batches_done)
+                if progress is not None:
+                    progress.tick(batches_done, batches_total, "elevation_batch")
                 try:
                     batch_results = provider.fetch(batch_locations)
                 except Exception:

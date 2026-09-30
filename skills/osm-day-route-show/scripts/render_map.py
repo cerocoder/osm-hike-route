@@ -155,8 +155,8 @@ SECTION_ALIASES = {
         "Come arrivare", "Accesso",
     ],
     "confidence": [
-        "Interest-layer confidence", "Points of interest", "Interest layers",
-        "Точки интереса", "Пункты интереса", "точек интереса", "Достопримечательности",
+        "Interest-layer confidence", "Points of interest", "Interest layers", "Order of points",
+        "Точки интереса", "Пункты интереса", "точек интереса", "Достопримечательности", "Порядок точек",
         "Puntos de interés", "Puntos de interes",
         "Points d'intérêt", "Points d'interet",
         "Sehenswürdigkeiten", "Interessante Orte",
@@ -313,6 +313,26 @@ def lang_priority(user_lang: str, local_lang: str | None) -> list[str]:
 # ---------------------------------------------------------------------------
 # notes.md -> HTML
 # ---------------------------------------------------------------------------
+
+def interest_points_markdown(geojson: dict) -> str:
+    """A markdown bullet list of the route's own points (everything but access points) for the panel's
+    "Points of interest" block when notes.md has no section the aliases recognise: the points are in
+    route.geojson anyway, so the block must not say there are none. Only http(s) sources become links."""
+    lines = []
+    for feature in geojson.get("features", []):
+        props = feature.get("properties") or {}
+        if feature.get("geometry", {}).get("type") != "Point" or props.get("type") == "access" or not props.get("name"):
+            continue
+        meta = ", ".join(str(props[k]) for k in ("type", "tier") if props.get(k))
+        line = f"- **{props['name']}**" + (f" ({meta})" if meta else "")
+        if props.get("note"):
+            line += f": {props['note']}"
+        source = props.get("source")
+        if isinstance(source, str) and source.startswith(("http://", "https://")):
+            line += f" [{source.split('/')[2]}]({source})"
+        lines.append(line)
+    return "\n".join(lines)
+
 
 def extract_md_section(md_text: str, section_key: str) -> str:
     """Returns the body of the first '## ...<alias>...' heading matching any
@@ -793,7 +813,7 @@ def build_map_html(geojson_path: Path, notes_path: Path | None, title: str,
     notes = notes_path.read_text(encoding="utf-8") if notes_path and notes_path.exists() else ""
     placeholder = f'<p><em>{t("no_section", user_lang)}</em></p>'
     access = extract_md_section(notes, "access")
-    confidence = extract_md_section(notes, "confidence")
+    confidence = extract_md_section(notes, "confidence") or interest_points_markdown(geojson)
     access_html = f"<h3>{t('getting_there', user_lang)}</h3>{markdown_to_html(access) if access else placeholder}"
     confidence_html = f"<h3>{t('interest_layers', user_lang)}</h3>{markdown_to_html(confidence) if confidence else placeholder}"
 

@@ -54,6 +54,9 @@ def fwi_url(lat: float, lon: float, date: datetime.date) -> str:
     return _url(FWI_LAYER, lat, lon, date.isoformat())
 
 
+MISSING_VALUE = -9000.0         # values at or below this are GWIS's "no data" marker (-9999 in winter and at the poles)
+
+
 def _number(text: str) -> float | None:
     m = re.match(r"\s*(-?\d+(?:\.\d+)?)", text)
     return float(m.group(1)) if m else None
@@ -64,8 +67,9 @@ def parse_fwi(html: str) -> dict | None:
     values = {}
     for label, value in _ROW.findall(html or ""):
         for marker, key in _FWI_LABELS:
-            if marker in label and _number(value) is not None:
-                values[key] = _number(value)
+            number = _number(value)
+            if marker in label and number is not None and number > MISSING_VALUE:     # GWIS writes -9999 for "no value"
+                values[key] = number
     return values if "FWI" in values else None
 
 

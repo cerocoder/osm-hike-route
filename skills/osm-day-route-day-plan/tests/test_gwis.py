@@ -155,3 +155,11 @@ def test_an_empty_fwi_answer_is_remembered_for_a_day_only_even_for_a_past_date(m
     ctx.cache._data["gwis_fwi|56.84|60.60|2026-06-10"]["t"] = fixed_now.timestamp() - 2 * 24 * 3600
     assert fwi_at(ctx, 56.84, 60.6, ctx.date) is None
     assert len(text.calls) == 2
+
+
+def test_gwis_minus_9999_marks_a_missing_value_not_a_real_index():
+    html = FWI_HTML.replace("9.5045595", "-9999.0").replace("29.865156", "-9999.0")
+    assert parse_fwi(html) is None                                   # no FWI at all: no value, never "very low"
+    partial = FWI_HTML.replace("29.865156", "-9999.0")
+    values = parse_fwi(partial)
+    assert "BUI" not in values and values["FWI"] == pytest.approx(9.5045595)

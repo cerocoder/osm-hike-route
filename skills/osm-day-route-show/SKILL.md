@@ -142,15 +142,15 @@ Two independent language concerns, handled differently — see `UI_STRINGS`,
   per-source localized labels aren't implemented for this round. Any
   other language, or any individual key missing for a listed one, falls
   back to English — never left blank. `<html lang="...">` is set to
-  `--user-lang` regardless of whether a translation exists for it. Route
-  mode labels (`route_stats_html`'s "walking"/"на велосипеде" etc.) follow
+  `--user-lang` regardless of whether a translation exists for it. The
+  type of the outing (`route_stats_html`'s "on foot"/"вело (спорт)" etc.) follows
   the same fallback-to-English rule, but only for `en`/`ru` — see the
   known limitation below.
   - **Known limitation — the route-stats block is not fully localized**:
     unlike `UI_STRINGS`' full `en`/`ru`/`es`/`fr`/`de`/`pt`/`it` coverage,
-    `_MODE_LABELS` (the mode name itself, "walking"/"пешком") only has
+    `_ACTIVITY_LABELS` (the type of the outing, "on foot"/"пешком") only has
     `en` and `ru` entries — any other `--user-lang` falls back to the
-    *English* mode label ("walking"/"cycling"), not a translation (a raw
+    *English* label ("on foot"/"cycling"), not a translation (a raw
     enum value like `"walk"` only surfaces for a mode this table doesn't
     know at all). Worse, the stats block's own `<h3>Route</h3>` heading
     and several of `route_stats_html`'s units/phrases are hardcoded
@@ -385,7 +385,7 @@ gracefully:
 
 | Property | Used for |
 |---|---|
-| `mode` | `"walk"` or `"bike"` — a missing value **defaults to `"walk"`** rather than erroring, for backward compatibility with pre-this-round archives that predate the `mode` property entirely. The value is then looked up in `_MODE_LABELS` for display (`--user-lang`, falling back to English): `walk` → "walking" (en) / "пешком" (ru); `bike` → "cycling" (en) / "на велосипеде" (ru). |
+| `mode` | `"walk"` or `"bike"` — a missing value **defaults to `"walk"`** rather than erroring, for backward compatibility with pre-this-round archives that predate the `mode` property entirely. The panel shows the type of the outing explicitly through `activity_label(line_properties, user_lang)`, looked up in `_ACTIVITY_LABELS` by (mode, `style`) (`--user-lang`, falling back to English): `walk` → "on foot" / "пешком"; `bike` + `sport` → "cycling (sport)" / "вело (спорт)"; `bike` + `leisure` → "cycling (leisure)" / "вело (прогулка)"; `bike` alone → "cycling" / "вело"; `ski` → "skiing" / "лыжи"; an unknown value is shown raw. |
 | `style` | Shown in parentheses next to the mode label (e.g. a `bike`/`sport` route renders as "cycling (sport)") |
 | `distance_km` | Total route distance, one decimal place |
 | `elevation_gain_m` / `elevation_loss_m` | Shown together as `+NNNm / -NNNm`; a missing `elevation_loss_m` renders as `0` |

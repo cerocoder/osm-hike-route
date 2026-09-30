@@ -9,13 +9,11 @@ Adirondack Explorer), and micro-spikes do not suit steep or demanding ice
 (Mammut's guide). Studded bicycle tires suit compact snow and ice and are not
 useful in deep snow or powder, but no depth is published, so the bicycle
 depths are guesses, labelled `derived` by the caller."""
-import math
 from dataclasses import dataclass, field
 
 from .osm_features import haversine_m
 
 VERDICT_RANK = {"passable": 0, "caution": 1, "danger": 2}
-ICE_RANK = {"none": 0, "moderate": 1, "high": 2}
 
 # ---- configuration ---------------------------------------------------------------------------------------------------
 CLEARED_HIGHWAYS = frozenset({"motorway", "trunk", "primary", "secondary", "tertiary", "residential", "living_street",

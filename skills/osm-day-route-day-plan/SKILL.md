@@ -97,23 +97,36 @@ python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all> --plugin <transit|poi
     [--warning caution:"text"] [--day-type holiday|weekend|workday]
 ```
 
+`--last-departure`, `--first-departure` and `--warning` belong to `transit`
+(`--warning` also to `poi_hours`); `--day-type` belongs to `calendar`. The
+helper refuses an option the plugin would ignore.
+
 - `--plugin transit`: timetables and **directions from the departure point**
   (which train/metro/bus, how long, where to change), frequencies on that
   weekday/holiday. `--last-departure` is the last bus/train/metro *back from
   the route's end point*, as local `HH:MM` (a departure after midnight, like
   `00:20`, is read as the night after the date): the plan compares it with the
   estimated return and warns (danger if the return is later, caution if the
-  margin is under 30 minutes). Use `--warning` for anything the person must
-  see in the Summary (works, replacement buses, closed stations).
+  margin is under 30 minutes). The same return check, and the warning that the
+  return point closes before the return, need `--start` and a route duration
+  (`duration_estimate_hours` in the route file); without them nothing is
+  compared. `--first-departure` is stored but not compared. Use `--warning
+  severity:text` (`danger|caution|info`) for anything the person must see in
+  the Summary (works, replacement buses, closed stations).
 - `--plugin poi_hours`: opening days and special features of the points of
   interest for that date (closed for an event, free days, reservations).
-- `--plugin calendar` with `--day-type`: the real kind of day when the free
-  holiday list is wrong. **For Russia and neighbouring countries always check
-  the date** (official calendar, `consultant.ru` or similar): the free list
-  is incomplete for Russia: it misses 8 January and the transferred days off
-  (for example 9 March and 11 May 2026), and working Saturdays are not marked.
-  Record `holiday`, `weekend`
-  or `workday`; it overrides the list and feeds the opening-hours rules (`PH`).
+- `--plugin calendar` with `--day-type` (`--markdown` is optional then): the
+  real kind of day when the free holiday list is wrong. A calendar fact needs
+  a specific date. `holiday` is any official day off, transferred ones
+  included; `workday` is a working day, working Saturdays included; `weekend`
+  only marks Saturday/Sunday and leaves the public-holiday rule undecided.
+  **For Russia and neighbouring countries always check the date** (official
+  calendar, `consultant.ru` or similar): the free list is incomplete for
+  Russia: it misses 8 January and the transferred days off (for example
+  9 March and 11 May 2026), and working Saturdays are not marked. For a
+  Russian route the script's `hint:` line asks for this fact until one is
+  recorded for the date. It overrides the list and feeds the opening-hours
+  rules (`PH`).
 - Every fact needs at least one `http(s)` source, or it is refused (and, if
   found in the file, ignored). Say only what the source says.
 - **Privacy:** facts end up in `day-plan-<date>.md`, embedded in a `map.html`
@@ -131,7 +144,9 @@ Sections carry a tier like the rest of the project. Light and weather are
 person) and is labelled as such in the text, with its sources. A section that
 could not be built says `no data`. OSM rarely carries schedules: lines through
 a stop usually have no `interval` or `opening_hours`, so expect "not stated in
-OSM" and rely on recorded web facts for timetables.
+OSM" and rely on recorded web facts for timetables. If Overpass fails for
+some access points only, the lines table is followed by the note "Lines for
+some access points could not be loaded"; run the command again later.
 
 A forecast is only as good as its horizon: beyond 15 days the weather table is
 a **climatology** (average of the same date over five previous years) and says

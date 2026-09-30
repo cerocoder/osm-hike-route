@@ -191,11 +191,9 @@ def test_sunrise_bounds_in_line_hours_use_the_light_plugin(make_route_with_point
 
 class PartialWeb:
     """Web that fails Overpass for the first point's coordinates, succeeds for the second."""
-    def __init__(self, first_lat, first_lon, second_lat, second_lon):
+    def __init__(self, first_lat, first_lon):
         self.first_lat = first_lat
         self.first_lon = first_lon
-        self.second_lat = second_lat
-        self.second_lon = second_lon
         self.calls = []
 
     def __call__(self, url):
@@ -215,7 +213,7 @@ class PartialWeb:
 def test_partial_overpass_failure_shows_rows_for_succeeded_points_and_notes_failure(make_route_with_points, fixed_now):
     first = ("A", "access", -3.7, 40.4, {"opening_hours": "Mo-Su 06:00-20:00"})
     second = ("B", "access", -3.6, 40.5, {"opening_hours": "Mo-Su 06:00-20:00"})
-    web = PartialWeb(first[3], first[2], second[3], second[2])
+    web = PartialWeb(first[3], first[2])
     section = _plugin_run(make_route_with_points, fixed_now, [first, second], web=web)
     md = section.markdown
     # Rows for second point are present
@@ -255,7 +253,7 @@ def test_partial_failure_note_absent_when_all_fail(make_route_with_points, fixed
 def test_partial_overpass_failure_shows_russian_note(make_route_with_points, fixed_now):
     first = ("A", "access", -3.7, 40.4, {"opening_hours": "Mo-Su 06:00-20:00"})
     second = ("B", "access", -3.6, 40.5, {"opening_hours": "Mo-Su 06:00-20:00"})
-    web = PartialWeb(first[3], first[2], second[3], second[2])
+    web = PartialWeb(first[3], first[2])
     section = _plugin_run(make_route_with_points, fixed_now, [first, second], web=web, lang="ru")
     md = section.markdown
     # The Russian partial warning is present

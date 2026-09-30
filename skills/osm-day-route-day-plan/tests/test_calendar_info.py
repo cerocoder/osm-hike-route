@@ -1,9 +1,7 @@
 import datetime
 import json
 
-import pytest
-
-from day_plan.calendar_info import DayType, country_code, describe, resolve_day_type
+from day_plan.calendar_info import country_code, describe, resolve_day_type
 from day_plan.context import build_context
 from day_plan.http import HttpError
 
@@ -46,7 +44,7 @@ def test_saturday_that_is_not_a_holiday(make_route, fixed_now):
     assert describe(day, ctx).startswith("Date: Saturday 2026-06-27 — weekend; not a public holiday (Nager.Date, ES)")
 
 
-def test_global_holiday_on_a_weekday(make_route, fixed_now):
+def test_global_holiday_that_falls_on_a_saturday(make_route, fixed_now):
     ctx = _ctx(make_route, fixed_now, FakeWeb(), datetime.date(2026, 8, 15))   # a Saturday in 2026, still a holiday
     day = resolve_day_type(ctx)
     assert day.holiday is True and day.holiday_name == "Asunción"

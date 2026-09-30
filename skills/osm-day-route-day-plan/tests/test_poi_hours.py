@@ -5,7 +5,6 @@ from day_plan.context import build_context
 from day_plan.plugins.poi_hours import PoiHoursPlugin
 
 SAT = datetime.date(2026, 6, 27)
-SUN = datetime.date(2026, 6, 28)
 MON = datetime.date(2026, 6, 29)
 
 

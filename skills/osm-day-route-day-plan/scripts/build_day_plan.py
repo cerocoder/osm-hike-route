@@ -17,14 +17,23 @@ import sys
 from pathlib import Path
 
 from day_plan.context import build_context
+from day_plan.facts import lookup
 from day_plan.http import get_json
 from day_plan.plugins.light import LightPlugin
+from day_plan.plugins.poi_hours import PoiHoursPlugin
+from day_plan.plugins.transit import TransitPlugin
 from day_plan.plugins.weather import WeatherPlugin
 from day_plan.service import build_plan
 
 
 def default_plugins() -> list:
-    return [WeatherPlugin(), LightPlugin()]
+    return [WeatherPlugin(), LightPlugin(), TransitPlugin(), PoiHoursPlugin()]
+
+
+def missing_web_facts(ctx) -> list:
+    """Plugin ids whose web-sourced facts Claude has not recorded yet for this date."""
+    wanted = ["transit"] + (["poi_hours"] if ctx.interest_points else [])
+    return [pid for pid in wanted if lookup(ctx.facts, ctx.date_iso, pid) is None]
 
 
 def coarse_departure(text: str | None) -> tuple[str | None, bool]:
@@ -69,6 +78,11 @@ def main(argv=None, http=get_json, now=None, plugins=None) -> int:
     print(f"wrote {out.resolve()}")
     for plugin_id, reason in result.failures:
         print(f"warning: plugin {plugin_id} failed: {reason}", file=sys.stderr)
+    missing = missing_web_facts(ctx)
+    if missing:
+        print(f"hint: no web-sourced facts recorded for {', '.join(missing)} on {date.isoformat()}: search the "
+              f"web (timetables, directions from the departure point, opening days), record what you find with "
+              f"record_fact.py, then run this command again")
     return 0
 
 

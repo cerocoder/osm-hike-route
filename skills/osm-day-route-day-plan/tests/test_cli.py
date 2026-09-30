@@ -49,3 +49,70 @@ def test_plan_written_by_cli_is_found_by_glob_used_in_show(make_route, weather_r
     route_dir = make_route()
     build_day_plan.main([str(route_dir), "2026-06-21"], http=lambda url: weather_response(), now=fixed_now)
     assert [p.name for p in route_dir.glob("day-plan-????-??-??.md")] == ["day-plan-2026-06-21.md"]
+
+
+# ---- plan 2: transit and points-of-interest sections, web-fact hints ------------------------------
+
+def _web(weather_response, date="2026-06-21"):
+    def http(url):
+        if "nominatim" in url:
+            return {"address": {"country_code": "es"}}
+        if "date.nager.at" in url:
+            return []
+        if "overpass" in url:
+            return {"elements": [{"tags": {"route": "bus", "ref": "41", "from": "Atocha", "to": "Colonia"}}]}
+        return weather_response(date=date)
+    return http
+
+
+def _route_with_points(make_route_with_points):
+    return make_route_with_points([
+        ("Lago", "access", -3.7275, 40.4247, {"role": "start", "opening_hours": "Mo-Su 06:00-23:00"}),
+        ("Museo", "sight", -3.74, 40.43, {"opening_hours": "Tu-Su 10:00-18:00"}),
+    ])
+
+
+def test_default_plan_has_getting_there_and_points_of_interest(make_route_with_points, weather_response, fixed_now):
+    route_dir = _route_with_points(make_route_with_points)
+    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), now=fixed_now) == 0
+    text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
+    headings = [line for line in text.splitlines() if line.startswith("## ")]
+    assert headings == ["## Summary", "## Daylight", "## Weather by hour", "## Getting there", "## Points of interest"]
+    assert "| Lago | start |" in text and "| Museo | sight | 10:00–18:00 |" in text and "| Lago | 41 | bus |" in text
+    assert "<!-- plugins: weather 1, light 1, transit 1, poi_hours 1 -->" in text
+
+
+def test_hint_asks_for_web_facts_until_they_are_recorded(make_route_with_points, weather_response, fixed_now, capsys):
+    route_dir = _route_with_points(make_route_with_points)
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), now=fixed_now)
+    out = capsys.readouterr().out
+    assert "hint: no web-sourced facts recorded for transit, poi_hours on 2026-06-21" in out and "record_fact.py" in out
+
+    import record_fact
+    for plugin in ("transit", "poi_hours"):
+        record_fact.record(route_dir, "2026-06-21", plugin, "Found on the web.", ["https://example.org/x"])
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), now=fixed_now)
+    out2 = capsys.readouterr().out
+    assert "hint:" not in out2
+    assert "Found on the web." in (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
+
+
+def test_hint_mentions_only_what_the_route_needs(make_route, weather_response, fixed_now, capsys):
+    route_dir = make_route()                        # a route without points of interest
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), now=fixed_now)
+    assert "recorded for transit on" in capsys.readouterr().out
+
+
+def test_a_broken_overpass_does_not_break_the_plan(make_route_with_points, weather_response, fixed_now):
+    from day_plan.http import HttpError
+    route_dir = _route_with_points(make_route_with_points)
+    inner = _web(weather_response)
+
+    def http(url):
+        if "overpass" in url:
+            raise HttpError("504")
+        return inner(url)
+
+    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=http, now=fixed_now) == 0
+    text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
+    assert "OSM lists no lines for these access points" in text and "## Points of interest" in text

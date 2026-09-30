@@ -26,15 +26,28 @@ The plan has these sections, always in this order:
    from the route archive, and — from `facts.json` — opening days and special
    features.
 
-Hazards (ticks, biting insects, mountains, air, radiation, fire) and mobile
-coverage are separate follow-up plans; until they exist the plan simply has
-no such sections — never invent them by hand.
+6. **Hazards**, with a `###` sub-heading for each part that applies:
+   **Mountain hazards** (only where the route reaches 600 m or more: cold and
+   freezing level, wind, thunderstorms, snow, terrain from OSM), **Fire
+   danger** (official Fire Weather Index from the Copernicus GWIS service,
+   the Russian Nesterov class for routes in Russia, active fires near the
+   route), **Ticks and biting insects** (ticks, mosquitoes, blackflies and
+   midges, horseflies — estimated from weather and water nearby) and **Air:
+   pollen and pollution** (Open-Meteo CAMS model). A part that does not apply
+   (mountains on a flat route, ticks in winter) is left out, not listed as
+   missing.
+
+Radiation zones, animals, people and mobile coverage are a separate follow-up
+plan; until it exists the plan has no such sections — never invent them by
+hand.
 
 Every script is **stdlib-only** (`urllib.request`/`json`/`zoneinfo`), no API
-keys, same rule as the other two skills. Sources: Open-Meteo (weather),
-Overpass (lines through the access points; mirrors and one retry, because the
-public servers answer 429/504 under load), Nominatim (the route's country,
-asked once per route and remembered) and Nager.Date (public holidays).
+keys, same rule as the other two skills. Sources: Open-Meteo (weather and air
+quality), Overpass (lines through the access points and terrain, water and
+industry near the route; mirrors and one retry, because the public servers
+answer 429/504 under load), Copernicus GWIS (Fire Weather Index and active
+fires), Nominatim (the route's country, asked once per route and remembered)
+and Nager.Date (public holidays).
 
 ## When to Use
 
@@ -90,7 +103,8 @@ Web-sourced material goes into `<route_dir>/facts.json` through the helper —
 never by hand-editing JSON:
 
 ```bash
-python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all> --plugin <transit|poi_hours|calendar> \
+python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all> \
+    --plugin <transit|poi_hours|calendar|fire|mountain|bio_hazards|air> \
     --markdown "text" | --markdown-file note.md \
     --source https://... [--source https://...] \
     [--last-departure HH:MM] [--first-departure HH:MM] \
@@ -98,8 +112,9 @@ python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all> --plugin <transit|poi
 ```
 
 `--last-departure`, `--first-departure` and `--warning` belong to `transit`
-(`--warning` also to `poi_hours`); `--day-type` belongs to `calendar`. The
-helper refuses an option the plugin would ignore.
+(`--warning` also to `poi_hours`, `fire`, `mountain`, `bio_hazards` and
+`air`); `--day-type` belongs to `calendar`. The helper refuses an option the
+plugin would ignore.
 
 - `--plugin transit`: timetables and **directions from the departure point**
   (which train/metro/bus, how long, where to change), frequencies on that
@@ -127,6 +142,13 @@ helper refuses an option the plugin would ignore.
   Russian route the script's `hint:` line asks for this fact until one is
   recorded for the date. It overrides the list and feeds the opening-hours
   rules (`PH`).
+- `--plugin fire|mountain|bio_hazards|air`: regional knowledge the models
+  cannot give — forest-access and open-fire bans, the avalanche bulletin or
+  closed huts and passes, the insect season and peaks of the region, animals
+  (bears, snakes, boar) and hunting seasons, a local pollen or smog alert.
+  The text appears under the matching hazard sub-heading, labelled
+  web-sourced. The script prints an optional `hint (optional):` line for the
+  hazard sections that apply to the route and date; it never blocks the plan.
 - Every fact needs at least one `http(s)` source, or it is refused (and, if
   found in the file, ignored). Say only what the source says.
 - **Privacy:** facts end up in `day-plan-<date>.md`, embedded in a `map.html`
@@ -168,8 +190,14 @@ public-holiday rule" when the holiday status is unknown.
   underestimated.
 - Weekends are Saturday and Sunday; countries with another weekend are not
   handled.
-- Pollen, radiation, fire danger, insects, mountain hazards and mobile
-  coverage are not in this version.
+- Fire Weather Index reaches 8 days ahead, air-quality and pollen data about
+  4 days; beyond that the section says so. Pollen is modelled for Europe only
+  (roughly up to 45° E); for the rest of Russia the plan points to the pollen
+  map in Yandex Weather. The Nesterov class is a simplified computation and is
+  shown for Russian routes only.
+- Insect levels are a weather and habitat estimate, not a measurement.
+- Radiation zones, animals, people and mobile coverage are not in this
+  version.
 
 ## Common Mistakes
 
@@ -183,3 +211,5 @@ public-holiday rule" when the holiday status is unknown.
 - Editing `facts.json` by hand (use `record_fact.py`: it validates, refuses
   source-less facts and never overwrites a file it cannot parse).
 - Forgetting to re-render `map.html` after adding a plan.
+- Recording a `mountain` fact for a flat route or a `bio_hazards` fact in
+  winter: the section does not exist then and the fact is never shown.

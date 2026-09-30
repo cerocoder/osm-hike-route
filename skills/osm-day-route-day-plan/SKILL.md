@@ -97,9 +97,11 @@ live navigation, multi-day plans.
    ```bash
    python3 build_day_plan.py <route_dir> <YYYY-MM-DD> \
        --lang <ISO 639-1 of the person's language> \
-       [--departure "<city or station>"] [--start HH:MM]
+       [--departure "<city or station>"] [--start HH:MM] [--quiet]
    ```
-   Re-running for the same date overwrites that date's file; other dates are
+   While it runs, one progress line per part (weather, daylight, hazards …) is
+   printed to stderr **in the `--lang` language**, with how long each took or
+   why it failed; `--quiet` switches that off. Re-running for the same date overwrites that date's file; other dates are
    kept. Network results are cached in `<route_dir>/day_plan_cache.json`
    (forecasts 3 hours, Overpass lines 7 days, holiday lists 30 days, the
    route's country for good).

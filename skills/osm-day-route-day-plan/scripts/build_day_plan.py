@@ -3,7 +3,10 @@
 
 Standard-library only. Usage:
     python3 build_day_plan.py <route_dir> <YYYY-MM-DD>
-        [--lang <ISO 639-1>] [--departure "<city or station>"] [--start HH:MM]
+        [--lang <ISO 639-1>] [--departure "<city or station>"] [--start HH:MM] [--quiet]
+
+Progress (one line per plugin, in the --lang language, on stderr) is printed when run from the command line;
+--quiet switches it off. Library callers and tests get none unless they pass `progress`.
 
 --departure is written into the file, and the file is meant to be forwarded
 (it is embedded in map.html), so pass a city, station or stop — never a street
@@ -36,6 +39,7 @@ from day_plan.plugins.snow_history import SnowHistoryPlugin
 from day_plan.plugins.trail_passability import TrailPassabilityPlugin
 from day_plan.plugins.transit import TransitPlugin
 from day_plan.plugins.weather import WeatherPlugin
+from day_plan.progress import Progress
 from day_plan.service import build_plan
 
 
@@ -83,13 +87,17 @@ def coarse_departure(text: str | None) -> tuple[str | None, bool]:
     return text.strip(), False
 
 
-def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text) -> int:
+AUTO_PROGRESS = object()        # main(progress=AUTO_PROGRESS): a Progress in the --lang language unless --quiet
+
+
+def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text, progress=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("route_dir")
     parser.add_argument("date", help="YYYY-MM-DD")
     parser.add_argument("--lang", default="en")
     parser.add_argument("--departure", default=None)
     parser.add_argument("--start", default=None, help="planned start time HH:MM")
+    parser.add_argument("--quiet", action="store_true", help="no progress lines")
     args = parser.parse_args(argv)
 
     route_dir = Path(args.route_dir)
@@ -110,7 +118,10 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text) -
 
     ctx = build_context(route_dir, date, lang=args.lang, departure=departure, start_time=start,
                         http=http, http_text=http_text, now=now)
-    result = build_plan(ctx, plugins if plugins is not None else default_plugins())
+    plugin_list = plugins if plugins is not None else default_plugins()
+    if progress is AUTO_PROGRESS:
+        progress = None if args.quiet else Progress(total_steps=len(plugin_list), lang=args.lang)
+    result = build_plan(ctx, plugin_list, progress)
     out = route_dir / f"day-plan-{date.isoformat()}.md"
     out.write_text(result.markdown, encoding="utf-8")
     print(f"wrote {out.resolve()}")
@@ -142,4 +153,4 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text) -
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(progress=AUTO_PROGRESS))

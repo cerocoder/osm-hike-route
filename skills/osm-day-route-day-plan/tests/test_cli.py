@@ -428,3 +428,53 @@ def test_record_fact_accepts_trail_conditions_and_the_hint_disappears(tmp_path, 
     with pytest.raises(ValueError, match="does not use --last-departure"):
         record_fact.record(route_dir, "all", "trail_conditions", "x", ["https://example.org/x"], last_departure="21:00")
 
+
+
+# ---- progress lines ------------------------------------------------------------------------------------------------------
+
+def test_the_cli_prints_one_progress_line_per_plugin_in_the_users_language(make_route, weather_response, fixed_now, capsys):
+    route_dir = make_route()
+    build_day_plan.main([str(route_dir), "2026-06-21", "--lang", "ru"], http=lambda url: weather_response(),
+                        http_text=_text, now=fixed_now, progress=build_day_plan.AUTO_PROGRESS)
+    lines = capsys.readouterr().err.splitlines()
+    starts = [l for l in lines if l.startswith("[")]
+    total = len(build_day_plan.default_plugins())
+    assert len(starts) == total and starts[0] == f"[1/{total}] Погода …"
+    assert any(l.startswith("[") and "Световой день" in l for l in lines)
+    assert sum(1 for l in lines if l.lstrip().startswith("✓")) >= total - 2
+    assert not any(word in "\n".join(lines) for word in ("Weather", "Daylight", "Mobile coverage"))
+
+
+def test_quiet_and_the_default_print_no_progress(make_route, weather_response, fixed_now, capsys):
+    route_dir = make_route()
+    http = lambda url: weather_response()  # noqa: E731
+    build_day_plan.main([str(route_dir), "2026-06-21", "--quiet"], http=http, http_text=_text, now=fixed_now,
+                        progress=build_day_plan.AUTO_PROGRESS)
+    assert "[1/" not in capsys.readouterr().err
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=http, http_text=_text, now=fixed_now)
+    assert "[1/" not in capsys.readouterr().err
+
+
+def test_a_failing_plugin_is_a_failed_progress_line_and_the_plan_still_builds(make_route, weather_response, fixed_now,
+                                                                                capsys):
+    from day_plan.base import SectionPlugin
+
+    class Broken(SectionPlugin):
+        plugin_id, section_id = "fire", "hazards"
+
+        def run(self, ctx, shared):
+            raise RuntimeError("HTTP 503")
+
+    route_dir = make_route()
+    code = build_day_plan.main([str(route_dir), "2026-06-21", "--lang", "es"], http=lambda url: weather_response(),
+                               http_text=_text, now=fixed_now, plugins=[Broken()],
+                               progress=build_day_plan.AUTO_PROGRESS)
+    err = capsys.readouterr().err
+    assert code == 0 and "[1/1] Peligro de incendio …" in err and "✗" in err and "RuntimeError: HTTP 503" in err
+
+
+def test_every_default_plugin_has_a_name_in_every_language():
+    from day_plan.i18n import LANGS, STRINGS
+    for plugin in build_day_plan.default_plugins():
+        for lang in LANGS:
+            assert f"pl_{plugin.plugin_id}" in STRINGS[lang], (plugin.plugin_id, lang)

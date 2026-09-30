@@ -50,6 +50,7 @@ What it does with that:
 - Estimates duration and warns if the day may not fit in daylight.
 - Labels every claim about a place by how sure it is: `tag-backed` (OSM says so), `web-sourced` (found online, unverified in person), `derived` (an estimate), `no-data` (nothing found). It does not invent answers.
 - Checks the saved archive is complete before showing you the result.
+- Shows what it is doing while it works, in your language: one line per step (map download, road graph, elevations, routing), with counts and timings. A downloaded map area is kept for a day, so changing a point does not wait for the server again. Elevations in `route.geojson` are stored to 0.1 m.
 
 Revising: refer to an existing route ("change the start point", "make it a bike route") and it updates the same folder rather than creating a new one.
 

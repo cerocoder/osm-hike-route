@@ -5,7 +5,8 @@ import datetime
 from dataclasses import dataclass
 
 from .base import SECTION_ORDER, Section
-from .i18n import activity_label, tr
+from .i18n import STRINGS, activity_label, tr
+from .progress import NullProgress
 from .summary import build_summary_section
 
 
@@ -53,20 +54,30 @@ def _validate_registration(plugins: list) -> None:
                              f"(known: {', '.join(SECTION_ORDER)})")
 
 
-def run_plugins(ctx, plugins: list):
-    """Returns (sections_in_registration_order, shared, failures)."""
+def _plugin_name(plugin, lang: str) -> str:
+    """The plugin's name in the user's language for a progress line (the id itself for an unknown plugin)."""
+    key = f"pl_{plugin.plugin_id}"
+    return tr(key, lang) if key in STRINGS["en"] else plugin.plugin_id
+
+
+def run_plugins(ctx, plugins: list, progress=None):
+    """Returns (sections_in_registration_order, shared, failures). `progress` (optional, see progress.py) gets one
+    step per plugin: its name in the user's language, then how long it took or why it failed."""
     _validate_registration(plugins)
+    progress = progress or NullProgress()
     shared, failures, by_id = {}, [], {}
     for plugin in _ordered(plugins):
         deps = {d: shared[d] for d in plugin.depends_on if d in shared}
-        try:
-            section = plugin.run(ctx, deps)
-        except Exception as e:  # noqa: BLE001 — isolate any plugin failure
-            reason = _one_line(f"{type(e).__name__}: {e}")
-            failures.append((plugin.plugin_id, reason))
-            section = Section(plugin.section_id, tr("plugin_failed", ctx.lang, reason=reason), "no-data")
-        else:
-            shared[plugin.plugin_id] = section.shared
+        with progress.step("plugin", text=_plugin_name(plugin, ctx.lang)) as step:
+            try:
+                section = plugin.run(ctx, deps)
+            except Exception as e:  # noqa: BLE001 — isolate any plugin failure
+                reason = _one_line(f"{type(e).__name__}: {e}")
+                failures.append((plugin.plugin_id, reason))
+                step.fail(reason)
+                section = Section(plugin.section_id, tr("plugin_failed", ctx.lang, reason=reason), "no-data")
+            else:
+                shared[plugin.plugin_id] = section.shared
         if section.title is None and plugin.title_key:
             section.title = tr(plugin.title_key, ctx.lang)
         by_id[plugin.plugin_id] = section
@@ -120,8 +131,8 @@ def assemble_markdown(ctx, sections: list, summary: Section, fetched_at: datetim
     return "\n\n".join(parts) + "\n"
 
 
-def build_plan(ctx, plugins: list) -> PlanResult:
-    sections, shared, failures = run_plugins(ctx, plugins)
+def build_plan(ctx, plugins: list, progress=None) -> PlanResult:
+    sections, shared, failures = run_plugins(ctx, plugins, progress)
     try:
         summary = build_summary_section(sections, ctx.lang)
     except Exception as e:  # noqa: BLE001 — the summary is outside run_plugins' isolation

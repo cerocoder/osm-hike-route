@@ -9,6 +9,7 @@ Date: 2026-10-01. Scope: `osm-day-route-planning` (speed, elevation precision, p
 | Console output | Stay with the prose pipeline and add a `progress.py` module; no `plan_route.py` CLI. |
 | Elevations | Only cache them (the cache already exists, see A3); no coarser sampling, no smaller area. |
 | Elevation precision in `route.geojson` | Stored with 0.1 m precision (was e.g. `682.020635343171`). |
+| Language of the progress output | **The user's language, all of it** (step names, details, notes, warnings, the module's own words), not just a few words. |
 
 ## Measured starting point
 
@@ -59,14 +60,14 @@ NullProgress()                                  # the default everywhere: does n
 ```
 - **Non-TTY (Claude Code tool output, logs):** plain lines only, flushed at once, no `\r` and no colour. `tick` prints at most one line every 5 s and at completion, e.g. `      … высоты 41/91 (45 %)`.
 - **TTY:** the `tick` line is rewritten in place (`\r`), a `✓` in green and `!` in yellow; `NO_COLOR` is respected.
-- **Language:** the module's own words (seconds, "done", "failed") are localized for `en` and `ru`, English fallback; titles and details come from the caller. Times are shown with one decimal; thousands are separated by a thin space.
+- **Language — everything the user reads is in the user's language.** `Progress(lang=...)` takes the language of the conversation (the same code as `--user-lang` of the map and the language of `notes.md`: `en ru es fr de pt it`, English fallback for any other, and for any single missing key). Callers never pass free text: they pass a message **key** and parameters (`progress.step("graph")`, `step.detail("graph_done", nodes=35398, edges=72658)`, `progress.note("overpass_cache_hit", age_h=3)`), and the module holds the catalogue `MESSAGES[lang][key]` with every step title, detail, note, warning and its own words (seconds, done, failed, "attempt 2 of 4", "batch 41 of 91") in all seven languages. Numbers follow the language (decimal comma in `ru es fr de pt it`, a thin space between thousands). An unknown key is shown as the key itself (never an exception in the middle of a planning run). The day-plan copy carries the catalogue for its plugin lines (plugin names reuse the section titles already in `day_plan/i18n.py`).
 - A step that raises prints `      ✗ <seconds> · <ExceptionName: message, one line>` and re-raises.
 - The clock and the stream are injectable for tests.
 
 ### B2. Hooks in the planner
 All take an optional `progress=None` (treated as `NullProgress`); nothing changes for callers that do not pass one: `query_overpass`, `fetch_area_data`, `tag_edges` (tick every 5 000 undirected edges), `ElevationService.get_elevations` (tick per batch), `select_optional_points` (tick per Dijkstra run), `route_through_waypoints` (tick per leg).
 
-The SKILL.md pipeline example creates `Progress(total_steps=N)` and wraps each step of the pipeline in `progress.step(...)`; it also says that a script whose step may exceed 30 s is run in the background with its output written to a log that is then followed.
+The SKILL.md pipeline example creates `Progress(total_steps=N, lang=<the user's language>)` and wraps each step of the pipeline in `progress.step(...)`; it also says that a script whose step may exceed 30 s is run in the background with its output written to a log that is then followed.
 
 ### B3. Day plan
 `run_plugins(ctx, plugins, progress=None)` reports one line per plugin (`✓ weather 0,8 s`, `✗ fire: HTTP 503`), `build_day_plan.main(..., progress=None)` creates a `Progress` only when run as a CLI (`--quiet` switches it off); tests and library callers get `NullProgress`. The existing stdout lines (`wrote …`, hints) and the stderr warnings stay as they are.
@@ -79,7 +80,7 @@ The SKILL.md pipeline example creates `Progress(total_steps=N)` and wraps each s
 ## Testing
 - A1, A4: oracle tests (old implementations kept in the tests) on random inputs; A1 also checks that forward and reverse edges get equal tags.
 - A2: hit, miss, expired, `refresh`, malformed entry, atomic write, key changes with radius and mode patterns, pruning of old entries — all in a temporary folder with an injected clock and a fake transport; no network.
-- B: fake stream with `isatty` true and false, injected clock for rate limiting, `NO_COLOR`, error path, language fallback; hook tests (a recording progress object receives the expected calls); the two `progress.py` copies are identical.
+- B: fake stream with `isatty` true and false, injected clock for rate limiting, `NO_COLOR`, error path; every key of the catalogue exists in all seven languages with the same placeholders (a test compares the sets), a Russian run prints no English words outside exception text and proper names, an unknown language falls back to English, an unknown key prints the key; hook tests (a recording progress object receives the expected calls); the two `progress.py` copies are identical.
 - C: written elevations have at most one decimal; gain/loss rounded; unknown elevation rules unchanged.
 - Whole suites of all three skills stay green. Acceptance on the cached Pelayos data: `tag_edges` under 5 s (prototype 0.5 s); a second run of the planning script makes no Overpass request within 24 h.
 

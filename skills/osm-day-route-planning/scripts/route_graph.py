@@ -32,6 +32,7 @@ import heapq
 import math
 
 from overpass_query import query_overpass, haversine
+from progress import NullProgress
 
 
 RESTRICTED_ACCESS = ("private", "no", "military")
@@ -42,7 +43,8 @@ AVOIDANCE_HIGHWAY = ("motorway", "trunk", "primary", "secondary")
 
 def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
                      routable_highway=None, hard_exclude_highway=None,
-                     exclude_highway_without_infra=None, mode: str | None = None) -> dict:
+                     exclude_highway_without_infra=None, mode: str | None = None,
+                     cache_dir=None, refresh: bool = False, progress=None) -> dict:
     """One combined Overpass query for everything build_graph/tag_edges/
     exclusion need: walkable ways, highways (for avoidance), water,
     forest, fields, plus access-restricted ways, military land, barrier
@@ -68,7 +70,11 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
     bicycle=yes|designated (bike) or foot=yes|designated (walk) is not
     bucketed as restricted for THAT mode only — a bicycle-designated path
     through an access=no area is still closed to walkers. mode=None (an
-    old caller) gets no override at all: the strict default."""
+    old caller) gets no override at all: the strict default.
+
+    cache_dir (e.g. Path("routes/.cache")) keeps the Overpass answer for a day so that a re-plan or a revision of the
+    same area does not wait for the server again; refresh=True bypasses it. progress (optional) is told about a
+    cache hit and about retries (see overpass_query.query_overpass)."""
     routable_highway = tuple(routable_highway) if routable_highway else DEFAULT_ROUTABLE_HIGHWAY
     hard_exclude_highway = tuple(hard_exclude_highway or ())
     exclude_highway_without_infra = tuple(exclude_highway_without_infra or ())
@@ -125,7 +131,14 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
     .barrierways out geom;
     .barriernodes out;
     """
-    result = query_overpass(ql)
+    options = {}
+    if cache_dir is not None:
+        options["cache_dir"] = cache_dir
+    if refresh:
+        options["refresh"] = True
+    if progress is not None:
+        options["progress"] = progress
+    result = query_overpass(ql, **options)
     elements = result.get("elements", [])
     walkable_set = set(walkable_highway_values)
     # Overpass doesn't tag which named set an element came from in this
@@ -453,36 +466,68 @@ class _VertexGrid:
         return False
 
 
+class _RingSet:
+    """Polygon rings with their bounding boxes: a point is tested with `point_in_ring` only against the rings whose
+    box contains it (a point outside a polygon's box is outside the polygon), which is what makes landcover
+    tagging of tens of thousands of edges against dozens of large forest polygons cheap."""
+
+    def __init__(self, rings):
+        self._items = [(ring, (min(p[0] for p in ring), max(p[0] for p in ring),
+                               min(p[1] for p in ring), max(p[1] for p in ring))) for ring in rings]
+
+    def contains(self, lat, lon):
+        for ring, (south, north, west, east) in self._items:
+            if south <= lat <= north and west <= lon <= east and point_in_ring(lat, lon, ring):
+                return True
+        return False
+
+
+TAG_PROGRESS_EVERY = 5000                    # directed edges between two progress ticks
+
+
 def tag_edges(graph, node_coords, highway_ways, water_ways, forest_ways, field_ways,
-              highway_buffer_m=50, water_buffer_m=30):
+              highway_buffer_m=50, water_buffer_m=30, progress=None):
     """Mutates graph in place: each edge [neighbor, length, tags] gets
-    tags = {'near_highway': bool, 'near_water': bool, 'landcover': 'forest'|'field'|None}."""
+    tags = {'near_highway': bool, 'near_water': bool, 'landcover': 'forest'|'field'|None}.
+    The tags depend only on the midpoint of the edge, so the two directed edges of one physical segment are tagged
+    from one computation. `progress` (optional) gets a tick every TAG_PROGRESS_EVERY directed edges."""
     highway_geoms = [w["geometry"] for w in highway_ways if w.get("geometry")]
     water_geoms = [w["geometry"] for w in water_ways if w.get("geometry")]
-    forest_rings = [[(p["lat"], p["lon"]) for p in w["geometry"]]
-                    for w in forest_ways if w.get("geometry") and len(w["geometry"]) >= 3]
-    field_rings = [[(p["lat"], p["lon"]) for p in w["geometry"]]
-                   for w in field_ways if w.get("geometry") and len(w["geometry"]) >= 3]
+    forests = _RingSet([[(p["lat"], p["lon"]) for p in w["geometry"]]
+                        for w in forest_ways if w.get("geometry") and len(w["geometry"]) >= 3])
+    fields = _RingSet([[(p["lat"], p["lon"]) for p in w["geometry"]]
+                       for w in field_ways if w.get("geometry") and len(w["geometry"]) >= 3])
 
     highway_grid = _VertexGrid(highway_geoms, highway_buffer_m) if highway_geoms else None
     water_grid = _VertexGrid(water_geoms, water_buffer_m) if water_geoms else None
 
+    def tags_at(mid_lat, mid_lon):
+        landcover = "forest" if forests.contains(mid_lat, mid_lon) else \
+            "field" if fields.contains(mid_lat, mid_lon) else None
+        return {"near_highway": highway_grid is not None and highway_grid.near(mid_lat, mid_lon),
+                "near_water": water_grid is not None and water_grid.near(mid_lat, mid_lon),
+                "landcover": landcover}
+
+    progress = progress or NullProgress()
+    total = sum(len(edges) for edges in graph.values())
+    done = 0
+    computed = {}
     for node_id, edges in graph.items():
         for edge in edges:
             neighbor_id = edge[0]
             lat1, lon1 = node_coords[node_id]
-            lat2, lon2 = node_coords.get(neighbor_id, (lat1, lon1))
-            mid_lat, mid_lon = (lat1 + lat2) / 2, (lon1 + lon2) / 2
-
-            near_highway = highway_grid is not None and highway_grid.near(mid_lat, mid_lon)
-            near_water = water_grid is not None and water_grid.near(mid_lat, mid_lon)
-            landcover = None
-            if any(point_in_ring(mid_lat, mid_lon, ring) for ring in forest_rings):
-                landcover = "forest"
-            elif any(point_in_ring(mid_lat, mid_lon, ring) for ring in field_rings):
-                landcover = "field"
-
-            edge[2].update({"near_highway": near_highway, "near_water": near_water, "landcover": landcover})
+            if neighbor_id in node_coords:
+                lat2, lon2 = node_coords[neighbor_id]
+                key = (node_id, neighbor_id) if node_id <= neighbor_id else (neighbor_id, node_id)
+                if key not in computed:
+                    computed[key] = tags_at((lat1 + lat2) / 2, (lon1 + lon2) / 2)
+                tags = computed[key]
+            else:                                                   # a neighbour without coordinates: the node itself
+                tags = tags_at(lat1, lon1)
+            edge[2].update(tags)
+            done += 1
+            if done % TAG_PROGRESS_EVERY == 0:
+                progress.tick(done, total, "tag_progress")
 
 
 def tag_grades(graph, node_coords, elevations):
@@ -576,16 +621,48 @@ def weighted_shortest_path(graph, start, end, preferences):
     return list(reversed(path)), dist[end]
 
 
-def route_through_waypoints(graph, waypoint_ids, preferences):
+def shortest_costs(graph, start, preferences, targets=None):
+    """Preference-weighted cost (the same numbers weighted_shortest_path returns) from `start` to each of
+    `targets`: {target: cost, or None when unreachable}. The search stops as soon as every target is settled.
+    With targets=None the costs to every reachable node are returned. One call replaces one
+    weighted_shortest_path per target."""
+    wanted = None if targets is None else set(targets)
+    dist = {start: 0.0}
+    pq = [(0.0, start)]
+    visited = set()
+    remaining = None if wanted is None else set(wanted)
+    while pq:
+        d, node = heapq.heappop(pq)
+        if node in visited:
+            continue
+        visited.add(node)
+        if remaining is not None:
+            remaining.discard(node)
+            if not remaining:
+                break
+        for neighbor, length_m, tags in graph.get(node, []):
+            nd = d + _edge_cost(length_m, tags, preferences)
+            if nd < dist.get(neighbor, float("inf")):
+                dist[neighbor] = nd
+                heapq.heappush(pq, (nd, neighbor))
+    if wanted is None:
+        return dist
+    return {t: (dist[t] if t in visited else None) for t in wanted}
+
+
+def route_through_waypoints(graph, waypoint_ids, preferences, progress=None):
     """Concatenates weighted_shortest_path between consecutive waypoints
     in the given order. Caller decides waypoint order (nearest-neighbor +
-    2-opt for a handful of points; brute force below that)."""
+    2-opt for a handful of points; brute force below that). `progress` (optional) gets a route_leg tick per leg."""
     full_path = [waypoint_ids[0]]
     total_cost = 0.0
-    for a, b in zip(waypoint_ids, waypoint_ids[1:]):
+    legs = list(zip(waypoint_ids, waypoint_ids[1:]))
+    for done, (a, b) in enumerate(legs, start=1):
         segment, cost = weighted_shortest_path(graph, a, b, preferences)
         if segment is None:
             return None, None, f"no path between {a} and {b}"
         full_path.extend(segment[1:])
         total_cost += cost
+        if progress is not None:
+            progress.tick(done, len(legs), "route_leg")
     return full_path, total_cost, None

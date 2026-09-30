@@ -148,3 +148,113 @@ def test_select_optional_points_handles_single_node_mandatory_path():
 
     assert [c["name"] for c in included] == ["Рядом"]
     assert skipped == []
+
+
+# ---- the one-search-per-source selection gives the answers of the original three-searches-per-pair one -----------------
+
+import random
+
+import route_graph
+from waypoints import _TIER_RANK
+
+
+def _random_directed_graph(seed, nodes=40, edges=110):
+    rng = random.Random(seed)
+    graph = {i: [] for i in range(nodes + 3)}                     # the last three nodes stay isolated
+    for _ in range(edges):
+        a, b = rng.sample(range(nodes), 2)
+        length = rng.uniform(20, 400)
+        graph[a].append([b, length, {"grade_pct": rng.uniform(-15, 15), "landcover": rng.choice([None, "forest", "field"])}])
+        if rng.random() < 0.7:                                    # mostly two-way, sometimes one-way
+            graph[b].append([a, length, {"grade_pct": rng.uniform(-15, 15), "near_highway": rng.random() < 0.2}])
+    return graph, rng
+
+
+PREFS = {"prefer_forest": 2.0, "avoid_open_field": 1.5, "avoid_near_highway": 2.0, "gradient_threshold_pct": 8,
+         "avoid_steep_gradient": 2.0}
+
+
+def _original_cheapest_insertion_cost_km(graph, path, candidate_node, preferences):
+    from route_graph import weighted_shortest_path
+    if len(path) == 1:
+        _, there = weighted_shortest_path(graph, path[0], candidate_node, preferences)
+        return None if there is None else 2 * there / 1000.0
+    best = None
+    for a, b in zip(path, path[1:]):
+        _, cost_to = weighted_shortest_path(graph, a, candidate_node, preferences)
+        _, cost_from = weighted_shortest_path(graph, candidate_node, b, preferences)
+        _, direct = weighted_shortest_path(graph, a, b, preferences)
+        if cost_to is None or cost_from is None:
+            continue
+        direct = direct or 0.0
+        detour = (cost_to + cost_from - direct) / 1000.0
+        if best is None or detour < best:
+            best = detour
+    return best
+
+
+def _original_select(graph, path, mandatory_cost_km, candidates, preferences, max_distance_km):
+    remaining = float("inf") if max_distance_km is None else max_distance_km - mandatory_cost_km
+    scored, skipped = [], []
+    for candidate in candidates:
+        cost = _original_cheapest_insertion_cost_km(graph, path, candidate["node_id"], preferences)
+        if cost is None:
+            skipped.append(candidate["name"])
+        else:
+            scored.append((cost, _TIER_RANK.get(candidate.get("tier"), 99), candidate))
+    scored.sort(key=lambda item: (item[0], item[1]))
+    included = []
+    for cost, _rank, candidate in scored:
+        if cost <= remaining:
+            included.append(candidate)
+            remaining -= cost
+        else:
+            skipped.append(candidate["name"])
+    return included, skipped
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_select_optional_points_agrees_with_the_original_search_per_pair(seed):
+    graph, rng = _random_directed_graph(seed)
+    path_length = [1, 2, 3, 6, 6, 4][seed]
+    path = [rng.randrange(40) for _ in range(path_length)]
+    if seed == 5:
+        path = path + [path[0]]                                   # a loop: the start repeats
+    candidates = [{"name": f"c{i}", "node_id": rng.choice(list(range(40)) + [40, 41, 42]),
+                   "tier": rng.choice(["tag-backed", "web-sourced", None])} for i in range(12)]
+    candidates[0]["node_id"] = 41                                 # an isolated node: always unreachable
+    for budget in (None, 3.0, 8.0):
+        expected = _original_select(graph, path, 1.0, candidates, PREFS, budget)
+        assert "c0" in expected[1]
+        assert select_optional_points(graph, path, 1.0, candidates, PREFS, budget) == expected
+
+
+def test_shortest_costs_equals_weighted_shortest_path_for_every_target():
+    graph, rng = _random_directed_graph(11)
+    start = 3
+    everything = route_graph.shortest_costs(graph, start, PREFS)
+    assert everything[start] == 0.0
+    subset = set(rng.sample(range(43), 15)) | {start, 41}
+    costs = route_graph.shortest_costs(graph, start, PREFS, subset)
+    assert set(costs) == subset and costs[start] == 0.0 and costs[41] is None        # 41 is isolated
+    for target in subset:
+        _, expected = route_graph.weighted_shortest_path(graph, start, target, PREFS)
+        assert costs[target] == expected
+        assert everything.get(target) == expected
+
+
+def test_select_optional_points_ticks_once_per_search():
+    graph, rng = _random_directed_graph(2)
+
+    class Recorder:
+        def __init__(self):
+            self.ticks = []
+
+        def tick(self, done, total, key="tag_progress", **params):
+            self.ticks.append((done, total, key))
+
+    recorder = Recorder()
+    candidates = [{"name": f"c{i}", "node_id": n} for i, n in enumerate([5, 6, 7])]
+    select_optional_points(graph, [1, 2, 1], 1.0, candidates, PREFS, None, progress=recorder)
+    assert recorder.ticks == [(1, 5, "optional_run"), (2, 5, "optional_run"), (3, 5, "optional_run"),
+                              (4, 5, "optional_run"), (5, 5, "optional_run")]       # 2 distinct path nodes + 3 candidates

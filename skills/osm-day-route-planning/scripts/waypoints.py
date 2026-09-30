@@ -1,7 +1,8 @@
 """Waypoint-level checks that run BEFORE the graph is built (spec §3.4):
 a restricted-zone hit here must become an explicit message, never a
 silent 'no path found' surfaced later from the router."""
-from route_graph import point_in_ring, weighted_shortest_path
+from progress import NullProgress
+from route_graph import point_in_ring, shortest_costs
 
 
 class RestrictedWaypointError(Exception):
@@ -41,20 +42,20 @@ def check_mandatory_budget(mandatory_cost_km: float, max_distance_km: float | No
         )
 
 
-def _cheapest_insertion_cost_km(graph, path: list[int], candidate_node: int, preferences: dict) -> float:
-    """Cost (km) of visiting candidate_node via the cheapest detour between
-    any two consecutive nodes already in `path`. When `path` has a single
-    node (a bare loop with no other mandatory point yet), the only
-    'insertion' possible is a there-and-back detour off that one node."""
+def _cheapest_insertion_cost_km(path: list[int], candidate_node: int, costs_from: dict, costs_from_candidate: dict):
+    """Cost (km) of visiting candidate_node via the cheapest detour between any two consecutive nodes already in
+    `path`, or None when it cannot be reached. `costs_from[a][x]` is the cost a -> x (a on the path, x on the path
+    or the candidate) and `costs_from_candidate[b]` the cost candidate -> b. When `path` has a single node (a bare
+    loop with no other mandatory point yet) the only 'insertion' possible is a there-and-back detour."""
     if len(path) == 1:
-        _, there = weighted_shortest_path(graph, path[0], candidate_node, preferences)
+        there = costs_from[path[0]][candidate_node]
         return None if there is None else 2 * there / 1000.0
 
     best = None
     for a, b in zip(path, path[1:]):
-        _, cost_to = weighted_shortest_path(graph, a, candidate_node, preferences)
-        _, cost_from = weighted_shortest_path(graph, candidate_node, b, preferences)
-        _, direct = weighted_shortest_path(graph, a, b, preferences)
+        cost_to = costs_from[a][candidate_node]
+        cost_from = costs_from_candidate[b]
+        direct = costs_from[a][b]
         if cost_to is None or cost_from is None:
             continue
         direct = direct or 0.0
@@ -66,19 +67,39 @@ def _cheapest_insertion_cost_km(graph, path: list[int], candidate_node: int, pre
 
 def select_optional_points(graph, mandatory_path: list[int], mandatory_cost_km: float,
                             candidates: list[dict], preferences: dict,
-                            max_distance_km: float | None):
+                            max_distance_km: float | None, progress=None):
     """Greedy cheapest-insertion selection under a distance budget (spec
     §3.5 step 3). Candidates unreachable from the mandatory path are
-    treated as skipped, same as ones that don't fit the budget."""
+    treated as skipped, same as ones that don't fit the budget.
+    One route search runs from every distinct node of the path and one from every candidate (the graph is directed,
+    so candidate -> path costs need their own search): P + C searches, not three per pair per candidate.
+    `progress` (optional) gets a tick per search."""
     if max_distance_km is None:
         remaining_budget = float("inf")
     else:
         remaining_budget = max_distance_km - mandatory_cost_km
 
+    progress = progress or NullProgress()
+    sources = list(dict.fromkeys(mandatory_path))
+    candidate_nodes = {c["node_id"] for c in candidates}
+    total_runs = len(sources) + len(candidate_nodes)
+    done = 0
+    costs_from = {}
+    for node in sources:
+        costs_from[node] = shortest_costs(graph, node, preferences, set(mandatory_path) | candidate_nodes)
+        done += 1
+        progress.tick(done, total_runs, "optional_run")
+    costs_from_candidate = {}
+    for node in candidate_nodes:
+        costs_from_candidate[node] = shortest_costs(graph, node, preferences, set(mandatory_path))
+        done += 1
+        progress.tick(done, total_runs, "optional_run")
+
     scored = []
     skipped = []
     for candidate in candidates:
-        cost_km = _cheapest_insertion_cost_km(graph, mandatory_path, candidate["node_id"], preferences)
+        cost_km = _cheapest_insertion_cost_km(mandatory_path, candidate["node_id"], costs_from,
+                                              costs_from_candidate[candidate["node_id"]])
         if cost_km is None:
             skipped.append(candidate["name"])
         else:

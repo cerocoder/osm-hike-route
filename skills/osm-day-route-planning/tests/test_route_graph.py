@@ -646,3 +646,121 @@ def test_vertex_grid_respects_the_radius_exactly_and_an_empty_set_is_never_near(
     grid = route_graph._VertexGrid([[vertex]], distance + 0.01)
     assert grid.near(56.0, 37.0 + east) and not route_graph._VertexGrid([[vertex]], distance - 0.01).near(56.0, 37.0 + east)
     assert route_graph._VertexGrid([], 50).near(56.0, 37.0) is False
+
+
+# ---- tag_edges: same tags as the brute-force computation, computed once per physical segment ---------------------------
+
+def _reference_tags(mid_lat, mid_lon, highways, water, forests, fields, highway_buffer_m, water_buffer_m):
+    """The original definition: distance to line vertices, point-in-ring against every ring."""
+    from overpass_query import haversine
+
+    def near(geoms, buffer_m):
+        return any(haversine(mid_lat, mid_lon, p["lat"], p["lon"]) < buffer_m for g in geoms for p in g)
+
+    def inside(rings):
+        return any(route_graph.point_in_ring(mid_lat, mid_lon, ring) for ring in rings)
+
+    landcover = "forest" if inside(forests) else "field" if inside(fields) else None
+    return {"near_highway": near(highways, highway_buffer_m), "near_water": near(water, water_buffer_m),
+            "landcover": landcover}
+
+
+def _random_world(seed):
+    import math
+    import random
+    rng = random.Random(seed)
+    lat0, lon0 = 40.36, -4.33
+
+    def pt():
+        return {"lat": lat0 + rng.uniform(-0.03, 0.03), "lon": lon0 + rng.uniform(-0.04, 0.04)}
+
+    def polygon():
+        cx, cy = pt()["lat"], pt()["lon"]
+        n = rng.randint(3, 9)
+        return [{"lat": cx + rng.uniform(0.002, 0.012) * (1 if i % 2 else 0.6) * math.cos(6.283 * i / n),
+                 "lon": cy + rng.uniform(0.003, 0.016) * (1 if i % 2 else 0.6) * math.sin(6.283 * i / n)}
+                for i in range(n)]
+
+    highways = [[pt() for _ in range(rng.randint(2, 8))] for _ in range(25)]
+    water = [[pt() for _ in range(rng.randint(2, 8))] for _ in range(25)]
+    forests = [polygon() for _ in range(12)]
+    fields = [polygon() for _ in range(6)]
+    coords = {i: (lat0 + rng.uniform(-0.03, 0.03), lon0 + rng.uniform(-0.04, 0.04)) for i in range(1, 301)}
+    graph = {i: [] for i in coords}
+    for _ in range(700):
+        a, b = rng.sample(sorted(coords), 2)
+        graph[a].append([b, 10.0, {}])
+        graph[b].append([a, 10.0, {}])
+    graph[1].append([999, 5.0, {}])                        # a neighbour without coordinates
+    return graph, coords, highways, water, forests, fields
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_tag_edges_gives_the_brute_force_tags(seed):
+    graph, coords, highways, water, forests, fields = _random_world(seed)
+    route_graph.tag_edges(graph, coords, [{"geometry": g} for g in highways], [{"geometry": g} for g in water],
+                          [{"geometry": g} for g in forests], [{"geometry": g} for g in fields],
+                          highway_buffer_m=400, water_buffer_m=250)
+    forest_rings = [[(p["lat"], p["lon"]) for p in g] for g in forests]
+    field_rings = [[(p["lat"], p["lon"]) for p in g] for g in fields]
+    checked = {"forest": 0, "field": 0, "near_highway": 0, "near_water": 0}
+    for node, edges in graph.items():
+        for neighbor, _length, tags in edges:
+            lat1, lon1 = coords[node]
+            lat2, lon2 = coords.get(neighbor, (lat1, lon1))
+            expected = _reference_tags((lat1 + lat2) / 2, (lon1 + lon2) / 2, highways, water, forest_rings,
+                                       field_rings, 400, 250)
+            assert {k: tags[k] for k in expected} == expected
+            checked["forest"] += expected["landcover"] == "forest"
+            checked["field"] += expected["landcover"] == "field"
+            checked["near_highway"] += expected["near_highway"]
+            checked["near_water"] += expected["near_water"]
+    assert all(count > 0 for count in checked.values()), checked            # the world really exercises every branch
+
+
+def test_tag_edges_reports_progress_every_five_thousand_directed_edges(monkeypatch):
+    monkeypatch.setattr(route_graph, "TAG_PROGRESS_EVERY", 100)
+    graph, coords, highways, water, forests, fields = _random_world(4)
+
+    class Recorder:
+        def __init__(self):
+            self.ticks = []
+
+        def tick(self, done, total, key="tag_progress", **params):
+            self.ticks.append((done, total, key))
+
+    recorder = Recorder()
+    route_graph.tag_edges(graph, coords, [], [], [], [], progress=recorder)
+    total = sum(len(e) for e in graph.values())
+    assert [d for d, _, _ in recorder.ticks] == list(range(100, total + 1, 100))
+    assert all(t == total and k == "tag_progress" for _, t, k in recorder.ticks)
+
+
+def test_fetch_area_data_passes_cache_options_only_when_given():
+    captured = []
+
+    def fake(ql, **options):
+        captured.append(options)
+        return {"elements": []}
+
+    with patch.object(route_graph, "query_overpass", side_effect=fake):
+        fetch_area_data(55.0, 37.0)
+        fetch_area_data(55.0, 37.0, cache_dir="cache", refresh=True, progress="P")
+    assert captured == [{}, {"cache_dir": "cache", "refresh": True, "progress": "P"}]
+
+
+def test_route_through_waypoints_ticks_once_per_leg():
+    graph = {1: [[2, 100.0, {}]], 2: [[3, 100.0, {}]], 3: []}
+
+    class Recorder:
+        def __init__(self):
+            self.ticks = []
+
+        def tick(self, done, total, key="tag_progress", **params):
+            self.ticks.append((done, total, key))
+
+    recorder = Recorder()
+    path, cost, error = route_graph.route_through_waypoints(graph, [1, 2, 3], {}, progress=recorder)
+    assert path == [1, 2, 3] and error is None
+    assert recorder.ticks == [(1, 2, "route_leg"), (2, 2, "route_leg")]
+    assert route_graph.route_through_waypoints(graph, [3, 1], {})[2] == "no path between 3 and 1"

@@ -51,3 +51,19 @@ def md_link(url: str) -> str:
 
 def sources_line(urls: list, lang: str) -> str:
     return tr("tr_sources", lang, urls=", ".join(md_link(url) for url in urls))
+
+
+def hour_ranges(hours: list) -> str:
+    """[5, 6, 7, 19, 20] -> '05:00–08:00, 19:00–21:00'."""
+    ranges, start, prev = [], None, None
+    for h in sorted(set(hours)):
+        if start is None:
+            start = prev = h
+        elif h == prev + 1:
+            prev = h
+        else:
+            ranges.append((start, prev))
+            start = prev = h
+    if start is not None:
+        ranges.append((start, prev))
+    return ", ".join(f"{a:02d}:00–{b + 1:02d}:00" for a, b in ranges)

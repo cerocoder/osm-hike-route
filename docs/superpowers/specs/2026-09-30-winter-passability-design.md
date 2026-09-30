@@ -96,11 +96,11 @@ For each segment run, from its tags:
 
 #### Verdicts
 
-Three profiles from the route's `mode` and `style`: `walk`, `bike_leisure`, `bike_sport`; a bicycle is always assessed with studded tires (the text says so), because in winter they are mandatory and in summer they can be kept on. The snow depth used for a run is `0` if it is cleared, otherwise the leg's depth. All numbers below are draft values in the configuration table; they are checked against guidance on winter hiking and studded-tire cycling before the plan is written and the sources are recorded with them.
+Three profiles from the route's `mode` and `style`: `walk`, `bike_leisure`, `bike_sport`; a bicycle is always assessed with studded tires (the text says so), because in winter they are mandatory and in summer they can be kept on. The snow depth used for a run is `0` if it is cleared, otherwise the leg's depth. All numbers below live in the configuration table. Where a published figure exists it is cited in the table's comments and in `SKILL.md`; the rest are heuristics and say so (see "Sources of the thresholds").
 
 | Profile | Difficult (`caution`) from | Not recommended (`danger`) from |
 |---|---|---|
-| walk | snow ≥ 5 cm | snow ≥ 25 cm |
+| walk | snow ≥ 8 cm | snow ≥ 20 cm |
 | bike_leisure | snow ≥ 3 cm (hard, compacted), ≥ 2 cm (soft, unknown) | snow ≥ 8 cm (hard, compacted), ≥ 6 cm (soft, unknown) |
 | bike_sport | snow ≥ 3 cm (hard, compacted), ≥ 2 cm (soft, unknown) | snow ≥ 10 cm (hard, compacted), ≥ 8 cm (soft, unknown) |
 
@@ -110,7 +110,16 @@ Ice and terrain rules on top:
 - bicycle (studded): ice alone is not penalised (the studs work); a `moderate` icy crust on an uncleared run, or slush (snow with `T_z > 0`), → difficult; `mtb:scale` 2 or higher with snow ≥ 1 cm → difficult.
 - The verdict of a **leg**: not recommended if its not-recommended runs make up at least 20 % of its length; else difficult if difficult and not-recommended runs together make up at least 30 %; else passable. Runs with no road data count as an uncleared soft path and are reported as such.
 
-#### Output
+#### Sources of the thresholds
+
+Read while researching (the statements are what those pages say, nothing more):
+
+- Walk, snow ≥ 20 cm (8 inches) → not recommended on foot without snowshoes or skis: the Adirondack Explorer reports that in the High Peaks Wilderness of New York snowshoes or skis are required at eight inches or more of snowpack (a regulation in force for more than 20 years, fine up to 250 dollars) and quotes the Adirondack Mountain Club advice to use them above eight inches (https://www.adirondackexplorer.org/?p=291382). The "difficult" step at 8 cm and the other walking values are heuristics.
+- Walk, ice: the outdoor brand Mammut's guide says micro-spikes suit hard-packed snow and icy trails, have no front points and are not suitable for steep, technical terrain or demanding ice sections (https://www.mammut.com/stories-guides/microspikes-vs-crampons-differences-how-to-use-them-and-mammut-tips-at-a-glance). This is the basis of "high ice → difficult (micro-spikes)" and "high ice on a steep leg → not recommended". The 10 % gradient is a heuristic.
+- Bicycle: an article on studded tires (https://wheretheroadforks.com/?p=1006689) says they suit compact snow and ice, are not useful in deep snow or powder, and wear on pavement. It gives no depth, so **all bicycle depths are heuristics**, labelled `derived`, and the text advises a fat bike or a postponed ride in deep snow. Studs on bare pavement wear and slow the ride, which is why the summer ride is slower; the assessment does not model that.
+- Not found or not readable: Schwalbe's guidance page was not available (404), the Sectionhiker snowshoe article could not be read; nothing from them is cited.
+
+### Output
 
 A sub-section "Trail and road passability" (`hz_trails`), the second in the hazards group after radiation:
 

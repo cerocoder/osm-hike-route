@@ -7,7 +7,7 @@ Date: 2026-09-30. Extends `2026-09-29-osm-day-route-day-plan-design.md` (parts 1
 Three things were asked for:
 
 1. The panel of `map.html` should show the type of the outing explicitly: on foot, cycling (sport), cycling (leisure), and in the future skiing.
-2. The day plan should judge how passable the trails and roads of the route are in winter, on foot and by bicycle (a bicycle only with studded tires) depends on type of the outing.
+2. The day plan should judge how passable the trails and roads of the route are in winter; the judgement depends on the type of the outing the route was planned for (on foot, or by bicycle, which is always assessed with studded tires).
 3. In the off-season the plan must estimate the snow level and the icing of trails and roads correctly from the weather.
 
 What exists today (checked in the code):
@@ -23,7 +23,7 @@ What exists today (checked in the code):
 |---|---|
 | Panel: how to show the type | Explicit label from mode and style, in the panel and in the plan header; extendable for skiing |
 | Result of the passability assessment | A verdict **per leg between points of interest** with a table; no map highlighting; the verdict is computed only for the **activity the route was planned for** (no walk-and-bike comparison) |
-| Bicycle | Assessed **with studded tires**, and the text says so |
+| Bicycle | **Always assessed with studded tires**, and the text says so. In summer the studs can be kept on (only slower), in winter they are mandatory, so one assumption serves the whole year |
 | Snow and ice model | **Hybrid:** the model snow depth of Open-Meteo, corrected for the elevation of the leg by two identical simulations, plus explicit ice rules |
 | Verdict scale | **Three levels:** passable, difficult (`caution`), not recommended (`danger`) |
 | When the section appears | By conditions: snow at the route's level, snow that fell in the last days, or freezing conditions; otherwise the section is left out and never listed as missing data |
@@ -31,7 +31,7 @@ What exists today (checked in the code):
 | Forums and reviews of the current season | Claude searches them while running the skill and records findings with sources as facts (`trail_conditions`); they add text and warnings and **never change the computed verdict** |
 | Where the road data comes from | The **planning skill stores it in `route.geojson`** at planning time (approach 2); old routes without it are re-planned, and the day plan says so instead of guessing |
 
-Non-goals: highlighting legs on the map; assessing skiing (only its label is prepared); assessing a bicycle without studded tires on winter, but normal tires are used on summer; changing how the planner chooses routes; an hour-by-hour timeline per leg; live-verified snow depth (the model is an estimate).
+Non-goals: highlighting legs on the map; assessing skiing (only its label is prepared); assessing a bicycle on normal tires (a bicycle is always assessed with studded tires, see the decision above); changing how the planner chooses routes; an hour-by-hour timeline per leg; live-verified snow depth (the model is an estimate).
 
 ## Architecture
 
@@ -44,7 +44,7 @@ Three skills change, nothing new is added to the plugin's public contract:
 ### 1. Planner and archive (`osm-day-route-planning`)
 
 - `route_graph.build_graph` puts a compact description of the way into the tags of every edge it creates: `way_id` and those of `highway`, `surface`, `smoothness`, `tracktype`, `sac_scale`, `mtb:scale`, `trail_visibility`, `bicycle`, `foot`, `winter_service`, `snowplowing` that the way carries (absent tags are absent, values are stored as OSM gives them). `tag_edges` keeps the existing keys and adds its own (it currently overwrites the dict).
-- New `route_graph.path_way_segments(graph, node_path)`: for each consecutive node pair it takes the edge (the shortest of parallel edges) and merges consecutive pairs with the same `way_id` and the same tags into runs `{"from": i, "to": j, "way_id": …, "highway": …, …}`. `from` and `to` are inclusive vertex indices of the LineString; consecutive runs share their boundary vertex; the runs cover 0 … n−1.
+- New `route_graph.path_geometry(graph, node_path, node_coords, node_elevations)` returns **both** the path coordinates `(lon, lat, ele)` and the way segments computed from the same `node_path`, so that the indices cannot drift from the coordinates (the planner's `SKILL.md` pipeline calls it instead of building the coordinates by hand). Inside it `path_way_segments(graph, node_path)`: for each consecutive node pair it takes the edge (the shortest of parallel edges) and merges consecutive pairs with the same `way_id` and the same tags into runs `{"from": i, "to": j, "way_id": …, "highway": …, …}`. `from` and `to` are inclusive vertex indices of the LineString; consecutive runs share their boundary vertex; the runs cover 0 … n−1.
 - `route_output.build_geojson(..., way_segments)`: a new required parameter without a default (the function's convention: a value cannot be silently left out) written to the LineString property `segments`. Existing callers and tests are updated.
 - `archive_validate`: if `segments` is present it is validated (a list of objects, integer `from` < `to`, starting at 0 and ending at the last vertex, contiguous). Its absence is not an error (older archives).
 - `SKILL.md` of the planner: the pipeline step that saves the archive computes `path_way_segments` and passes it on; a Common Mistakes entry says that a route saved before this change has no `segments` and must be re-planned to get a passability assessment.
@@ -73,11 +73,11 @@ The access points and interest points of the archive that lie within 300 m of th
 
 #### Snow and ice (plugin `snowpack`, no section of its own)
 
-Input from Open-Meteo hourly, for the 14 days before the date and the date itself (same source selection as the weather plugin: forecast API for near dates, the archive for older ones, nothing beyond the forecast horizon): `temperature_2m`, `dew_point_2m`, `precipitation`, `rain`, `snowfall`, `snow_depth`, `cloud_cover`, `weather_code`, plus the model elevation. Cached like the weather plugin.
+Input from Open-Meteo hourly, for the 14 days before the date and the date itself (same source selection as the weather plugin: forecast API with `past_days` for near dates, the archive for older ones, nothing beyond the forecast horizon): `temperature_2m` (°C), `dew_point_2m` (°C), `precipitation` (mm), `rain` (mm), `snowfall` (**cm**), `snow_depth` (**metres**), `cloud_cover` (%), `weather_code`, plus the model elevation. All of these exist in both APIs (verified live). Cached like the weather plugin. Depths are converted to centimetres once, on reading (`snow_depth` × 100), and all formulas below are in centimetres.
 
 For an elevation `z` the temperature is `T_z = T_model + (z_model − z) × 0.0065` per metre.
 
-- **Snow depth at the elevation of a leg.** Two identical simulations over the last 10 days, one with `T_model` and one with `T_z`, starting from zero depth: per hour, accumulate the model `snowfall` (cm) plus 1 cm per mm of precipitation that the model gave as rain but would be snow at `z` (`T_z ≤ +1 °C`, `T_model > +1 °C`); accumulate nothing where `T > +1 °C`; melt `1.5 cm × max(0, T) / 24` per hour plus `0.3 cm` per mm of rain; the depth never goes below zero. The depth for the leg is `max(0, model snow_depth + (sim_z − sim_model))` per hour. The elevation of a leg is the mean of its vertex elevations.
+- **Snow depth at the elevation of a leg.** Two identical simulations over the last 10 days, one with `T_model` and one with `T_z`, starting from zero depth: per hour, accumulate the model `snowfall` (cm) plus 1 cm per mm of precipitation that the model gave as rain but would be snow at `z` (`T_z ≤ +1 °C`, `T_model > +1 °C`); accumulate nothing where `T > +1 °C`; melt `1.5 cm × max(0, T) / 24` per hour plus `0.3 cm` per mm of rain; the depth never goes below zero. The depth for the leg is `max(0, 100 × model snow_depth + (sim_z − sim_model))` centimetres per hour. The elevation of a leg is the mean of its vertex elevations.
 - **Ice, per hour at the leg's elevation** (a level of `none`, `moderate`, `high`):
   - glaze: a freezing-rain or freezing-drizzle weather code (56, 57, 66, 67) in this hour or the previous 6 → `high`;
   - refreeze: `T_z ≤ 0` now, `T_z > +1` at some time in the previous 12 hours, and either more than 0.2 mm of precipitation in those 12 hours or snow on the ground → `high` on cleared surfaces (wet asphalt, black ice) and `moderate` on uncleared snow (icy crust);
@@ -96,7 +96,7 @@ For each segment run, from its tags:
 
 #### Verdicts
 
-Three profiles from the route's `mode` and `style`: `walk`, `bike_leisure`, `bike_sport`; a bicycle is assessed with studded tires. The snow depth used for a run is `0` if it is cleared, otherwise the leg's depth. All numbers below are draft values in the configuration table; they are checked against guidance on winter hiking and studded-tire cycling before the plan is written and the sources are recorded with them.
+Three profiles from the route's `mode` and `style`: `walk`, `bike_leisure`, `bike_sport`; a bicycle is always assessed with studded tires (the text says so), because in winter they are mandatory and in summer they can be kept on. The snow depth used for a run is `0` if it is cleared, otherwise the leg's depth. All numbers below are draft values in the configuration table; they are checked against guidance on winter hiking and studded-tire cycling before the plan is written and the sources are recorded with them.
 
 | Profile | Difficult (`caution`) from | Not recommended (`danger`) from |
 |---|---|---|
@@ -129,7 +129,8 @@ Warnings in the Summary: `danger` naming the legs that are not recommended (or t
 #### Degradation
 
 - No `segments` in the archive: `no-data`, "the route archive has no road data; re-plan the route" (not "passable").
-- The weather history could not be fetched, or the date is beyond the forecast horizon: `no-data` with the reason, the rest of the plan intact.
+- The weather history could not be fetched: `no-data` with the reason, the rest of the plan intact.
+- The date is beyond the forecast horizon (no weather to model): the section is **left out** in the warm season and `no-data` with the reason ("no forecast this far ahead") only when snow or frost is plausible. The cold season is October to April for latitudes north of the equator, April to October south of it, and the whole year when the route reaches 2 000 m; a recorded fact still shows.
 - Part of the track without road data: reported as such in the table and treated as an uncleared soft path.
 
 ### Internationalisation

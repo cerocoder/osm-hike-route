@@ -9,12 +9,15 @@ Usage:
 Or import:
     from overpass_query import query_overpass, route_length_m
 """
+import hashlib
 import json
 import math
+import os
 import sys
 import time
 import urllib.request
 import urllib.parse
+from pathlib import Path
 
 ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
@@ -30,13 +33,66 @@ HEADERS = {
 }
 
 
-def query_overpass(ql: str, timeout: int = 90, retries: int = 2) -> dict:
+CACHE_MAX_AGE_S = 24 * 3600          # OSM changes slowly, but a closure matters: a cached answer is at most a day old
+CACHE_PRUNE_AGE_S = 7 * 24 * 3600   # older entries are deleted whenever a new one is written
+
+
+def _cache_file(cache_dir, ql: str) -> Path:
+    """The query text holds the centre, the radius and the tag patterns, so its hash is the whole key."""
+    return Path(cache_dir) / "overpass" / (hashlib.sha256(ql.encode("utf-8")).hexdigest() + ".json")
+
+
+def _read_cache(path: Path, max_age_s: float):
+    """(answer, age_seconds) of a fresh, readable entry; None for a missing, expired or malformed one."""
+    try:
+        age = time.time() - path.stat().st_mtime
+        if age > max_age_s:
+            return None
+        return json.loads(path.read_text(encoding="utf-8")), age
+    except (OSError, ValueError):
+        return None
+
+
+def _write_cache(path: Path, result: dict) -> None:
+    """Atomic (temporary file, then rename); a failure to cache never fails the query."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(result), encoding="utf-8")
+        os.replace(temporary, path)
+        cutoff = time.time() - CACHE_PRUNE_AGE_S
+        for old in path.parent.glob("*.json"):
+            if old != path and old.stat().st_mtime < cutoff:
+                old.unlink()
+    except OSError:
+        pass
+
+
+def _host(endpoint: str) -> str:
+    return urllib.parse.urlparse(endpoint).netloc or endpoint
+
+
+def query_overpass(ql: str, timeout: int = 90, retries: int = 2, cache_dir=None,
+                   max_age_s: float = CACHE_MAX_AGE_S, refresh: bool = False, progress=None) -> dict:
     """Run an Overpass QL query, trying each endpoint, retrying on
-    5xx/timeout-body responses. Raises RuntimeError if all attempts fail."""
+    5xx/timeout-body responses. Raises RuntimeError if all attempts fail.
+
+    With `cache_dir` the answer is kept in <cache_dir>/overpass/ and a fresh one (younger than `max_age_s`) is
+    returned without a request; `refresh=True` skips the read. `progress` (optional: see progress.py) is told about
+    a cache hit, every retry or endpoint switch and every failed attempt."""
+    cache_path = _cache_file(cache_dir, ql) if cache_dir is not None else None
+    if cache_path is not None and not refresh:
+        cached = _read_cache(cache_path, max_age_s)
+        if cached is not None:
+            if progress is not None:
+                progress.note("overpass_cache_hit", age=int(cached[1] // 3600))
+            return cached[0]
     body = urllib.parse.urlencode({"data": ql}).encode()
     last_error = None
-    for endpoint in ENDPOINTS:
+    for endpoint_index, endpoint in enumerate(ENDPOINTS):
         for attempt in range(retries):
+            if progress is not None and (endpoint_index, attempt) != (0, 0):
+                progress.note("overpass_attempt", endpoint=_host(endpoint), n=attempt + 1, m=retries)
             try:
                 req = urllib.request.Request(endpoint, data=body, headers=HEADERS)
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -49,9 +105,14 @@ def query_overpass(ql: str, timeout: int = 90, retries: int = 2) -> dict:
                         last_error = f"{endpoint}: server-side timeout/error body"
                         time.sleep(2)
                         continue
-                    return json.loads(text)
+                    result = json.loads(text)
+                    if cache_path is not None:
+                        _write_cache(cache_path, result)
+                    return result
             except Exception as e:
                 last_error = f"{endpoint}: {e}"
+                if progress is not None:
+                    progress.warn("overpass_failed", endpoint=_host(endpoint), reason=" ".join(str(e).split())[:80])
                 time.sleep(2)
     raise RuntimeError(f"Overpass query failed on all endpoints/attempts: {last_error}")
 

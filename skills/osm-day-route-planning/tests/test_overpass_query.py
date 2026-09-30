@@ -180,3 +180,32 @@ def test_all_endpoints_failing_still_raises(server):
     server(*[OSError("down")] * 4)
     with pytest.raises(RuntimeError, match="failed on all endpoints"):
         query_overpass("q")
+
+
+def test_a_cache_file_from_the_future_is_not_fresh(server, tmp_path):
+    fake = server({"elements": [1]}, {"elements": [2]})
+    query_overpass("q", cache_dir=tmp_path)
+    entry = next((tmp_path / "overpass").glob("*.json"))
+    tomorrow = time.time() + 24 * 3600
+    os.utime(entry, (tomorrow, tomorrow))
+    assert query_overpass("q", cache_dir=tmp_path) == {"elements": [2]} and fake.calls == 2
+
+
+@pytest.mark.parametrize("content", ["null", "[]", "42", '"text"'])
+def test_a_cache_entry_that_is_not_an_object_is_ignored(server, tmp_path, content):
+    fake = server({"elements": [1]}, {"elements": [2]})
+    query_overpass("q", cache_dir=tmp_path)
+    next((tmp_path / "overpass").glob("*.json")).write_text(content, encoding="utf-8")
+    assert query_overpass("q", cache_dir=tmp_path) == {"elements": [2]} and fake.calls == 2
+
+
+def test_orphaned_temporary_files_are_pruned(server, tmp_path):
+    server({"elements": [1]})
+    folder = tmp_path / "overpass"
+    folder.mkdir()
+    orphan = folder / "crashed.tmp"
+    orphan.write_text("partial", encoding="utf-8")
+    ten_days_ago = time.time() - 10 * 24 * 3600
+    os.utime(orphan, (ten_days_ago, ten_days_ago))
+    query_overpass("a", cache_dir=tmp_path)
+    assert not orphan.exists() and not list(folder.glob("*.tmp"))

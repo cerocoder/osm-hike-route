@@ -143,7 +143,10 @@ class Progress:
         self.lang = lang if lang in LANGS else "en"
         self.stream = stream if stream is not None else sys.stderr
         self._clock = clock
-        self._tty = bool(getattr(self.stream, "isatty", lambda: False)()) if tty is None else tty
+        try:
+            self._tty = bool(getattr(self.stream, "isatty", lambda: False)()) if tty is None else tty
+        except Exception:  # noqa: BLE001 — a stream that cannot even say whether it is a terminal
+            self._tty = False
         self._color = (self._tty and not os.environ.get("NO_COLOR")) if color is None else color
         self._interval = tick_interval
         encoding = (getattr(self.stream, "encoding", None) or "utf-8")
@@ -152,6 +155,12 @@ class Progress:
             self._ok, self._bad, self._dot, self._dots = "✓", "✗", "·", "…"
         except (UnicodeEncodeError, LookupError):
             self._ok, self._bad, self._dot, self._dots = "ok", "x", "-", "..."
+        try:
+            _NBSP.encode(encoding)
+            self._nbsp = _NBSP
+        except (UnicodeEncodeError, LookupError):
+            self._nbsp = " "
+        self._broken = False                                    # a failed write switches the output off for good
         self._count = 0
         self._current = None
         self._last_tick = None
@@ -161,20 +170,31 @@ class Progress:
     def _paint(self, text: str, code: str) -> str:
         return f"\x1b[{code}m{text}\x1b[0m" if self._color else text
 
+    def _emit(self, text: str) -> None:
+        """Every write goes through here: a broken pipe, a closed stream or an unencodable character must never
+        stop the planning run, so the first failure silences the output instead of raising."""
+        if self._broken:
+            return
+        try:
+            self.stream.write(text)
+            self.stream.flush()
+        except Exception:  # noqa: BLE001 — progress is decoration, never a failure of the work it reports on
+            self._broken = True
+
     def _write(self, line: str) -> None:
         if self._live:
-            self.stream.write("\r\x1b[K")
+            self._emit("\r\x1b[K")
             self._live = False
-        self.stream.write(line + "\n")
-        self.stream.flush()
+        self._emit(line + "\n")
 
     def _seconds(self, seconds: float) -> str:
-        return f"{format_number(seconds, self.lang, 1)} {_translate('unit_s', self.lang)}"
+        shown = f"{format_number(seconds, self.lang, 1)} {_translate('unit_s', self.lang)}"
+        return shown.replace(_NBSP, self._nbsp)
 
     def _text(self, key, params) -> str:
         shown = {k: format_number(v, self.lang) if isinstance(v, int) and not isinstance(v, bool) else v
                  for k, v in params.items()}
-        return _translate(key, self.lang, **shown)
+        return _translate(key, self.lang, **shown).replace(_NBSP, self._nbsp)
 
     # ---- steps ----------------------------------------------------------------------------------------------------
     def step(self, key: str, text: str | None = None, **params):
@@ -189,8 +209,7 @@ class Progress:
         percent = int(100 * done / total) if total else 100
         message = f"{self._dots} {self._text(key, dict(params, done=done, total=total))} ({percent} %)"
         if self._tty:
-            self.stream.write("\r\x1b[K      " + message)
-            self.stream.flush()
+            self._emit("\r\x1b[K      " + message)
             self._live = True
             return
         if self._last_tick is None:

@@ -489,7 +489,9 @@ with progress.step("routing"):
 **Progress output.** Every long step reports to the user, in the user's language (`Progress(lang=...)`: the
 language of the conversation; the wording lives in `progress.py`'s catalogue, never pass free text). Functions that
 accept `progress=` are `fetch_area_data`, `query_overpass`, `tag_edges`, `ElevationService.get_elevations`,
-`select_optional_points` (key `optional`) and `route_through_waypoints` (key `routing`). Run the planning script so that its
+`select_optional_points` and `route_through_waypoints` (they tick the step that is running; wrap them in their own
+`progress.step("optional")` / `progress.step("routing")` and raise `total_steps` accordingly, or the counter reads
+`[6/5]`). Run the planning script so that its
 output reaches the user while it works: a script whose step may take more than 30 s (Overpass, the first elevation
 fetch of an area) is started in the background with its output written to a log that is then followed. When
 Overpass answered from `routes/.cache` (its line says how old the answer is), a user who suspects stale data gets
@@ -584,7 +586,8 @@ routes/
 
 Create `routes/` and `routes/.cache/` on first save if they don't exist
 (`weights_io.save_weights`/`elevation.cache.write_cache` both call
-`mkdir(parents=True, exist_ok=True)`). Before building a new route, check
+`mkdir(parents=True, exist_ok=True)`). `routes/.cache/` holds `elevation.json` and, when the pipeline passes
+`cache_dir`, `overpass/<hash>.json` (Overpass answers, kept 24 h, pruned after 7 days). Before building a new route, check
 whether an existing entry already fits — reuse/adapt rather than recompute
 (pipeline step 2); if the request is actually about an existing archive,
 follow **Revising an Existing Route** instead of starting over.

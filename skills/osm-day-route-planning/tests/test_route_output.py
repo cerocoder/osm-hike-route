@@ -112,3 +112,9 @@ def test_rounding_keeps_coordinates_and_the_unknown_elevation_rules():
     assert line["geometry"]["coordinates"][0] == [37.123456789, 55.987654321, 0.0]     # unknown stays 0.0
     point = next(f for f in result["features"] if f["geometry"]["type"] == "Point")
     assert point["geometry"]["coordinates"] == [37.0, 55.0]                              # and no elevation for a point
+
+
+def test_an_unknown_gain_or_loss_is_written_as_null_not_a_crash():
+    result = _sample_call(elevation_gain_m=None, elevation_loss_m=None)
+    line = next(f for f in result["features"] if f["geometry"]["type"] == "LineString")
+    assert line["properties"]["elevation_gain_m"] is None and line["properties"]["elevation_loss_m"] is None

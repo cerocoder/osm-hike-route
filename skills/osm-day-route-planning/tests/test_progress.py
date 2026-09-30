@@ -183,3 +183,43 @@ def test_the_day_plan_copy_is_identical():
     if not copy.exists():
         pytest.skip("osm-day-route-day-plan is not next to this skill")
     assert copy.read_text(encoding="utf-8") == Path(pr.__file__).read_text(encoding="utf-8")
+
+
+# ---- a progress write must never raise into the work it reports on -------------------------------------------------------
+
+class _BrokenPipe(io.StringIO):
+    def write(self, text):
+        raise BrokenPipeError("closed")
+
+
+class _NoFlush:
+    encoding = "utf-8"
+
+    def __init__(self):
+        self.parts = []
+
+    def write(self, text):
+        self.parts.append(text)
+
+
+def test_a_broken_stream_silences_the_output_and_never_raises():
+    progress = Progress(total_steps=1, lang="ru", stream=_BrokenPipe(), clock=Clock())
+    with progress.step("graph"):
+        progress.tick(1, 2, "tag_progress")
+        progress.detail("graph_done", nodes=1, edges=2)
+    progress.note("overpass_cache_hit", age=1)
+    progress.warn("overpass_failed", endpoint="e", reason="r")
+
+
+def test_a_stream_without_flush_or_isatty_does_not_raise():
+    progress = Progress(total_steps=1, stream=_NoFlush(), clock=Clock())
+    with progress.step("graph"):
+        pass
+
+
+def test_a_stream_that_cannot_encode_the_no_break_space_gets_a_plain_space():
+    stream = Stream(encoding="ascii")
+    progress = Progress(total_steps=1, lang="en", stream=stream, clock=Clock())
+    with progress.step("graph"):
+        progress.detail("graph_done", nodes=35398, edges=72658)
+    assert " " not in stream.getvalue() and "35 398 nodes, 72 658 edges" in stream.getvalue()

@@ -14,6 +14,7 @@ import json
 import math
 import os
 import sys
+import tempfile
 import time
 import urllib.request
 import urllib.parse
@@ -46,26 +47,36 @@ def _read_cache(path: Path, max_age_s: float):
     """(answer, age_seconds) of a fresh, readable entry; None for a missing, expired or malformed one."""
     try:
         age = time.time() - path.stat().st_mtime
-        if age > max_age_s:
+        if age < 0 or age > max_age_s:                      # a file from the future (clock stepped back) is not fresh
             return None
-        return json.loads(path.read_text(encoding="utf-8")), age
+        answer = json.loads(path.read_text(encoding="utf-8"))
+        return (answer, age) if isinstance(answer, dict) else None
     except (OSError, ValueError):
         return None
 
 
 def _write_cache(path: Path, result: dict) -> None:
     """Atomic (temporary file, then rename); a failure to cache never fails the query."""
+    temporary = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(".tmp")
-        temporary.write_text(json.dumps(result), encoding="utf-8")
+        handle, temporary = tempfile.mkstemp(dir=path.parent, suffix=".tmp")      # a name of its own per writer
+        with os.fdopen(handle, "w", encoding="utf-8") as out:
+            out.write(json.dumps(result))
         os.replace(temporary, path)
+        temporary = None
         cutoff = time.time() - CACHE_PRUNE_AGE_S
-        for old in path.parent.glob("*.json"):
+        for old in list(path.parent.glob("*.json")) + list(path.parent.glob("*.tmp")):
             if old != path and old.stat().st_mtime < cutoff:
                 old.unlink()
     except OSError:
         pass
+    finally:
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
 
 
 def _host(endpoint: str) -> str:

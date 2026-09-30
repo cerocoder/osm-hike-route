@@ -469,7 +469,9 @@ class _VertexGrid:
 class _RingSet:
     """Polygon rings with their bounding boxes: a point is tested with `point_in_ring` only against the rings whose
     box contains it (a point outside a polygon's box is outside the polygon), which is what makes landcover
-    tagging of tens of thousands of edges against dozens of large forest polygons cheap."""
+    tagging of tens of thousands of edges against dozens of large forest polygons cheap. (The answers equal the
+    unfiltered ones except for a polygon edge shorter than about 1e-13 degrees, which OSM's 1e-7 degree grid cannot
+    produce.)"""
 
     def __init__(self, rings):
         self._items = [(ring, (min(p[0] for p in ring), max(p[0] for p in ring),

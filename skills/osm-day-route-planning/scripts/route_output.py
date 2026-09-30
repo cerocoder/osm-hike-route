@@ -6,7 +6,7 @@ ELEVATION_DECIMALS = 1                      # elevations are stored to 0.1 m: th
 
 
 def _round_elevation(value):
-    return round(value, ELEVATION_DECIMALS)
+    return None if value is None else round(value, ELEVATION_DECIMALS)
 
 
 _OPTIONAL_POINT_KEYS = (

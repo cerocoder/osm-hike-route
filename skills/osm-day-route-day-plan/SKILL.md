@@ -27,19 +27,23 @@ The plan has these sections, always in this order:
    features.
 
 6. **Hazards**, with a `###` sub-heading for each part that applies:
-   **Mountain hazards** (only where the route reaches 600 m or more, or its relief is
+   **Radiation** (first: the route and its points against a hand-curated
+   registry of contaminated or closed zones), **Mountain hazards** (only where the route reaches 600 m or more, or its relief is
    at least 300 m: cold and freezing level, wind, thunderstorms, snow, terrain from OSM), **Fire
    danger** (official Fire Weather Index from the Copernicus GWIS service,
    the Russian Nesterov class for routes in Russia, active fires near the
    route), **Ticks and biting insects** (ticks, mosquitoes, blackflies and
    midges, horseflies — estimated from weather and water nearby) and **Air:
-   pollen and pollution** (Open-Meteo CAMS model). A part that does not apply
-   (mountains on a flat route, ticks in winter) is left out, not listed as
-   missing.
-
-Radiation zones, animals, people and mobile coverage are a separate follow-up
-plan; until it exists the plan has no such sections — never invent them by
-hand.
+   pollen and pollution** (Open-Meteo CAMS model) and **People and access**
+   (only what Claude recorded with a source: permit or border zones, travel
+   advisories, access restrictions). A part that does not apply (mountains on
+   a flat route, ticks in winter, people notes nobody recorded) is left out,
+   not listed as missing. Animals (bears, snakes, boar, hunting) are recorded
+   as `bio_hazards` facts and appear under **Ticks and biting insects**.
+7. **Mobile coverage** — the masts OpenStreetMap records near the route, the
+   advice (offline maps and GPX, tell someone, power bank, 112) and links to
+   the coverage maps. It is not a coverage measurement and never warns above
+   `info`.
 
 Every script is **stdlib-only** (`urllib.request`/`json`/`zoneinfo`), no API
 keys, same rule as the other two skills. Sources: Open-Meteo (weather and air
@@ -47,7 +51,9 @@ quality), Overpass (lines through the access points and terrain, water and
 industry near the route; mirrors and one retry, because the public servers
 answer 429/504 under load), Copernicus GWIS (Fire Weather Index and active
 fires), Nominatim (the route's country, asked once per route and remembered)
-and Nager.Date (public holidays).
+and Nager.Date (public holidays). The radiation registry
+(`data/radiation_zones.json`) is a static file: no network. Coverage maps
+are only linked (nPerf, OpenCellID), never fetched.
 
 ## When to Use
 
@@ -90,7 +96,8 @@ live navigation, multi-day plans.
    ask about; a section without facts says so plainly, which is honest.
 6. Report the file path and read the **Summary** section back to the person.
    If the plan shows the route does not fit the day (finish after sunset,
-   thunderstorm, last bus before the return, a point closed), say so and offer
+   thunderstorm, last bus before the return, a point closed, **a radiation
+   zone on the track**), say so and offer
    to go back to osm-day-route-planning — this skill never changes the route.
 7. Offer to re-render the map so the new date is inside it:
    `python3 ../../osm-day-route-show/scripts/render_map.py <route_dir> --user-lang <code>`.
@@ -104,7 +111,7 @@ never by hand-editing JSON:
 
 ```bash
 python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all> \
-    --plugin <transit|poi_hours|calendar|fire|mountain|bio_hazards|air> \
+    --plugin <transit|poi_hours|calendar|fire|mountain|bio_hazards|air|people_hazards> \
     --markdown "text" | --markdown-file note.md \
     --source https://... [--source https://...] \
     [--last-departure HH:MM] [--first-departure HH:MM] \
@@ -112,8 +119,8 @@ python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all> \
 ```
 
 `--last-departure`, `--first-departure` and `--warning` belong to `transit`
-(`--warning` also to `poi_hours`, `fire`, `mountain`, `bio_hazards` and
-`air`); `--day-type` belongs to `calendar`. The helper refuses an option the
+(`--warning` also to `poi_hours`, `fire`, `mountain`, `bio_hazards`, `air`
+and `people_hazards`); `--day-type` belongs to `calendar`. The helper refuses an option the
 plugin would ignore.
 
 - `--plugin transit`: timetables and **directions from the departure point**
@@ -149,6 +156,11 @@ plugin would ignore.
   The text appears under the matching hazard sub-heading, labelled
   web-sourced. The script prints an optional `hint (optional):` line for the
   hazard sections that apply to the route and date; it never blocks the plan.
+- `--plugin people_hazards`: only verifiable, sourced items for the region —
+  permit or border zones (parts of Russia and its neighbours), conflict-zone
+  or access restrictions, official travel advisories, known problem sections.
+  Never a statement about a population or a group of people. Without a
+  source it is refused; the part appears under **People and access**.
 - Every fact needs at least one `http(s)` source, or it is refused (and, if
   found in the file, ignored). Say only what the source says.
 - **Privacy:** facts end up in `day-plan-<date>.md`, embedded in a `map.html`
@@ -196,8 +208,35 @@ public-holiday rule" when the holiday status is unknown.
   map in Yandex Weather. The Nesterov class is a simplified computation and is
   shown for Russian routes only.
 - Insect levels are a weather and habitat estimate, not a measurement.
-- Radiation zones, animals, people and mobile coverage are not in this
-  version.
+- **Radiation registry:** curated by hand and incomplete. It holds the East
+  Urals trace (the reserve as the core, the trace as an approximate outline),
+  the Techa river and floodplain, the Mayak site and Lake Karachay, the
+  Chernobyl exclusion zone (Ukraine), the Polesie reserve (Belarus), the
+  Chernobyl-contaminated districts of the Bryansk, Tula, Kaluga and Orel
+  regions (government decree No. 1074), the Semipalatinsk test site, the
+  Yenisei floodplain below Zheleznogorsk (first 100 km) and, as an
+  advisory-only tier, four Bavarian areas where wild mushrooms can still
+  exceed the caesium limit (BfS) and seven Norwegian mountain municipalities
+  with the highest caesium in wild mushrooms (DSA). **Researched and left out
+  on purpose** (the sources show only local plots, a contamination that has
+  decayed away, contradict each other or say no warning is needed): Totskoye
+  1954, Novaya Zemlya, the Seversk 1993 trace, the peaceful underground
+  explosions, Sweden and Finland. **Not researched yet:** Wismut, Jachymov, La
+  Hague, Sellafield, Andreeva Bay and Balkan depleted-uranium sites;
+  `data/README.md` says why for each. A route with no hit is told "no entry in
+  the registry", never "safe". Zones have three tiers: `danger` (closed or
+  heavily contaminated land), `caution` (a wide affected area) and `info` (an
+  advisory area, only mushroom and game advice, no pinned warning). The
+  registry covers Europe with the Urals
+  (north of 36 N), Siberia, northern Kazakhstan and the Far East north of
+  49 N, and Primorye; a route outside those boxes (China, Mongolia, Japan,
+  Korea, the Americas, ...) gets no radiation part at all, and a route just
+  inside a box edge in China or Mongolia is a known limitation of rough
+  rectangles. The Mayak reservoir cascade on the Techa is not outlined.
+  Outlines marked *approximate* are built from published figures (a
+  centre and an area, named settlements, whole districts) and say how; they
+  are not survey isolines. There is no live dose-rate feed.
+- Mobile coverage counts OpenStreetMap masts only and does not model signal.
 
 ## Common Mistakes
 
@@ -211,6 +250,12 @@ public-holiday rule" when the holiday status is unknown.
 - Editing `facts.json` by hand (use `record_fact.py`: it validates, refuses
   source-less facts and never overwrites a file it cannot parse).
 - Forgetting to re-render `map.html` after adding a plan.
+- Treating a radiation hit as a trivia line: a route that enters a danger zone
+  is a reason to offer going back to osm-day-route-planning (this skill never
+  changes the route itself), and the Summary says so.
+- Recording a radiation zone as a fact: there is no `radiation` fact plugin.
+  New zones go into `data/radiation_zones.json` with a cited source, both
+  languages and geometry, and `tests/test_radiation_registry.py` must pass.
 - Recording a `mountain` fact for a flat route (neither 600 m high nor 300 m
   of relief): the section does not exist then and the fact is never shown. A
   `bio_hazards` fact recorded out of season is different: it is still shown

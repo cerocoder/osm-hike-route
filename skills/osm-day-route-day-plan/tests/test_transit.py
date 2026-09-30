@@ -34,8 +34,8 @@ class Web:
 
 
 def _plugin_run(make_route_with_points, fixed_now, points, web=None, lang="en", start=None, duration=4.0,
-                facts=None, date=SAT, light=None):
-    route_dir = make_route_with_points(points, duration_hours=duration)
+                facts=None, date=SAT, light=None, folder="proute"):
+    route_dir = make_route_with_points(points, duration_hours=duration, folder=folder)
     if facts is not None:
         (route_dir / "facts.json").write_text(json.dumps(facts), encoding="utf-8")
     ctx = build_context(route_dir, date, lang=lang, start_time=start, http=web or Web(), now=fixed_now)
@@ -269,3 +269,60 @@ def test_a_point_name_with_a_newline_gives_a_one_line_warning(make_route_with_po
                           web=Web(overpass={"elements": []}))
     assert len(section.warnings) == 1 and "\n" not in section.warnings[0].text
     assert section.warnings[0].text.startswith("Atocha ## Injected closes at 22:00")
+
+
+# ---- a closed access point warns ---------------------------------------------------------------
+
+WORKDAYS = ("Terminal", "access", -3.7, 40.4, {"role": "end", "opening_hours": "Mo-Fr 06:00-18:00"})
+
+
+def test_a_closed_return_point_is_a_caution_with_or_without_a_start_time(make_route_with_points, fixed_now):
+    import datetime as dt
+    for start in (None, dt.time(9, 0)):
+        section = _plugin_run(make_route_with_points, fixed_now, [WORKDAYS], start=start,
+                              web=Web(overpass={"elements": []}), folder=f"c{start is not None}")
+        assert [(w.severity, w.text) for w in section.warnings] == [("caution", "Terminal is closed on this date.")]
+
+
+def test_a_closed_start_point_warns_too_and_an_open_point_does_not(make_route_with_points, fixed_now):
+    start_point = ("Depot", "access", -3.7, 40.4, {"role": "start", "opening_hours": "Mo-Fr 06:00-18:00"})
+    section = _plugin_run(make_route_with_points, fixed_now, [start_point, ATOCHA], web=Web(overpass={"elements": []}))
+    assert [w.text for w in section.warnings] == ["Depot is closed on this date."]
+
+
+def test_an_uncertain_closure_does_not_warn(make_route_with_points, fixed_now):
+    stop = ("Ph", "access", -3.7, 40.4, {"role": "end", "opening_hours": "Mo-Fr 09:00-18:00; PH 10:00-12:00"})
+    web = Web(overpass={"elements": []})
+    web.country = ""
+    section = _plugin_run(make_route_with_points, fixed_now, [stop], web=web)     # Saturday, PH status unknown
+    assert section.warnings == []
+
+
+# ---- the lines table ---------------------------------------------------------------------------
+
+def _lines(make_route_with_points, fixed_now, tags_list, lang="en", folder="proute"):
+    data = {"elements": [{"tags": {"route": "bus", **tags}} for tags in tags_list]}
+    return _plugin_run(make_route_with_points, fixed_now, [LAGO], web=Web(overpass=data), lang=lang, folder=folder).markdown
+
+
+def test_a_relation_without_ref_name_or_direction_shows_dashes(make_route_with_points, fixed_now):
+    md = _lines(make_route_with_points, fixed_now, [{}])
+    assert "| Lago | – | bus | – | – | not stated in OSM |" in md
+
+
+def test_rows_identical_on_the_shown_columns_appear_once(make_route_with_points, fixed_now):
+    md = _lines(make_route_with_points, fixed_now, [
+        {"ref": "7", "from": "A", "to": "B", "name": "first", "operator": "X"},
+        {"ref": "7", "from": "A", "to": "B", "name": "second", "operator": "Y"},
+        {"ref": "8", "from": "A", "to": "B"}])
+    assert md.count("| Lago | 7 | bus | A → B |") == 1 and md.count("| Lago | 8 | bus |") == 1
+
+
+def test_at_most_25_rows_per_access_point_and_a_more_line(make_route_with_points, fixed_now):
+    md = _lines(make_route_with_points, fixed_now, [{"ref": str(n)} for n in range(1, 41)])
+    assert md.count("| Lago | ") == 1 + 25                # the access-point row and 25 lines
+    assert "| Lago | 25 | bus |" in md and "| Lago | 26 | bus |" not in md
+    assert "… and 15 more lines" in md
+    assert "… и ещё 15" in _lines(make_route_with_points, fixed_now, [{"ref": str(n)} for n in range(1, 41)],
+                                   lang="ru", folder="ru")
+    assert "more lines" not in _lines(make_route_with_points, fixed_now, [{"ref": "1"}], folder="one")

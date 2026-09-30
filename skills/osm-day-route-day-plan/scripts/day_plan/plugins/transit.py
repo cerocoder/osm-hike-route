@@ -13,6 +13,7 @@ from ..overpass import OverpassError, format_interval, routes_near
 from .common import cell, finish_minute, hours_on_date, sources_line, sun_from_light
 
 CLOSING_MARGIN_MIN = 30
+MAX_LINES_PER_POINT = 25
 
 
 def _clock(minute: int) -> str:
@@ -57,6 +58,8 @@ class TransitPlugin(SectionPlugin):
                 has_osm = has_osm or result is not None
                 role = tr("tr_role_" + point.role, lang) if point.role in ("start", "end") else tr("tr_role_none", lang)
                 rows.append(f"| {cell(point.name)} | {role} | {text} |")
+                if result is not None and result.status == "closed" and not result.uncertain:
+                    warnings.append(PlanWarning("caution", tr("poi_warn_closed", lang, name=cell(point.name))))
                 if (point is return_point and finish is not None and result is not None
                         and result.status == "open_hours"):
                     close = latest_close(result)
@@ -66,13 +69,14 @@ class TransitPlugin(SectionPlugin):
                             finish=_clock(finish))))
             lines += ["", tr("tr_access_points", lang), "", *rows]
 
-            route_rows, failed = [], False
+            route_rows, more, failed = [], [], False
             for point in ctx.access_points:
                 try:
                     routes = routes_near(ctx, point.lat, point.lon)
                 except OverpassError:
                     failed = True
                     continue
+                shown, cut = set(), 0
                 for r in routes:
                     runs = tr("tr_runs_unknown", lang)
                     if r.opening_hours:
@@ -84,15 +88,24 @@ class TransitPlugin(SectionPlugin):
                         elif res.status == "closed":
                             runs = tr("tr_runs_no", lang)
                     direction = f"{r.from_} → {r.to}" if r.from_ and r.to else r.name
-                    route_rows.append(
-                        f"| {cell(point.name)} | {cell(r.ref or r.name)} | {tr('tr_type_' + r.mode, lang)} | "
-                        f"{cell(direction)} | {cell(format_interval(r.interval, lang))} | {cell(runs)} |")
+                    row = (f"| {cell(point.name)} | {cell(r.ref or r.name) or '–'} | {tr('tr_type_' + r.mode, lang)} | "
+                           f"{cell(direction) or '–'} | {cell(format_interval(r.interval, lang))} | {cell(runs)} |")
+                    if row in shown:
+                        continue
+                    shown.add(row)
+                    if len(shown) > MAX_LINES_PER_POINT:
+                        cut += 1
+                        continue
+                    route_rows.append(row)
+                if cut:
+                    more.append(f"- {cell(point.name)}: " + tr("tr_more_lines", lang, n=cut))
             if route_rows:
                 has_osm = True
                 header = [tr(k, lang) for k in ("tr_col_point", "tr_col_line", "tr_col_type", "tr_col_direction",
                                                 "tr_col_interval", "tr_col_runs")]
                 lines += ["", tr("tr_routes_title", lang), "",
                           "| " + " | ".join(header) + " |", "|" + "---|" * len(header), *route_rows]
+                lines += more
                 if failed:
                     lines.append("- " + tr("tr_lines_partial", lang))
             else:

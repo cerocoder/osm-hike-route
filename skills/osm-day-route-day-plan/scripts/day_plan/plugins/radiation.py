@@ -36,15 +36,11 @@ class RadiationPlugin(SectionPlugin):
         if not any(in_scope(registry, c[1], c[0]) for c in route[:1] + route[-1:] + [(lon, lat)]):
             return Section("hazards", "", "derived", omit=True)             # far outside the registry's area
         margin = registry["margin_km"]
-        hits = find_hits(registry, route, points)
+        all_hits = find_hits(registry, route, points)
+        hits = [h for h in all_hits if h.inside or h.zone["severity"] != "info"]     # an advisory area matters only inside it
         if not hits:
-            return Section("hazards", "- " + tr("rad_none", lang, km=f"{margin:g}", areas=tr("rad_areas", lang)),
-                           "derived")
-
-        hits = [h for h in hits if h.inside or h.zone["severity"] != "info"]     # an advisory area matters only inside it
-        if not hits:
-            return Section("hazards", "- " + tr("rad_none", lang, km=f"{margin:g}", areas=tr("rad_areas", lang)),
-                           "derived")
+            key = "rad_none_advisory" if all_hits else "rad_none"      # near-but-outside advisory areas were dropped
+            return Section("hazards", "- " + tr(key, lang, km=f"{margin:g}", areas=tr("rad_areas", lang)), "derived")
         lines, warnings, urls = [], [], []
         any_danger_zone_reached = False
         for hit in hits:
@@ -70,12 +66,10 @@ class RadiationPlugin(SectionPlugin):
             elif hit.inside and zone["severity"] == "info":
                 warnings.append(PlanWarning("info", tr("rad_warn_inside_info", lang, name=name)))
             elif hit.inside:
-                event = zone["event"].get(lang) or zone["event"]["en"]
-                warnings.append(PlanWarning("caution", tr("rad_warn_inside_caution", lang, name=name, event=event),
-                                            pinned=True))
+                warnings.append(PlanWarning("caution", tr("rad_warn_inside_caution", lang, name=name), pinned=True))
             else:
                 warnings.append(PlanWarning("caution" if danger_zone else "info",
-                                            tr("rad_warn_near", lang, name=name, km=f"{hit.distance_km:.0f}"),
+                                            tr("rad_warn_near", lang, name=name, km=f"{hit.distance_km:.1f}"),
                                             pinned=True))
         if any(h.zone["advice"] == "full" for h in hits):
             lines += ["", tr("rad_advice_title", lang), tr("rad_advice_food", lang), tr("rad_advice_water", lang),

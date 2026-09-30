@@ -110,7 +110,10 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text) -
     print(f"wrote {out.resolve()}")
     for plugin_id, reason in result.failures:
         print(f"warning: plugin {plugin_id} failed: {reason}", file=sys.stderr)
-    missing = missing_web_facts(ctx)
+    try:
+        missing = missing_web_facts(ctx)
+    except Exception:  # noqa: BLE001 — a hint must never turn a written plan into a failure
+        missing = []
     if missing:
         print(f"hint: no web-sourced facts recorded for {', '.join(missing)} on {date.isoformat()}: search the "
               f"web (timetables, directions from the departure point, opening days), record what you find with "

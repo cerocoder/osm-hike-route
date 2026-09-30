@@ -309,3 +309,14 @@ def test_a_failing_hint_never_fails_the_written_plan(make_route, weather_respons
     assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text,
                                now=fixed_now) == 0
     assert (route_dir / "day-plan-2026-06-21.md").exists() and "hint (optional)" not in capsys.readouterr().out
+
+
+def test_a_failing_missing_facts_check_never_fails_the_written_plan(make_route, weather_response, fixed_now,
+                                                                     monkeypatch):
+    def boom(ctx):
+        raise RuntimeError("missing facts exploded")
+    monkeypatch.setattr(build_day_plan, "missing_web_facts", boom)
+    route_dir = make_route()
+    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text,
+                               now=fixed_now) == 0
+    assert (route_dir / "day-plan-2026-06-21.md").exists()

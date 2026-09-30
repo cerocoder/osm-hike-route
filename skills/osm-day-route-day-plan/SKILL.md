@@ -252,7 +252,8 @@ public-holiday rule" when the holiday status is unknown.
 - Forgetting to re-render `map.html` after adding a plan.
 - Treating a radiation hit as a trivia line: a route that enters a danger zone
   is a reason to offer going back to osm-day-route-planning (this skill never
-  changes the route itself), and the Summary says so.
+  changes the route itself), and the Radiation section says so (the Summary
+  lists the danger warning).
 - Recording a radiation zone as a fact: there is no `radiation` fact plugin.
   New zones go into `data/radiation_zones.json` with a cited source, both
   languages and geometry, and `tests/test_radiation_registry.py` must pass.

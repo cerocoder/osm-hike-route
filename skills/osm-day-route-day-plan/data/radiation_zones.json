@@ -37,8 +37,8 @@
     "ru": "стронций-90 после аварии на «Маяке» в 1957 году"
    },
    "status": {
-    "en": "State radiation and strict nature reserve, not open to the public; about 180 km² near the explosion site are still officially off-limits.",
-    "ru": "Государственный радиационный и строгий заповедник, закрыт для посещения; около 180 км² у места взрыва официально остаются закрытыми."
+    "en": "State radiation and strict nature reserve, not open to the public; about 180 km² near the explosion site are still officially off-limits (NRPA, 2007).",
+    "ru": "Государственный радиационный и строгий заповедник, закрыт для посещения; около 180 км² у места взрыва официально остаются закрытыми (NRPA, 2007 год)."
    },
    "geometry": {
     "type": "polygons",
@@ -92,7 +92,7 @@
     "half_width_km": 25.0
    },
    "geometry_note": {
-    "en": "Centre line through Mayak, Bagaryak, Kamensk-Uralsky and the area between Bogdanovich and Kamyshlov (the settlements named on the source's map), starting 25 km downwind of Mayak and ending so that the outline spans 300 km from Mayak; half-width 25 km is the upper bound of the 30–50 km width given by the source. An outline, not an isoline.",
+    "en": "Centre line through Bagaryak, Kamensk-Uralsky and the area between Bogdanovich and Kamyshlov (the settlements named on the source's map), starting 25 km downwind of Mayak and ending so that the outline spans 300 km from Mayak; half-width 25 km is the upper bound of the 30–50 km width given by the source. An outline, not an isoline.",
     "ru": "Осевая линия через Багаряк, Каменск-Уральский и место между Богдановичем и Камышловом (населённые пункты с карты источника), начинается в 25 км от «Маяка» по ветру и заканчивается так, чтобы контур занимал 300 км от «Маяка»; полуширина 25 км — верхняя граница ширины 30–50 км из источника. Контур, а не изолиния."
    },
    "event": {
@@ -555,7 +555,7 @@
    },
    "status": {
     "en": "The Norwegian Radiation and Nuclear Safety Authority (DSA, report 2/2026) finds the highest caesium levels in wild mushrooms from the most contaminated areas of Innlandet, Trøndelag and Nordland (2017–2025: up to 17 000 Bq/kg in gypsy mushroom from Øystre Slidre, 12 000 Bq/kg in another edible species from Lierne) and no clear decline over the last decade. It advises against taking in more than 80 000 Bq of caesium a year, which concerns people who eat very large amounts of wild food from the hard-hit areas; the national limits were removed in 2025.",
-    "ru": "Норвежское управление радиационной и ядерной безопасности (DSA, доклад 2/2026) находит самое высокое содержание цезия в диких грибах из наиболее загрязнённых районов Иннландета, Трёнделага и Нурланна (в 2017–2025 годах до 17 000 Бк/кг в морщинистом кольцевике (норв. rimsopp) из Эйстре-Слидре, 12 000 Бк/кг в другом съедобном виде из Лирне) и не видит явного снижения за последнее десятилетие. Оно советует не получать более 80 000 Бк цезия в год, что касается людей, которые едят очень много дикой пищи из сильно пострадавших районов; национальные пределы отменены в 2025 году."
+    "ru": "Норвежское управление радиационной и ядерной безопасности (DSA, доклад 2/2026) находит самое высокое содержание цезия в диких грибах из наиболее загрязнённых районов Иннландета, Трёнделага и Нурланна (в 2017–2025 годах до 17 000 Бк/кг в колпаке кольчатом (норв. rimsopp) из Эйстре-Слидре, 12 000 Бк/кг в другом съедобном виде из Лирне) и не видит явного снижения за последнее десятилетие. Оно советует не получать более 80 000 Бк цезия в год, что касается людей, которые едят очень много дикой пищи из сильно пострадавших районов; национальные пределы отменены в 2025 году."
    },
    "event": {
     "en": "Chernobyl accident, 1986",

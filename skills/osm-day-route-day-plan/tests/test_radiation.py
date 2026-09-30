@@ -11,7 +11,7 @@ MADRID = ((-3.75, 40.42, 650.0), (-3.74, 40.43, 660.0))
 SYDNEY = ((151.20, -33.86, 20.0), (151.21, -33.85, 25.0))
 BEIJING = ((116.39, 39.90, 50.0), (116.41, 39.92, 50.0))
 BAVARIAN_FOREST = ((13.35, 48.85, 700.0), (13.42, 48.88, 900.0))
-NEAR_BAVARIAN_FOREST = ((14.0, 48.9, 500.0), (14.05, 48.95, 500.0))
+NEAR_BAVARIAN_AREA = ((12.08, 49.075, 500.0), (12.081, 49.076, 500.0))     # about 1.5 km outside a Bavarian area
 TULA = ((37.50, 54.00, 200.0), (37.55, 54.02, 210.0))
 KYSHTYM = ((60.50, 55.70, 250.0), (60.62, 55.74, 255.0), (60.85, 55.80, 260.0))     # the reserve, Mayak and the trace
 
@@ -43,7 +43,7 @@ def test_the_neighbouring_reserve_is_reported_as_near_with_its_distance(make_rou
     section = run(make_route, fixed_now, CROSSING)
     assert "Polesie State Radioecological Reserve (Belarus)** (danger zone): the route passes about 0.9 km from the zone." \
         in section.markdown
-    assert any(w.severity == "caution" and "about 1 km from Polesie" in w.text for w in section.warnings)
+    assert any(w.severity == "caution" and "about 0.9 km from Polesie" in w.text for w in section.warnings)
 
 
 def test_a_near_miss_is_a_caution_not_a_danger(make_route, fixed_now):
@@ -82,15 +82,31 @@ def test_the_norwegian_mountain_municipalities_are_an_info_line_with_the_dsa_sou
     assert section.confidence == "tag-backed"
 
 
-def test_being_near_an_advisory_area_says_nothing(make_route, fixed_now):
-    section = run(make_route, fixed_now, ((13.2, 49.4, 500.0), (13.21, 49.41, 500.0)), folder="near")
-    assert section.warnings == [] and section.markdown.startswith("- No zone of the radiation registry")
+def test_being_near_an_advisory_area_says_nothing_but_tells_the_truth(make_route, fixed_now):
+    section = run(make_route, fixed_now, NEAR_BAVARIAN_AREA, folder="near")
+    assert section.warnings == []
+    assert section.markdown.startswith(
+        "- No danger zone or affected area of the radiation registry lies within 3 km of the route or its points.")
+    assert "so no entry does not mean the land is clean" in section.markdown and "safe" not in section.markdown.lower()
+    assert "No zone of the radiation registry" not in section.markdown
 
 
-def test_the_full_advice_wins_when_both_kinds_of_zone_are_reached(make_route, fixed_now):
+def test_the_advisory_wording_is_translated(make_route, fixed_now):
+    section = run(make_route, fixed_now, NEAR_BAVARIAN_AREA, lang="ru", folder="nearru")
+    assert section.markdown.startswith("- Ни опасная зона, ни затронутая территория реестра радиации не лежат в радиусе 3 км")
+
+
+def test_a_route_inside_an_advisory_area_alone_gets_no_full_advice(make_route, fixed_now):
     section = run(make_route, fixed_now, ((13.0, 48.9, 500.0), (13.4, 48.9, 500.0)), folder="mixed")
     assert "(advisory area)" in section.markdown       # the Bavarian Forest
     assert "Wild mushrooms and game from these areas" in section.markdown and "Springs, streams" not in section.markdown
+
+
+def test_a_small_near_miss_reads_in_tenths_of_a_kilometre(make_route, fixed_now):
+    section = run(make_route, fixed_now, ((30.3851, 51.0805, 120.0), (30.3861, 51.0805, 120.0)), folder="tenth")
+    near = [w.text for w in section.warnings if "about" in w.text]
+    assert len(near) == 1 and near[0].startswith("The route passes about 0.3 km from ")
+    assert "about 0 km" not in near[0]
 
 
 def test_central_russian_districts_are_a_caution_with_the_decree_as_source(make_route, fixed_now):
@@ -123,8 +139,11 @@ def test_the_east_urals_trace_is_an_approximate_caution_and_the_reserve_a_danger
     section = run(make_route, fixed_now, KYSHTYM)
     assert "East Ural State Nature Reserve (core of the East Urals Radioactive Trace)** (danger zone)" in section.markdown
     assert "East Urals Radioactive Trace (fallout of 1957, approximate outline)** (affected area)" in section.markdown
-    assert "Approximate outline: Centre line through Mayak, Bagaryak" in section.markdown
-    assert any("(contamination: Kyshtym accident, 1957)" in w.text for w in section.warnings)
+    assert "Approximate outline: Centre line through Bagaryak" in section.markdown
+    assert any(w.text == "The route crosses East Urals Radioactive Trace (fallout of 1957, approximate outline). "
+               "Do not pick mushrooms or berries and do not drink from springs or streams."
+               for w in section.warnings)
+    assert all("contamination:" not in w.text for w in section.warnings)
 
 
 def test_russian_text_uses_the_russian_names_and_advice(make_route, fixed_now):

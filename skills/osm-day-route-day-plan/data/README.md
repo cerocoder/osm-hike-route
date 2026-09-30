@@ -8,7 +8,8 @@ A hand-curated list of contaminated or closed zones, read by
 ```json
 {
   "id": "unique-slug",
-  "severity": "danger | caution",
+  "severity": "danger | caution | info",
+  "advice": "full | mushrooms",
   "approximate": true,
   "name": {"en": "...", "ru": "..."},
   "contamination": {"en": "...", "ru": "..."},
@@ -56,7 +57,7 @@ A hand-curated list of contaminated or closed zones, read by
 | `ural-karachay` | circle at 55.6783°N 60.7997°E (Wikipedia), r = 3 km assumed | NRPA Report 2008:3 (1967 dispersal); Wikipedia |
 | `ua-chernobyl-exclusion-zone` | OSM relation 3311547 | IAEA/UIAR presentation (evacuated in 1986, 2 122 km²) |
 | `by-polesie-reserve` | OSM relation 3397849 | Order No. 39 of the Belarus Ministry for Emergency Situations, 1995 (FAOLEX) |
-| `ru-bryansk-contaminated-districts` | OSM boundaries of seven districts | Radiation Hygiene 2023;16(4):55-63 (districts, mushrooms up to 75–82 % of the internal dose) |
+| `ru-bryansk-contaminated-districts` | OSM boundaries of seven districts | Radiation Hygiene 2023;16(4):55-63 (districts, mushrooms up to 75–82 % of the internal dose); Government decree No. 1074 of 8 Oct 2015 |
 | `kz-semipalatinsk-test-site` | OSM way 932505322 (boundary=hazard) | National Nuclear Center of Kazakhstan, radioecological surveys |
 | `ru-central-chernobyl-districts` | OSM boundaries of nine districts (Tula: Arsenyevsky, Belevsky, Plavsky, Chernsky, Shchekinsky; Kaluga: Zhizdra, Ulyanovo, Khvastovichi; Orel: Bolkhov) | Government decree No. 1074 of 8 Oct 2015 (the list itself, read at government.ru: zone of residence with the right to resettle) |
 | `de-bavaria-wild-food-areas` | OSM: Bayerischer Wald region, Landkreis Berchtesgadener Land, Mittenwald, Karlshuld (stands for the Donaumoos) | BfS press release of 10 Sep 2024 (regions, 600 Bq/kg, moderate consumption harmless) |

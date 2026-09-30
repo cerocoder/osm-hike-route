@@ -139,6 +139,25 @@ def test_the_techa_buffer_follows_the_river_not_its_bounding_box():
     assert "ural-techa-river" not in [h.zone["id"] for h in far]
 
 
+def _hit(pts, zone_id):
+    return [h for h in find_hits(REGISTRY, pts, []) if h.zone["id"] == zone_id]
+
+
+def test_a_long_segment_crossing_the_mayak_circle_with_both_ends_far_outside_is_a_hit():
+    west, east = (60.6, 55.7333), (61.2, 55.7333)                # about 19 km either side of the 6 km circle
+    assert _hit([west, west], "ural-mayak-site") == [] and _hit([east, east], "ural-mayak-site") == []
+    hits = _hit([west, east], "ural-mayak-site")
+    assert len(hits) == 1 and hits[0].inside and hits[0].distance_km == 0
+
+
+def test_a_long_segment_crossing_the_techa_line_between_two_far_ends_is_a_hit():
+    lon, lat = ZONES["ural-techa-river"]["geometry"]["lines"][0][20]      # a river vertex
+    south, north = (lon, lat - 0.1), (lon, lat + 0.1)                     # about 11 km either side, beyond buffer and margin
+    assert _hit([south, south], "ural-techa-river") == [] and _hit([north, north], "ural-techa-river") == []
+    hits = _hit([south, north], "ural-techa-river")
+    assert len(hits) == 1 and hits[0].inside and hits[0].distance_km == 0
+
+
 def test_the_corridor_of_the_trace_does_not_reach_upwind_of_the_release_point():
     trace = [h for h in find_hits(REGISTRY, [(60.62, 55.70), (60.6201, 55.70)], []) if h.zone["id"] == "ural-eurt-trace"]
     assert trace == []                                    # Kyshtym-side land west of Mayak: the plume went north-east
@@ -203,3 +222,8 @@ def test_validation_catches_broken_entries():
     broken = copy.deepcopy(REGISTRY)
     broken["zones"].append(copy.deepcopy(broken["zones"][0]))
     assert any("duplicate" in p for p in validate_registry(broken))
+
+
+def test_the_norwegian_zone_names_the_right_russian_mushroom():
+    ru = ZONES["no-wild-mushroom-municipalities"]["status"]["ru"]
+    assert "колпаке кольчатом" in ru and "кольцевик" not in ru

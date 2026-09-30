@@ -108,7 +108,7 @@ Ice and terrain rules on top:
 
 - walk: `high` ice on any run → difficult (micro-spikes); `high` ice on a leg with an average gradient of 10 % or more → not recommended; on a way with `sac_scale` T3 or harder any snow (≥ 1 cm) → not recommended.
 - bicycle (studded): ice alone is not penalised (the studs work); a `moderate` icy crust on an uncleared run, or slush (snow with `T_z > 0`), → difficult; `mtb:scale` 2 or higher with snow ≥ 1 cm → difficult.
-- The verdict of a **leg**: not recommended if its not-recommended runs make up at least 20 % of its length; else difficult if difficult and not-recommended runs together make up at least 30 %; else passable. Runs with no road data count as an uncleared soft path and are reported as such.
+- The verdict of a **leg**: not recommended if its not-recommended runs make up at least 20 % of its length; else difficult if its not-recommended runs alone make up at least 10 % (no cliff below 20 %) or difficult and not-recommended runs together make up at least 30 %; else passable. Runs with no road data count as an uncleared soft path and are reported as such.
 
 #### Sources of the thresholds
 

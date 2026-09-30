@@ -2,6 +2,7 @@
 route archive (route.geojson) and the CLI arguments."""
 import datetime
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -55,9 +56,17 @@ class PlanContext:
         return self.date.isoformat()
 
 
+def _dict(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
 def _line_feature(geojson: dict) -> dict:
     for feature in geojson.get("features", []):
-        if (feature.get("geometry") or {}).get("type") == "LineString":
+        if _dict(_dict(feature).get("geometry")).get("type") == "LineString":
             return feature
     raise ValueError("route.geojson has no LineString feature")
 
@@ -69,11 +78,14 @@ def _text(value) -> str | None:
 def _points(geojson: dict) -> tuple[list, list]:
     access, interest = [], []
     for feature in geojson.get("features", []):
-        geometry = feature.get("geometry") or {}
-        coords = geometry.get("coordinates")
-        if geometry.get("type") != "Point" or not isinstance(coords, list) or len(coords) < 2:
+        if not isinstance(feature, dict):
             continue
-        props = feature.get("properties") or {}
+        geometry = _dict(feature.get("geometry"))
+        coords = geometry.get("coordinates")
+        if (geometry.get("type") != "Point" or not isinstance(coords, list) or len(coords) < 2
+                or not (_number(coords[0]) and _number(coords[1]))):
+            continue
+        props = _dict(feature.get("properties"))
         point = RoutePoint(
             name=_text(props.get("name")) or "Waypoint", type=_text(props.get("type")) or "waypoint",
             lat=coords[1], lon=coords[0], role=_text(props.get("role")),
@@ -91,7 +103,7 @@ def build_context(route_dir, date: datetime.date, lang: str = "en", departure: s
     route_dir = Path(route_dir)
     geojson = json.loads((route_dir / "route.geojson").read_text(encoding="utf-8"))
     line = _line_feature(geojson)
-    props = line.get("properties") or {}
+    props = _dict(line.get("properties"))
     coords = []
     for c in line["geometry"]["coordinates"]:
         coords.append((c[0], c[1], c[2] if len(c) > 2 else None))

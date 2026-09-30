@@ -124,7 +124,7 @@ def build_plan(ctx, plugins: list) -> PlanResult:
         summary = build_summary_section(sections, ctx.lang)
     except Exception as e:  # noqa: BLE001 — the summary is outside run_plugins' isolation
         failures.append(("summary", _one_line(f"{type(e).__name__}: {e}")))
-        summary = Section("summary", "- " + tr("summary_none", ctx.lang), "derived")
+        summary = Section("summary", "- " + tr("summary_unavailable", ctx.lang), "derived")
     markdown = assemble_markdown(ctx, sections, summary, _fetched_at(ctx, shared),
                                  (shared.get("weather") or {}).get("utc_offset_seconds"), plugins)
     return PlanResult(markdown=markdown, sections=sections, failures=failures)

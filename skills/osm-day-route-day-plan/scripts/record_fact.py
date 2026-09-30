@@ -43,6 +43,12 @@ def record(route_dir, date: str, plugin: str, markdown: str, sources: list, last
             raise ValueError(f"bad date {date!r}: use YYYY-MM-DD or 'all'") from None
     if plugin == "calendar" and date == "all":
         raise ValueError("a calendar fact needs a specific date (--date YYYY-MM-DD), not 'all'")
+    for option, value, uses in (("--day-type", day_type, ("calendar",)),
+                                ("--last-departure", last_departure, ("transit",)),
+                                ("--first-departure", first_departure, ("transit",)),
+                                ("--warning", warnings, ("transit", "poi_hours"))):
+        if value and plugin not in uses:
+            raise ValueError(f"the {plugin} plugin does not use {option} (only: {', '.join(uses)})")
     entry = {"markdown": markdown, "sources": sources}
     for key, value in (("last_departure_local", last_departure), ("first_departure_local", first_departure),
                        ("day_type", day_type)):

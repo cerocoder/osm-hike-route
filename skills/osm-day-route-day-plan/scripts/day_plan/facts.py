@@ -17,12 +17,13 @@ day-plan-<date>.md, a file meant to be forwarded: keep places at city,
 station or stop level, never a street address or anything personal."""
 import json
 import re
+import urllib.parse
 from pathlib import Path
 
 from .base import SEVERITIES
 
 DAY_TYPES = ("holiday", "weekend", "workday")
-_TIME = re.compile(r"^\d{1,2}:[0-5]\d$")
+_TIME = re.compile(r"[0-9]{1,2}:[0-5][0-9]")
 _HEADING = re.compile(r"^ {0,3}#{1,6} +(\S.*?)\s*$", re.MULTILINE)
 
 
@@ -38,7 +39,13 @@ def load_facts(route_dir) -> dict:
 
 
 def _valid_time(value) -> bool:
-    return isinstance(value, str) and bool(_TIME.match(value)) and int(value.split(":")[0]) <= 29
+    return isinstance(value, str) and bool(_TIME.fullmatch(value)) and int(value.split(":")[0]) <= 29
+
+
+def _valid_source(url: str) -> bool:
+    """An http(s) URL with a host and no whitespace (parentheses are fine)."""
+    return (url.lower().startswith(("http://", "https://")) and not any(c.isspace() for c in url)
+            and bool(urllib.parse.urlparse(url).netloc))
 
 
 def normalize_entry(entry) -> dict | None:
@@ -46,7 +53,7 @@ def normalize_entry(entry) -> dict | None:
     if not isinstance(entry, dict):
         return None
     sources = [s.strip() for s in (entry.get("sources") or []) if isinstance(s, str)
-               and s.strip().lower().startswith(("http://", "https://"))] if isinstance(entry.get("sources"), list) else []
+               and _valid_source(s.strip())] if isinstance(entry.get("sources"), list) else []
     if not sources:
         return None
     markdown = entry.get("markdown")

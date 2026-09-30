@@ -100,3 +100,32 @@ def test_format_interval_is_localized_and_falls_back_to_the_raw_text():
     assert format_interval("30", "ru") == "каждые 30 мин"
     assert format_interval("10-15", "en") == "10-15"
     assert format_interval("", "en") == "–"
+
+
+@pytest.mark.parametrize("raw", ["²", "①", None, "٣"])
+def test_interval_minutes_ignores_unicode_digits(raw):
+    assert interval_minutes(raw) is None
+
+
+def test_the_server_gives_up_before_the_http_client_does():
+    assert "[timeout:9]" in routes_query(40.4, -3.7)
+
+
+def test_an_empty_answer_is_cached_for_a_day_and_a_non_empty_one_for_a_week(make_route, fixed_now):
+    import datetime
+    from day_plan.cache import JsonCache
+    from day_plan.context import build_context
+    clock = [1_000_000.0]
+    for name, data, ttl in (("empty", {"elements": []}, 86400), ("full", MADRID, 7 * 86400)):
+        route_dir = make_route(folder=name)
+        web = Web(data, data)
+        ctx = build_context(route_dir, datetime.date(2026, 6, 27), http=web, now=fixed_now,
+                            cache=JsonCache(route_dir / "c.json", now=lambda: clock[0]))
+        start = clock[0]
+        routes_near(ctx, 40.4247, -3.7275)
+        clock[0] = start + ttl - 60
+        routes_near(ctx, 40.4247, -3.7275)
+        assert len(web.urls) == 1, name                 # still cached just before the limit
+        clock[0] = start + ttl + 60
+        routes_near(ctx, 40.4247, -3.7275)
+        assert len(web.urls) == 2, name                 # expired just after it

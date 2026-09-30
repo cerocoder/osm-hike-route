@@ -133,3 +133,28 @@ def test_a_calendar_fact_needs_a_specific_date(tmp_path, capsys):
     assert _run(tmp_path, "--date", "all", "--plugin", "calendar", "--day-type", "holiday", "--source", URL) == 1
     assert "a calendar fact needs a specific date" in capsys.readouterr().err
     assert not (tmp_path / "facts.json").exists()
+
+
+@pytest.mark.parametrize("args,plugin", [
+    (["--plugin", "transit", "--day-type", "holiday"], "transit"),
+    (["--plugin", "poi_hours", "--day-type", "holiday"], "poi_hours"),
+    (["--plugin", "poi_hours", "--last-departure", "23:00"], "poi_hours"),
+    (["--plugin", "calendar", "--last-departure", "23:00", "--day-type", "holiday"], "calendar"),
+    (["--plugin", "poi_hours", "--first-departure", "05:00"], "poi_hours"),
+    (["--plugin", "calendar", "--first-departure", "05:00", "--day-type", "holiday"], "calendar"),
+    (["--plugin", "calendar", "--warning", "info:x", "--day-type", "holiday"], "calendar"),
+])
+def test_fields_the_plugin_ignores_are_refused_naming_the_plugin(tmp_path, capsys, args, plugin):
+    assert _run(tmp_path, "--date", "2026-06-27", "--markdown", "x", "--source", URL, *args) == 1
+    err = capsys.readouterr().err
+    assert plugin in err and "does not use" in err
+    assert not (tmp_path / "facts.json").exists()
+
+
+def test_fields_that_the_plugin_uses_are_accepted(tmp_path):
+    assert _run(tmp_path, "--date", "2026-06-27", "--plugin", "transit", "--markdown", "x", "--source", URL,
+                "--last-departure", "23:00", "--first-departure", "05:00", "--warning", "info:x") == 0
+    assert _run(tmp_path, "--date", "2026-06-27", "--plugin", "poi_hours", "--markdown", "x", "--source", URL,
+                "--warning", "info:x") == 0
+    assert _run(tmp_path, "--date", "2026-06-27", "--plugin", "calendar", "--day-type", "holiday",
+                "--source", URL) == 0

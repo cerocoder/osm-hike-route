@@ -44,6 +44,8 @@ def test_build_plan_survives_a_summary_failure(make_route, fixed_now, monkeypatc
     monkeypatch.setattr(service, "build_summary_section", boom)
     result = build_plan(_ctx(make_route, fixed_now), [Stub("a")])
     assert "## Summary" in result.markdown
+    assert "The summary could not be built; read the sections below." in result.markdown
+    assert "No warnings for this date." not in result.markdown
     assert ("summary", "RuntimeError: summary exploded") in result.failures
 
 
@@ -54,7 +56,8 @@ def test_failure_reason_is_collapsed_to_one_line_and_truncated(make_route, fixed
     text = sections[0].markdown
     assert "\n" not in text
     assert len(text) < 320
-    assert text.endswith("…).") or "…" in text
+    assert "…" in text
+    assert len(failures[0][1]) <= 200
     assert failures[0][0] == "bad"
 
 

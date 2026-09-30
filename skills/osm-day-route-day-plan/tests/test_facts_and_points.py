@@ -132,3 +132,44 @@ def test_warning_text_whitespace_is_collapsed_and_headings_in_markdown_are_demot
                                    warnings=[{"severity": "caution", "text": "Line\n## Injected\t here"}]))
     assert entry["warnings"] == [{"severity": "caution", "text": "Line ## Injected here"}]
     assert entry["markdown"].splitlines() == ["**Hazards**", "text", "**Title**", "####### seven", "#nospace"]
+
+
+@pytest.mark.parametrize("bad", ["http://", "https://", "https://exa mple.com", "https://example.com/a b",
+                                 "https://example.com/a\nb", "http:///path"])
+def test_sources_need_a_host_and_no_whitespace(bad):
+    assert normalize_entry(_entry(sources=[bad])) is None
+    assert normalize_entry(_entry(sources=[bad, URL]))["sources"] == [URL]
+
+
+def test_parentheses_stay_allowed_in_a_source():
+    url = "https://en.wikipedia.org/wiki/Foo_(bar)"
+    assert normalize_entry(_entry(sources=[url]))["sources"] == [url]
+
+
+def test_time_fields_reject_a_trailing_newline_and_check_the_hour_bound():
+    assert "last_departure_local" not in normalize_entry(_entry(last_departure_local="23:40\n"))
+    assert normalize_entry(_entry(last_departure_local="29:59"))["last_departure_local"] == "29:59"
+    assert "last_departure_local" not in normalize_entry(_entry(last_departure_local="30:00"))
+
+
+# ---- odd features in route.geojson --------------------------------------------------------------
+
+def test_points_skip_features_and_parts_of_the_wrong_type(tmp_path, fixed_now):
+    route_dir = _write_route(tmp_path, [
+        LINE, "a string", 5, None, ["x"],
+        {"type": "Feature", "geometry": "Point", "properties": {}},
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [1.0, 2.0]}, "properties": "props"},
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": ["1", "2"]}, "properties": {"name": "str"}},
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [True, 2.0]}, "properties": {"name": "bool"}},
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [1.0, None]}, "properties": {"name": "none"}},
+        _point("Good", "sight", 1.5, 2.5),
+    ])
+    ctx = build_context(route_dir, datetime.date(2026, 6, 21), now=fixed_now)
+    assert [p.name for p in ctx.interest_points] == ["Waypoint", "Good"]     # the "props" feature has no name
+    assert ctx.access_points == []
+
+
+def test_a_non_dict_feature_before_the_line_does_not_break_the_context(tmp_path, fixed_now):
+    route_dir = _write_route(tmp_path, ["junk", None, {"type": "Feature", "geometry": []}, LINE])
+    ctx = build_context(route_dir, datetime.date(2026, 6, 21), now=fixed_now)
+    assert ctx.route_name == "R" and ctx.access_points == [] and ctx.interest_points == []

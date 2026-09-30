@@ -21,6 +21,7 @@ MIRRORS = (
 )
 ROUTE_TYPES = ("bus", "train", "subway", "tram", "light_rail", "trolleybus", "ferry")
 ROUTES_TTL_S = 7 * 86400
+EMPTY_TTL_S = 86400          # "no lines" may be a query that gave up early: look again after a day
 
 
 class OverpassError(Exception):
@@ -67,7 +68,7 @@ class RouteInfo:
 
 def routes_query(lat: float, lon: float, radius: int = 80) -> str:
     types = "|".join(ROUTE_TYPES)
-    return (f'[out:json][timeout:25];node(around:{radius},{lat:.5f},{lon:.5f})["public_transport"];'
+    return (f'[out:json][timeout:9];node(around:{radius},{lat:.5f},{lon:.5f})["public_transport"];'
             f'rel(bn)["route"~"^({types})$"];out tags;')
 
 
@@ -99,23 +100,25 @@ def routes_near(ctx, lat: float, lon: float) -> list:
     """RouteInfo list for the lines through public-transport nodes near a point
     (cached 7 days in the route folder). Raises OverpassError."""
     key = f"overpass|routes|{lat:.4f}|{lon:.4f}"
-    cached = ctx.cache.get_entry(key, ROUTES_TTL_S)
+    cached = ctx.cache.get_entry(key)
     if cached is not None:
-        return [RouteInfo(**r) for r in cached[0]]
+        value = cached[0]
+        if ctx.cache.get_entry(key, ROUTES_TTL_S if value else EMPTY_TTL_S) is not None:
+            return [RouteInfo(**r) for r in value]
     routes = parse_routes(run(ctx.http, routes_query(lat, lon)))
     ctx.cache.put(key, [asdict(r) for r in routes])
     return routes
 
 
-_CLOCK = re.compile(r"^(\d{1,2}):(\d{2})(?::\d{2})?$")
+_CLOCK = re.compile(r"([0-9]{1,2}):([0-9]{2})(?::[0-9]{2})?")
 
 
 def interval_minutes(raw: str) -> int | None:
     """OSM `interval`: '10' (minutes), '00:10' or '00:10:00' (h:mm[:ss])."""
     raw = (raw or "").strip()
-    if raw.isdigit():
+    if re.fullmatch(r"[0-9]+", raw):
         return int(raw) or None
-    m = _CLOCK.match(raw)
+    m = _CLOCK.fullmatch(raw)
     if m:
         return (int(m.group(1)) * 60 + int(m.group(2))) or None
     return None

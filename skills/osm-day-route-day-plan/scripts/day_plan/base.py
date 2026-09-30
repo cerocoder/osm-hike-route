@@ -27,6 +27,7 @@ class Section:
     warnings: list = field(default_factory=list)
     shared: dict = field(default_factory=dict)  # data for dependent plugins
     title: str | None = None  # sub-heading, used when a group has >1 plugin
+    omit: bool = False  # "not applicable" or a data-only plugin: left out of the file and not listed as missing data
 
 
 class SectionPlugin(ABC):
@@ -34,6 +35,7 @@ class SectionPlugin(ABC):
     section_id: str
     version: str = "1"
     depends_on: tuple = ()
+    title_key: str | None = None  # i18n key of the sub-heading when the plugin shares a section group
 
     @abstractmethod
     def run(self, ctx, shared: dict) -> Section:

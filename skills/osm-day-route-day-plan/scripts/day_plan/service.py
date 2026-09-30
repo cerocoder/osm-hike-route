@@ -67,6 +67,8 @@ def run_plugins(ctx, plugins: list):
             section = Section(plugin.section_id, tr("plugin_failed", ctx.lang, reason=reason), "no-data")
         else:
             shared[plugin.plugin_id] = section.shared
+        if section.title is None and plugin.title_key:
+            section.title = tr(plugin.title_key, ctx.lang)
         by_id[plugin.plugin_id] = section
     return [by_id[p.plugin_id] for p in plugins], shared, failures
 
@@ -102,7 +104,7 @@ def assemble_markdown(ctx, sections: list, summary: Section, fetched_at: datetim
     for section_id in SECTION_ORDER:
         if section_id == "summary":
             continue
-        group = [s for s in sections if s.section_id == section_id]
+        group = [s for s in sections if s.section_id == section_id and not s.omit]
         if not group:
             continue
         body = []
@@ -113,7 +115,7 @@ def assemble_markdown(ctx, sections: list, summary: Section, fetched_at: datetim
                 body.append(s.markdown)
         parts.append(f"## {tr('h_' + section_id, lang)}\n\n" + "\n\n".join(body))
     for s in sections:  # never drop a section whose id is not in SECTION_ORDER
-        if s.section_id not in SECTION_ORDER:
+        if s.section_id not in SECTION_ORDER and not s.omit:
             parts.append(f"## {s.section_id}\n\n{s.markdown}")
     return "\n\n".join(parts) + "\n"
 

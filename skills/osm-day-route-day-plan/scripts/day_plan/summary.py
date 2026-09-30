@@ -28,7 +28,7 @@ def build_summary_section(sections: list, lang: str) -> Section:
     lines = [f"- **{_severity_label(w.severity, lang)}:** {_flat(w.text)}" for w in warnings[:MAX_ITEMS]]
     if not lines:
         lines.append("- " + tr("summary_none", lang))
-    missing = [s.title or tr("h_" + s.section_id, lang) for s in sections if s.confidence == "no-data"]
+    missing = [s.title or tr("h_" + s.section_id, lang) for s in sections if s.confidence == "no-data" and not s.omit]
     if missing:
         lines.append("- " + tr("summary_no_data", lang, names=", ".join(missing)))
     return Section("summary", "\n".join(lines), "derived", warnings=[])

@@ -53,6 +53,8 @@ def test_calendar_fact_needs_only_a_day_type_and_a_source(tmp_path):
     (["--date", "27-06-2026", "--plugin", "transit", "--markdown", "x", "--source", URL], "bad date"),
     (["--date", "2026-6-7", "--plugin", "transit", "--markdown", "x", "--source", URL], "bad date"),
     (["--date", "2026-06-27T10:00", "--plugin", "transit", "--markdown", "x", "--source", URL], "bad date"),
+    (["--date", "20260627", "--plugin", "transit", "--markdown", "x", "--source", URL], "bad date"),
+    (["--date", "2026-W26-6", "--plugin", "transit", "--markdown", "x", "--source", URL], "bad date"),
     (["--date", "all", "--plugin", "weather", "--markdown", "x", "--source", URL], "unknown plugin"),
     (["--date", "all", "--plugin", "transit", "--markdown", "x", "--source", URL, "--last-departure", "late"], "bad last_departure_local"),
     (["--date", "all", "--plugin", "calendar", "--day-type", "funday", "--markdown", "x", "--source", URL], "bad day type"),
@@ -105,5 +107,23 @@ def test_temp_file_cleaned_up_on_write_failure(tmp_path, capsys, monkeypatch):
     assert _run(tmp_path, "--date", "all", "--plugin", "transit", "--markdown", "x", "--source", URL) == 1
     assert "disk full" in capsys.readouterr().err
     assert not (tmp_path / "facts.json").exists()
+    tmp_files = [p.name for p in tmp_path.iterdir() if p.name.startswith(".facts-")]
+    assert tmp_files == []
+
+
+def test_existing_facts_json_unchanged_after_failed_write(tmp_path, capsys, monkeypatch):
+    # Create an existing facts.json with known content
+    original_content = json.dumps({"2026-06-21": {"calendar": {"day_type": "holiday", "sources": ["https://example.com"]}}})
+    (tmp_path / "facts.json").write_text(original_content, encoding="utf-8")
+
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+    monkeypatch.setattr("record_fact.os.replace", boom)
+
+    assert _run(tmp_path, "--date", "2026-06-22", "--plugin", "transit", "--markdown", "new", "--source", URL) == 1
+    assert "disk full" in capsys.readouterr().err
+    # Verify facts.json is unchanged byte for byte
+    assert (tmp_path / "facts.json").read_text(encoding="utf-8") == original_content
+    # Verify no temporary files remain
     tmp_files = [p.name for p in tmp_path.iterdir() if p.name.startswith(".facts-")]
     assert tmp_files == []

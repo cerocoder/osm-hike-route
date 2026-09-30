@@ -7,7 +7,7 @@ Date: 2026-09-30. Extends `2026-09-29-osm-day-route-day-plan-design.md` (parts 1
 Three things were asked for:
 
 1. The panel of `map.html` should show the type of the outing explicitly: on foot, cycling (sport), cycling (leisure), and in the future skiing.
-2. The day plan should judge how passable the trails and roads of the route are in winter, on foot and by bicycle (a bicycle only with studded tires).
+2. The day plan should judge how passable the trails and roads of the route are in winter, on foot and by bicycle (a bicycle only with studded tires) depends on type of the outing.
 3. In the off-season the plan must estimate the snow level and the icing of trails and roads correctly from the weather.
 
 What exists today (checked in the code):
@@ -31,7 +31,7 @@ What exists today (checked in the code):
 | Forums and reviews of the current season | Claude searches them while running the skill and records findings with sources as facts (`trail_conditions`); they add text and warnings and **never change the computed verdict** |
 | Where the road data comes from | The **planning skill stores it in `route.geojson`** at planning time (approach 2); old routes without it are re-planned, and the day plan says so instead of guessing |
 
-Non-goals: highlighting legs on the map; assessing skiing (only its label is prepared); assessing a bicycle without studded tires; changing how the planner chooses routes; an hour-by-hour timeline per leg; live-verified snow depth (the model is an estimate).
+Non-goals: highlighting legs on the map; assessing skiing (only its label is prepared); assessing a bicycle without studded tires on winter, but normal tires are used on summer; changing how the planner chooses routes; an hour-by-hour timeline per leg; live-verified snow depth (the model is an estimate).
 
 ## Architecture
 

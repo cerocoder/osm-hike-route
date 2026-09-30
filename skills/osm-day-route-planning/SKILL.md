@@ -383,30 +383,43 @@ from elevation.providers.elevation_api_eu import ElevationApiEuProvider
 from elevation.providers.open_elevation import OpenElevationProvider
 from duration import estimate_duration_hours, duration_warning
 from route_output import build_geojson
+from progress import Progress
+
+# Console progress, in the USER'S language (en ru es fr de pt it; English for any other): one line per step, plain
+# lines without a terminal, sub-progress only for slow steps. Pass `progress` to the functions below that accept it.
+progress = Progress(total_steps=5, lang=user_lang)        # user_lang: the language of the conversation / notes.md
 
 preset = load_preset(mode, style)                 # e.g. load_preset("bike", "leisure")
 weights = build_weights(preset, preference_overrides, max_distance_km, max_duration_hours)
 
-data = fetch_area_data(
-    lat, lon, radius_m=1500,
-    routable_highway=weights["routable_highway"],
-    hard_exclude_highway=weights["hard_exclude_tags"].get("highway", []),
-    exclude_highway_without_infra=weights["exclude_highway_without_infra"],
-    mode=weights["mode"],  # scopes the designated-path override to this mode
-)
+with progress.step("overpass"):
+    data = fetch_area_data(
+        lat, lon, radius_m=1500,
+        routable_highway=weights["routable_highway"],
+        hard_exclude_highway=weights["hard_exclude_tags"].get("highway", []),
+        exclude_highway_without_infra=weights["exclude_highway_without_infra"],
+        mode=weights["mode"],  # scopes the designated-path override to this mode
+        cache_dir=Path("routes/.cache"),  # the answer is kept for 24 h: a revision does not wait for Overpass again;
+        progress=progress,                # refresh=True forces a new query (say so if the user doubts the data)
+    )
+    progress.detail("overpass_done", walkable=len(data["walkable"]), restricted=len(data["restricted"]))
 restricted = build_restricted_polygons(data["restricted"], data["barrier_ways"])
 walkable = filter_excluded_ways(
     data["walkable"], restricted,
     hard_exclude_tags=weights["hard_exclude_tags"],
     exclude_highway_without_infra=weights["exclude_highway_without_infra"],
 )
-graph, node_coords = build_graph(
-    walkable, data["barrier_nodes"],
-    blocking_barrier_tags=weights["blocking_barrier_tags"],
-    respect_oneway=(mode == "bike"),
-)
-tag_edges(graph, node_coords, data["highways"], data["water"], data["forest"], data["fields"],
-          highway_buffer_m=weights["buffers_m"]["highway"], water_buffer_m=weights["buffers_m"]["water"])
+with progress.step("graph"):
+    graph, node_coords = build_graph(
+        walkable, data["barrier_nodes"],
+        blocking_barrier_tags=weights["blocking_barrier_tags"],
+        respect_oneway=(mode == "bike"),
+    )
+    progress.detail("graph_done", nodes=len(graph), edges=sum(len(e) for e in graph.values()))
+with progress.step("tag_edges"):
+    tag_edges(graph, node_coords, data["highways"], data["water"], data["forest"], data["fields"],
+              highway_buffer_m=weights["buffers_m"]["highway"], water_buffer_m=weights["buffers_m"]["water"],
+              progress=progress)
 
 # --- elevation wiring: batch ONCE across every way, never once per way ---
 
@@ -429,7 +442,7 @@ def compute_node_elevations(ways: list[dict], service: ElevationService) -> dict
         way_samples.append((way, coords, samples))
         all_points.extend((lat, lon) for lat, lon, _ in samples)
 
-    all_elevations = service.get_elevations(all_points)
+    all_elevations = service.get_elevations(all_points, progress=progress)
 
     node_elevations: dict[int, float] = {}
     unresolved = 0
@@ -463,12 +476,24 @@ def compute_node_elevations(ways: list[dict], service: ElevationService) -> dict
               f"gradient penalty", file=sys.stderr)
     return node_elevations
 
-elevations = compute_node_elevations(walkable, service)
+with progress.step("elevation"):
+    elevations = compute_node_elevations(walkable, service)        # ticks once per provider request
+    progress.detail("elevation_done", **service.last_request)
 tag_grades(graph, node_coords, elevations)          # mutates graph in place: grade_pct per directed edge
 
 preferences = {**weights["preferences"], "gradient_threshold_pct": weights["gradient_threshold_pct"]}
-path, cost = weighted_shortest_path(graph, start_node_id, end_node_id, preferences)
+with progress.step("routing"):
+    path, cost = weighted_shortest_path(graph, start_node_id, end_node_id, preferences)
 ```
+
+**Progress output.** Every long step reports to the user, in the user's language (`Progress(lang=...)`: the
+language of the conversation; the wording lives in `progress.py`'s catalogue, never pass free text). Functions that
+accept `progress=` are `fetch_area_data`, `query_overpass`, `tag_edges`, `ElevationService.get_elevations`,
+`select_optional_points` (key `optional`) and `route_through_waypoints` (key `routing`). Run the planning script so that its
+output reaches the user while it works: a script whose step may take more than 30 s (Overpass, the first elevation
+fetch of an area) is started in the background with its output written to a log that is then followed. When
+Overpass answered from `routes/.cache` (its line says how old the answer is), a user who suspects stale data gets
+`refresh=True`.
 
 **Do not paste an elevation-wiring version that calls `get_elevations` once
 per way** — with a real fetch (radius 1500m+) that's easily 1000+ separate
@@ -620,7 +645,7 @@ copy an input here):
 | `mode` | `"walk"` or `"bike"` |
 | `style` | `"leisure"`/`"sport"` for bike, `null`/omitted for walk |
 | `distance_km` | Physical distance — see **Budget & Duration Wiring**, not the router's weighted cost |
-| `elevation_gain_m`, `elevation_loss_m` | Summed positive/negative deltas along the solved path |
+| `elevation_gain_m`, `elevation_loss_m` | Summed positive/negative deltas along the solved path, to 0.1 m (`build_geojson` also rounds every vertex and point elevation to 0.1 m — the data is ~30 m resolution, more decimals are noise; an unknown vertex elevation is still `0.0`) |
 | `duration_estimate_hours` | From `duration.estimate_duration_hours` |
 | `duration_warning` | String from `duration.duration_warning`, or `null` |
 | `curated_routes_count` | From `overpass_query.count_curated_routes` |

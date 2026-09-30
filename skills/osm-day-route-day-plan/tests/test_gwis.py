@@ -145,3 +145,13 @@ def test_a_hotspot_query_failure_raises(make_route, fixed_now):
     ctx = _ctx(make_route, fixed_now, Text(HttpError("504")))
     with pytest.raises(HttpError):
         hotspots_near(ctx, [(43.2, -2.8)], datetime.date(2026, 9, 27), datetime.date(2026, 9, 29))
+
+
+def test_an_empty_fwi_answer_is_remembered_for_a_day_only_even_for_a_past_date(make_route, fixed_now):
+    text = Text("")
+    ctx = _ctx(make_route, fixed_now, text, date=datetime.date(2026, 6, 10))          # a past date: normally cached for good
+    assert fwi_at(ctx, 56.84, 60.6, ctx.date) is None and fwi_at(ctx, 56.84, 60.6, ctx.date) is None
+    assert len(text.calls) == 1
+    ctx.cache._data["gwis_fwi|56.84|60.60|2026-06-10"]["t"] = fixed_now.timestamp() - 2 * 24 * 3600
+    assert fwi_at(ctx, 56.84, 60.6, ctx.date) is None
+    assert len(text.calls) == 2

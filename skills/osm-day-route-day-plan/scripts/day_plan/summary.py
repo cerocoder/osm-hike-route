@@ -24,7 +24,7 @@ def _flat(text) -> str:
 
 def build_summary_section(sections: list, lang: str) -> Section:
     warnings = [w for s in sections for w in s.warnings]
-    warnings.sort(key=lambda w: _SEVERITY_RANK.get(w.severity, 3))  # stable: keeps plugin order
+    warnings.sort(key=lambda w: (_SEVERITY_RANK.get(w.severity, 3), not w.pinned))  # stable: keeps plugin order
     lines = [f"- **{_severity_label(w.severity, lang)}:** {_flat(w.text)}" for w in warnings[:MAX_ITEMS]]
     if not lines:
         lines.append("- " + tr("summary_none", lang))

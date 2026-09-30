@@ -87,12 +87,13 @@ def test_default_plan_has_getting_there_and_points_of_interest(make_route_with_p
     text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
     headings = [line for line in text.splitlines() if line.startswith("## ")]
     assert headings == ["## Summary", "## Daylight", "## Weather by hour", "## Getting there", "## Points of interest",
-                        "## Hazards"]
+                        "## Hazards", "## Mobile coverage"]
     subheadings = [line for line in text.splitlines() if line.startswith("### ")]
-    assert subheadings == ["### Mountain hazards", "### Fire danger", "### Ticks and biting insects",
+    assert subheadings == ["### Radiation", "### Mountain hazards", "### Fire danger", "### Ticks and biting insects",
                            "### Air: pollen and pollution"]
     assert "| Lago | start |" in text and "| Museo | sight | 10:00–18:00 |" in text and "| Lago | 41 | bus |" in text
-    assert "<!-- plugins: weather 1, light 1, osm_features 1, transit 1, poi_hours 1, mountain 1, fire 1, bio_hazards 1, air 1 -->" in text
+    assert ("<!-- plugins: weather 1, light 1, osm_features 1, radiation 1, transit 1, poi_hours 1, mountain 1, fire 1, "
+            "bio_hazards 1, air 1, people_hazards 1, cell_coverage 1 -->") in text
 
 
 def test_hint_asks_for_web_facts_until_they_are_recorded(make_route_with_points, weather_response, fixed_now, capsys):
@@ -226,8 +227,8 @@ def test_the_optional_hazard_hint_lists_only_what_applies_and_disappears_when_re
     route_dir = _route_with_points(make_route_with_points)
     build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text, now=fixed_now)
     out = capsys.readouterr().out
-    assert "hint (optional): regional facts would improve the hazard sections: fire, mountain, bio_hazards" in out
-    for plugin in ("fire", "mountain", "bio_hazards"):
+    assert "hint (optional): regional facts would improve the hazard sections: fire, mountain, bio_hazards, people_hazards" in out
+    for plugin in ("fire", "mountain", "bio_hazards", "people_hazards"):
         record_fact.record(route_dir, "2026-06-21", plugin, "Local note.", ["https://example.org/x"])
     build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text, now=fixed_now)
     assert "hint (optional)" not in capsys.readouterr().out
@@ -235,7 +236,7 @@ def test_the_optional_hazard_hint_lists_only_what_applies_and_disappears_when_re
     build_day_plan.main([str(flat), "2026-12-15"], http=_web(weather_response, date="2026-12-15"), http_text=_text,
                         now=fixed_now)
     winter = capsys.readouterr().out
-    assert "regional facts would improve the hazard sections: fire " in winter or "sections: fire —" in winter
+    assert "regional facts would improve the hazard sections: fire, people_hazards — " in winter
 
 
 def test_record_fact_accepts_the_hazard_plugins_and_their_warnings(tmp_path):
@@ -260,3 +261,62 @@ def test_a_failing_hazard_plugin_never_breaks_the_rest_of_the_plan(make_route_wi
     text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
     assert "## Getting there" in text and "### Fire danger" in text and "could not be built" in text
     assert "plugin fire failed" in capsys.readouterr().err
+
+
+# ---- plan 3b: radiation, people, coverage ----------------------------------------------------------------
+
+BRYANSK_ROUTE = ((31.90, 52.54, 150.0), (31.95, 52.56, 150.0))
+
+
+def test_a_route_in_a_contaminated_district_shows_radiation_first_and_warns_in_the_summary(
+        make_route, weather_response, fixed_now):
+    route_dir = make_route(coords=BRYANSK_ROUTE)
+    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text,
+                               now=fixed_now) == 0
+    text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
+    subheadings = [line for line in text.splitlines() if line.startswith("### ")]
+    assert subheadings[0] == "### Radiation"
+    summary = text.split("## Daylight")[0]
+    assert "South-western Bryansk region" in summary and "Do not pick mushrooms or berries" in summary
+    assert text.rstrip().split("## ")[-1].startswith("Mobile coverage")
+
+
+def test_a_route_outside_the_registry_area_has_no_radiation_part(make_route, weather_response, fixed_now):
+    route_dir = make_route(coords=((151.20, -33.86, 20.0), (151.21, -33.85, 25.0)))
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text, now=fixed_now)
+    text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
+    assert "### Radiation" not in text and "radiation registry" not in text
+
+
+def test_record_fact_accepts_people_hazards_and_the_plan_shows_it(make_route, weather_response, fixed_now):
+    import record_fact
+    route_dir = make_route()
+    record_fact.record(route_dir, "all", "people_hazards", "A permit is needed in the border zone.",
+                       ["https://example.org/permit"], warnings=[{"severity": "caution", "text": "Border permit needed."}])
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text, now=fixed_now)
+    text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
+    assert "### People and access" in text and "A permit is needed in the border zone." in text
+    assert "Border permit needed." in text.split("## Daylight")[0]
+    with pytest.raises(ValueError, match="does not use --last-departure"):
+        record_fact.record(route_dir, "all", "people_hazards", "x", ["https://example.org/x"], last_departure="21:00")
+
+
+def test_a_failing_hint_never_fails_the_written_plan(make_route, weather_response, fixed_now, monkeypatch, capsys):
+    def boom(ctx):
+        raise RuntimeError("hint exploded")
+    monkeypatch.setattr(build_day_plan, "optional_hazard_facts", boom)
+    route_dir = make_route()
+    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text,
+                               now=fixed_now) == 0
+    assert (route_dir / "day-plan-2026-06-21.md").exists() and "hint (optional)" not in capsys.readouterr().out
+
+
+def test_a_failing_missing_facts_check_never_fails_the_written_plan(make_route, weather_response, fixed_now,
+                                                                     monkeypatch):
+    def boom(ctx):
+        raise RuntimeError("missing facts exploded")
+    monkeypatch.setattr(build_day_plan, "missing_web_facts", boom)
+    route_dir = make_route()
+    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text,
+                               now=fixed_now) == 0
+    assert (route_dir / "day-plan-2026-06-21.md").exists()

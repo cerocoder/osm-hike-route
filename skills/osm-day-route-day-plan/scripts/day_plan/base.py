@@ -16,6 +16,7 @@ SECTION_ORDER = ("summary", "light", "weather", "transit", "pois", "hazards", "c
 class PlanWarning:
     severity: str  # one of SEVERITIES
     text: str
+    pinned: bool = False  # sorts before other warnings of the same severity in the Summary (radiation)
 
 
 @dataclass

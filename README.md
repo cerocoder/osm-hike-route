@@ -70,14 +70,16 @@ What you get, as `day-plan-<YYYY-MM-DD>.md` in the route folder:
   - *Fire danger:* the official Fire Weather Index (Copernicus GWIS, up to 8 days ahead), the Russian Nesterov class for routes in Russia, and active fires detected near the route by satellite.
   - *Ticks and biting insects:* ticks, mosquitoes, blackflies and midges, horseflies, estimated from temperature, wind, humidity and water near the route. Especially useful for Siberia and the Urals.
   - *Air:* pollen (Europe up to about 45° E; for the rest of Russia the plan points to Yandex Weather) and pollution (European AQI, PM10, PM2.5, ozone), up to about 4 days ahead.
+  - *Radiation*, listed first when it applies: the route and its points are checked against a hand-made registry of contaminated or closed areas (the East Urals trace and reserve, the Techa river, Mayak and Lake Karachay, the Chernobyl zones in Ukraine and Belarus, the Bryansk, Tula, Kaluga and Orel districts, the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-mushroom areas in Bavaria and Norway). A route inside a danger zone or an affected area gives a warning at the top of the plan; an advisory area only adds an info line. The warning says: do not pick mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires. No hit means "no entry in the registry", not "safe". The registry is incomplete and some outlines are approximate; the plan says which.
+  - *People and access:* only sourced notes Claude recorded (permit or border zones, travel advisories, access restrictions). Animals are recorded with the insect notes.
   - Regional knowledge Claude finds on the web (fire bans, avalanche bulletins, insect seasons) is added with its sources when recorded.
+- **Mobile coverage:** the masts OpenStreetMap knows near your route, practical advice (offline maps, tell someone your plan, power bank, 112) and links to coverage maps. OpenStreetMap lists only some masts, so this is not a signal forecast.
 
 Good to know:
 - Forecasts reach about 15 days ahead. For a later date you get the average of that date over the last five years, clearly labelled as *not a forecast*. Dates older than a week use recorded weather; the last week uses model data.
 - Ask for a plan for several dates: each gets its own file, and re-running a date overwrites only that date.
 - The plan records where you start from only as a city or station, never a street address, because the file is embedded in `map.html`, which is meant to be forwarded.
 - Everything that comes from the web rather than from OpenStreetMap is labelled *web-sourced* and carries its sources; a fact without a source is refused. For Russia and its neighbours, Claude checks the date against the official calendar, because the free holiday list is incomplete for Russia: it misses 8 January and the transferred days off (for example 9 March and 11 May 2026). The script reminds Claude to record such a date as a `calendar` fact (per date; `holiday` for any official day off including transferred ones, `workday` for working days including working Saturdays).
-- Radiation zones, animals, people and mobile coverage are planned next.
 
 ## Skill: osm-day-route-show
 

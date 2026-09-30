@@ -47,6 +47,9 @@ def _url(layer: str, lat: float, lon: float, time: str, extra: str = "") -> str:
             f"{lon + half_lon:.4f}&width=101&height=101&i=50&j=50&info_format=text/html&time={time}{extra}")
 
 
+EMPTY_FWI_TTL_S = 24 * 3600
+
+
 def fwi_url(lat: float, lon: float, date: datetime.date) -> str:
     return _url(FWI_LAYER, lat, lon, date.isoformat())
 
@@ -71,8 +74,8 @@ def fwi_at(ctx, lat: float, lon: float, date: datetime.date) -> dict | None:
     key = f"gwis_fwi|{lat:.2f}|{lon:.2f}|{date.isoformat()}"
     forecast = date >= ctx.today
     cached = ctx.cache.get_entry(key, FWI_FORECAST_TTL_S if forecast else None)
-    if cached is not None:
-        return cached[0] or None
+    if cached is not None and (cached[0] or ctx.now.timestamp() - cached[1] <= EMPTY_FWI_TTL_S):
+        return cached[0] or None      # an empty answer is remembered for a day only, even for a past date
     values = parse_fwi(ctx.http_text(fwi_url(lat, lon, date)))
     ctx.cache.put(key, values or {})
     return values

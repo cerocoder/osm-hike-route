@@ -174,7 +174,8 @@ def test_a_nesterov_failure_is_a_note(make_route, fixed_now):
 def test_no_nesterov_beyond_the_open_meteo_horizon(make_route, fixed_now):
     world = World(country="ru", history=history(31))
     section = run(make_route, fixed_now, world, coords=EKB, date=TODAY + datetime.timedelta(days=16))
-    assert "Nesterov" not in section.markdown and not any("open-meteo" in u for u in world.json_calls)
+    assert "The Nesterov index needs weather data and is not available this far ahead." in section.markdown
+    assert not any("open-meteo" in u for u in world.json_calls)
 
 
 def test_restrictions_from_facts_are_shown_with_sources_and_warnings(make_route, fixed_now):

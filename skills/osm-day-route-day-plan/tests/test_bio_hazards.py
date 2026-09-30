@@ -169,3 +169,15 @@ def test_russian_text(make_route, fixed_now):
 def test_group_title_and_dependencies():
     assert BioHazardsPlugin.title_key == "hz_bio"
     assert BioHazardsPlugin.depends_on == ("weather", "light", "osm_features")
+
+
+MARCH = datetime.date(2026, 3, 20)
+
+
+def test_no_tick_line_on_a_freezing_day_even_in_a_tick_month(make_route, fixed_now):
+    freezing = run(make_route, fixed_now, rows(temp=-3.0), mean=-3.0, date=MARCH)
+    assert freezing.omit is True and freezing.markdown == ""
+    mild = run(make_route, fixed_now, rows(temp=8.0), mean=8.0, date=MARCH, folder="mild")
+    assert "Ticks: **high**" in mild.markdown
+    chilly = run(make_route, fixed_now, rows(temp=2.0), mean=2.0, date=MARCH, folder="chilly")
+    assert "Ticks: **low**" in chilly.markdown

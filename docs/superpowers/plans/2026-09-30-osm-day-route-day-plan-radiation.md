@@ -11,12 +11,13 @@
 **Spec:** `docs/superpowers/specs/2026-09-29-osm-day-route-day-plan-design.md`. Parts 1, 2 and 3a are merged. This is part **3b**, the last of the third plan.
 
 **Deviations from the spec (decided while researching):**
+- **A third tier, `info`, for advisory areas** (the Bavarian mushroom areas named by the German federal radiation protection office): an info line only when the route is inside, with the mushroom and game advice only, because the source itself calls moderate consumption harmless.
 - **Radiation severity per zone.** The spec gives a `danger` on any hit. Here a closed or heavily contaminated zone (the East Ural reserve, Mayak, Karachay, the Chernobyl zone, the Polesie reserve) gives `danger`, and a wide affected area (the East Urals trace, the Techa floodplain, south-western Bryansk, the Semipalatinsk site) gives `caution`, because most of a district or of a 18 000 km² test site is far cleaner than its worst spot. The mushroom, berry and spring advice is the same for both.
 - **Radiation comes first in the Hazards group** (the spec lists it after air) and its warnings are pinned in the Summary.
 - **People hazards: no fact means no section**, not `no-data` (which would put "People and access" in every plan's missing-data list). Animals need no new plugin: `bio_hazards` facts already carry them.
 - **Mobile coverage is info-only**: mast count from OpenStreetMap, advice and links, no terrain model. OpenStreetMap masts are sparse and a model without measured data would be a guess dressed as an estimate. Only nPerf and OpenCellID were confirmed to answer; the operators' own maps (MTS, MegaFon, Beeline, T2) could not be confirmed and are not linked.
 - **Registry area.** The registry covers rectangles for Europe with the Urals (north of 36 N), Siberia, northern Kazakhstan and the Far East north of 49 N, and Primorye. The spec excluded China, Mongolia and the Far East outside Russia; rectangles cannot follow borders, so a route just inside a box edge in China or Mongolia is a known limitation.
-- **The registry starts with nine researched zones**, not the spec's whole list. Every zone has a source read during research and geometry from OpenStreetMap or from published figures. The zones not yet researched (Kaluga, Tula and Orel spots, Totskoye, Novaya Zemlya, peaceful underground explosions, Zheleznogorsk and the Yenisei, Seversk, Andreeva Bay, Wismut, Jachymov, La Hague, Sellafield, the Scandinavian and Bavarian hotspots, Balkan depleted uranium) are listed in `data/README.md` and SKILL.md; a plan says so and never says "safe".
+- **The registry starts with twelve researched zones**, not the spec's whole list. Every zone has a source read during research and geometry from OpenStreetMap or from published figures. Totskoye, Novaya Zemlya, the Seversk 1993 trace and the peaceful underground explosions were researched and left out because the sources show only local plots, decayed contamination or no outline; Scandinavia, Wismut, Jáchymov, La Hague, Sellafield, Andreeva Bay and the Balkans are not researched yet. `data/README.md` and SKILL.md say why for each; a plan says so and never says "safe".
 
 ## Global Constraints
 
@@ -327,13 +328,13 @@ Modify `skills/osm-day-route-day-plan/scripts/day_plan/i18n.py` — apply this p
 ```diff
 --- a/skills/osm-day-route-day-plan/scripts/day_plan/i18n.py
 +++ b/skills/osm-day-route-day-plan/scripts/day_plan/i18n.py
-@@ -154,6 +154,33 @@
+@@ -154,6 +154,35 @@
          "air_warn_emissions": "Industrial emissions may be carried toward the route ({hours}).",
          "hz_bio": "Ticks and biting insects", "hz_mountain": "Mountain hazards", "hz_fire": "Fire danger",
          "hz_air": "Air: pollen and pollution",
 +        "hz_radiation": "Radiation", "hz_people": "People and access",
 +        "rad_none": "No zone of the radiation registry lies within {km} km of the route or its points. The registry is curated by hand and incomplete (it covers: {areas}), so no entry does not mean the land is clean.",
-+        "rad_areas": "the East Urals trace, the Techa river, Mayak and Lake Karachay, the Chernobyl zones (Ukraine, Belarus, south-western Bryansk region), the Semipalatinsk test site",
++        "rad_areas": "the East Urals trace, the Techa river, Mayak and Lake Karachay, the Chernobyl zones (Ukraine, Belarus, the Bryansk, Tula, Kaluga and Orel regions), the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-food areas in Bavaria",
 +        "rad_inside": "- **{name}** ({severity}): the route or one of its points is inside the zone. {contamination}. {status}",
 +        "rad_near": "- **{name}** ({severity}): the route passes about {km} km from the zone. {contamination}. {status}",
 +        "rad_approx": " *Approximate outline: {note}*",
@@ -347,7 +348,9 @@ Modify `skills/osm-day-route-day-plan/scripts/day_plan/i18n.py` — apply this p
 +        "rad_warn_inside_danger": "The route enters {name}: contaminated land. Do not pick mushrooms or berries, do not drink from springs or streams, stay out of the zone if it is closed.",
 +        "rad_warn_inside_caution": "The route crosses {name} (contamination: {event}). Do not pick mushrooms or berries and do not drink from springs or streams.",
 +        "rad_warn_near": "The route passes about {km} km from {name}: do not pick mushrooms or berries and do not drink from springs or streams near it.",
-+        "rad_sev_danger": "danger zone", "rad_sev_caution": "affected area",
++        "rad_sev_danger": "danger zone", "rad_sev_caution": "affected area", "rad_sev_info": "advisory area",
++        "rad_advice_mushrooms": "- Wild mushrooms and game from these areas can still carry caesium-137: eat them in moderation and check the local advice.",
++        "rad_warn_inside_info": "The route crosses {name}: some wild mushrooms and game here can still exceed the caesium-137 limit; eat them in moderation.",
 +        "ppl_web_title": "**Access and safety notes (from web sources, not verified in person)**",
 +        "cell_masts": "- Mobile masts recorded in OpenStreetMap within {km} km of the route: **{count}**{nearest}.",
 +        "cell_nearest": " (nearest about {dist} km)",
@@ -361,13 +364,13 @@ Modify `skills/osm-day-route-day-plan/scripts/day_plan/i18n.py` — apply this p
          "weekday_names": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
          "cal_line": "Date: {weekday} {date} — {kind}; {holiday} {source}",
          "cal_weekend": "weekend", "cal_workday": "working day", "cal_dayoff": "day off",
-@@ -332,6 +359,33 @@
+@@ -332,6 +361,35 @@
          "air_warn_emissions": "Выбросы промышленных объектов могут нести на маршрут ({hours}).",
          "hz_bio": "Клещи и кровососущие насекомые", "hz_mountain": "Горные опасности",
          "hz_fire": "Пожарная опасность", "hz_air": "Воздух: пыльца и загрязнение",
 +        "hz_radiation": "Радиация", "hz_people": "Люди и доступ",
 +        "rad_none": "В радиус {km} км от маршрута и его точек не попадает ни одна зона реестра радиации. Реестр составлен вручную и неполон (в нём: {areas}), поэтому отсутствие записи не означает, что земля чистая.",
-+        "rad_areas": "Восточно-Уральский след, река Теча, «Маяк» и озеро Карачай, чернобыльские зоны (Украина, Беларусь, юго-запад Брянской области), Семипалатинский полигон",
++        "rad_areas": "Восточно-Уральский след, река Теча, «Маяк» и озеро Карачай, чернобыльские зоны (Украина, Беларусь, Брянская, Тульская, Калужская и Орловская области), Семипалатинский полигон, Енисей ниже Железногорска, районы Баварии с грибами",
 +        "rad_inside": "- **{name}** ({severity}): маршрут или одна из его точек внутри зоны. {contamination}. {status}",
 +        "rad_near": "- **{name}** ({severity}): маршрут проходит примерно в {km} км от зоны. {contamination}. {status}",
 +        "rad_approx": " *Приблизительный контур: {note}*",
@@ -381,7 +384,9 @@ Modify `skills/osm-day-route-day-plan/scripts/day_plan/i18n.py` — apply this p
 +        "rad_warn_inside_danger": "Маршрут входит в зону: {name} — заражённая земля. Не собирайте грибы и ягоды, не пейте из родников и ручьёв; если зона закрыта, не входите в неё.",
 +        "rad_warn_inside_caution": "Маршрут пересекает зону: {name} (загрязнение: {event}). Не собирайте грибы и ягоды и не пейте из родников и ручьёв.",
 +        "rad_warn_near": "Маршрут проходит примерно в {km} км от зоны: {name}. Рядом не собирайте грибы и ягоды и не пейте из родников и ручьёв.",
-+        "rad_sev_danger": "опасная зона", "rad_sev_caution": "затронутая территория",
++        "rad_sev_danger": "опасная зона", "rad_sev_caution": "затронутая территория", "rad_sev_info": "зона с рекомендациями",
++        "rad_advice_mushrooms": "- Дикие грибы и дичь из этих районов всё ещё могут содержать цезий-137: ешьте их умеренно и уточняйте местные рекомендации.",
++        "rad_warn_inside_info": "Маршрут пересекает зону: {name}. Некоторые дикие грибы и дичь здесь всё ещё могут превышать предел по цезию-137; ешьте их умеренно.",
 +        "ppl_web_title": "**Доступ и безопасность (по веб-источникам, лично не проверено)**",
 +        "cell_masts": "- Вышек сотовой связи в OpenStreetMap в радиусе {km} км от маршрута: **{count}**{nearest}.",
 +        "cell_nearest": " (ближайшая примерно в {dist} км)",
@@ -616,7 +621,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ### Task 3: The radiation registry
 
-`data/radiation_zones.json` holds nine zones, each with geometry, a bilingual name, contamination, status and event, an `approximate` flag with a bilingual note where the shape is not a published outline, and cited sources (each checked by reading the source while researching; see `data/README.md`). Geometry is taken from OpenStreetMap through Nominatim and simplified, or built from published figures; nothing comes from memory. `radiation.py` loads and validates the registry and finds the zones a route (by its segments, together with its access and interest points) is inside or within the margin of. Registry validation and known inside/outside places are pinned by tests.
+`data/radiation_zones.json` holds twelve zones, each with geometry, a bilingual name, contamination, status and event, an `approximate` flag with a bilingual note where the shape is not a published outline, and cited sources (each checked by reading the source while researching; see `data/README.md`, which also lists what was researched and left out and why). Geometry is taken from OpenStreetMap through Nominatim and simplified, or built from published figures; nothing comes from memory. `radiation.py` loads and validates the registry and finds the zones a route (by its segments, together with its access and interest points) is inside or within the margin of. Registry validation and known inside/outside places are pinned by tests.
 
 **Files:**
 - Create: `skills/osm-day-route-day-plan/tests/test_radiation_registry.py`
@@ -624,7 +629,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Create: `skills/osm-day-route-day-plan/data/radiation_zones.json`
 - Create: `skills/osm-day-route-day-plan/data/README.md`
 
-- [ ] **Step 1: Add the tests** (39 tests in the file(s) below)
+- [ ] **Step 1: Add the tests** (55 tests in the file(s) below)
 
 Create `skills/osm-day-route-day-plan/tests/test_radiation_registry.py`:
 
@@ -651,6 +656,9 @@ EXPECTED_BBOX = {
     "by-polesie-reserve": (29.0, 51.0, 30.8, 52.1),
     "ru-bryansk-contaminated-districts": (31.0, 51.9, 32.8, 53.4),
     "kz-semipalatinsk-test-site": (76.8, 49.0, 79.4, 51.2),
+    "ru-central-chernobyl-districts": (33.5, 52.9, 38.0, 54.4),
+    "de-bavaria-wild-food-areas": (10.9, 47.3, 14.0, 49.4),
+    "ru-yenisei-mcc-floodplain": (93.0, 56.0, 94.0, 57.2),
 }
 
 
@@ -661,7 +669,7 @@ def test_the_shipped_registry_is_valid():
 def test_every_zone_has_at_least_one_source_and_a_primary_one_for_the_strong_claims():
     for zone in REGISTRY["zones"]:
         assert zone["sources"], zone["id"]
-        assert all(s["url"].startswith("https://") for s in zone["sources"]), zone["id"]
+        assert all(s["url"].startswith(("https://", "http://government.ru/")) for s in zone["sources"]), zone["id"]
     assert all(any(s["kind"] == "primary" for s in z["sources"]) for z in REGISTRY["zones"])
 
 
@@ -679,8 +687,18 @@ def test_each_zone_lies_where_it_should(zone_id):
 def test_approximate_zones_say_how_their_shape_was_made():
     approximate = [z for z in REGISTRY["zones"] if z["approximate"]]
     assert {z["id"] for z in approximate} == {
-        "ural-eurt-trace", "ural-techa-river", "ural-mayak-site", "ural-karachay", "ru-bryansk-contaminated-districts"}
+        "ural-eurt-trace", "ural-techa-river", "ural-mayak-site", "ural-karachay", "ru-bryansk-contaminated-districts",
+        "ru-central-chernobyl-districts", "de-bavaria-wild-food-areas", "ru-yenisei-mcc-floodplain"}
     assert all(len(z["geometry_note"]["en"]) > 40 and len(z["geometry_note"]["ru"]) > 40 for z in approximate)
+
+
+def test_severity_and_advice_are_consistent():
+    for zone in REGISTRY["zones"]:
+        assert zone["severity"] in ("danger", "caution", "info") and zone["advice"] in ("full", "mushrooms")
+        if zone["severity"] == "info":
+            assert zone["advice"] == "mushrooms"
+        if zone["severity"] == "danger":
+            assert zone["advice"] == "full"
 
 
 def test_every_zone_has_a_short_event_and_bilingual_texts():
@@ -698,13 +716,22 @@ KNOWN_INSIDE = {
     "Kamensk-Uralsky": ((61.93, 56.41), "ural-eurt-trace"),
     "Bogdanovich": ((62.05, 56.78), "ural-eurt-trace"),
     "Degelen": ((78.106, 49.805), "kz-semipalatinsk-test-site"),
+    "Shchekino": ((37.52, 54.0), "ru-central-chernobyl-districts"),
+    "Zhizdra": ((34.73, 53.75), "ru-central-chernobyl-districts"),
+    "Belev": ((36.14, 53.81), "ru-central-chernobyl-districts"),
+    "Bolkhov": ((36.0, 53.44), "ru-central-chernobyl-districts"),
+    "Grafenau (Bavarian Forest)": ((13.40, 48.86), "de-bavaria-wild-food-areas"),
+    "Berchtesgaden": ((13.0, 47.63), "de-bavaria-wild-food-areas"),
+    "Mittenwald": ((11.26, 47.44), "de-bavaria-wild-food-areas"),
+    "Yenisei at the combine": ((93.5264, 56.3085), "ru-yenisei-mcc-floodplain"),
     "Karachay": ((60.7997, 55.6783), "ural-karachay"),
     "Mayak": ((60.9, 55.7333), "ural-mayak-site"),
 }
 KNOWN_CLEAN = {"Kyiv": (30.52, 50.45), "Moscow": (37.62, 55.75), "Madrid": (-3.70, 40.42),
                "Ekaterinburg": (60.60, 56.84), "Chelyabinsk": (61.40, 55.16), "Minsk": (27.56, 53.90),
                "Argayash (south of Mayak)": (60.87, 55.49), "Shadrinsk (east of the trace)": (63.63, 56.09),
-               "Kyshtym (upwind, west of Mayak)": (60.56, 55.71)}
+               "Kyshtym (upwind, west of Mayak)": (60.56, 55.71), "Kaluga city": (36.26, 54.51),
+               "Munich": (11.58, 48.14), "Hamburg": (9.99, 53.55), "Krasnoyarsk city": (92.87, 56.01)}
 
 
 @pytest.mark.parametrize("name", sorted(KNOWN_INSIDE))
@@ -787,6 +814,9 @@ def test_validation_catches_broken_entries():
     problems = validate_zone(zone)
     assert any("bad source" in p for p in problems) and any("severity" in p for p in problems) \
         and any("name needs" in p for p in problems)
+    no_advice = copy.deepcopy(ZONES["ural-karachay"])
+    del no_advice["advice"]
+    assert any("advice must be" in p for p in validate_zone(no_advice))
     circle = copy.deepcopy(ZONES["ural-karachay"])
     circle["geometry"]["center"] = [55.6783, 900.0]
     circle["approximate"] = True
@@ -839,7 +869,8 @@ from .geo import (
 )
 
 REGISTRY_PATH = Path(__file__).resolve().parents[2] / "data" / "radiation_zones.json"
-SEVERITIES = ("danger", "caution")
+SEVERITIES = ("danger", "caution", "info")
+ADVICE_KINDS = ("full", "mushrooms")
 SOURCE_KINDS = ("primary", "secondary")
 GEOMETRY_KINDS = ("polygons", "circle", "buffered_polyline")
 
@@ -875,6 +906,8 @@ def validate_zone(zone: dict) -> list:
         problems.append(f"{zid}: geometry_note needs non-empty en and ru text")
     if zone.get("severity") not in SEVERITIES:
         problems.append(f"{zid}: severity must be one of {SEVERITIES}")
+    if zone.get("advice") not in ADVICE_KINDS:
+        problems.append(f"{zid}: advice must be one of {ADVICE_KINDS}")
     if not isinstance(zone.get("approximate"), bool):
         problems.append(f"{zid}: approximate must be true or false")
     elif zone["approximate"] and not zone.get("geometry_note"):
@@ -1096,7 +1129,8 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
      "title": "East Ural Nature Reserve (Wikipedia)",
      "kind": "secondary"
     }
-   ]
+   ],
+   "advice": "full"
   },
   {
    "id": "ural-eurt-trace",
@@ -1135,7 +1169,8 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
      "title": "NRPA Bulletin 8-07: The Kyshtym accident, 29th September 1957",
      "kind": "primary"
     }
-   ]
+   ],
+   "advice": "full"
   },
   {
    "id": "ural-techa-river",
@@ -1185,7 +1220,8 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
      "title": "NRPA StrålevernRapport 2008:3: Mayak Health Report",
      "kind": "primary"
     }
-   ]
+   ],
+   "advice": "full"
   },
   {
    "id": "ural-mayak-site",
@@ -1222,7 +1258,8 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
      "title": "NRPA StrålevernRapport 2008:3: Mayak Health Report",
      "kind": "primary"
     }
-   ]
+   ],
+   "advice": "full"
   },
   {
    "id": "ural-karachay",
@@ -1264,7 +1301,8 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
      "title": "Lake Karachay (Wikipedia)",
      "kind": "secondary"
     }
-   ]
+   ],
+   "advice": "full"
   },
   {
    "id": "ua-chernobyl-exclusion-zone",
@@ -1302,7 +1340,8 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
      "title": "V. Kashparov (UIAR), National experience in remediation of contaminated farmlands after the Chernobyl accident (IAEA)",
      "kind": "primary"
     }
-   ]
+   ],
+   "advice": "full"
   },
   {
    "id": "by-polesie-reserve",
@@ -1340,7 +1379,8 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
      "title": "Order of the Ministry for Emergency Situations of Belarus No. 39 of 5 Aug 1995: regulation on the Polesie State Radioecological Reserve",
      "kind": "primary"
     }
-   ]
+   ],
+   "advice": "full"
   },
   {
    "id": "ru-bryansk-contaminated-districts",
@@ -1355,25 +1395,25 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
     "ru": "цезий-137 после Чернобыльской аварии 1986 года"
    },
    "status": {
-    "en": "The surveyed settlements of Chernobyl-contaminated territories of the region lie in the Gordeevsky, Zlynkovsky, Klimovsky, Klintsovsky, Krasnogorsky and Novozybkovsky districts; forest mushrooms can account for up to 75–82 % of the internal dose there (Radiation Hygiene, 2023). Only part of each district is contaminated.",
-    "ru": "Обследованные населённые пункты радиоактивно загрязнённых после Чернобыля территорий области расположены в Гордеевском, Злынковском, Климовском, Клинцовском, Красногорском и Новозыбковском районах; вклад лесных грибов во внутреннюю дозу там может достигать 75–82 % (журнал «Радиационная гигиена», 2023). Загрязнена лишь часть каждого района."
+    "en": "The government list of Chernobyl-contaminated settlements (decree No. 1074 of 2015) puts settlements of the Gordeevsky, Zlynkovsky, Klintsovsky, Krasnogorsky and Novozybkovsky districts into the resettlement zone, those of Krasnogorsky district also into the exclusion zone, and adds Klimovsky district to the zone of residence with the right to resettle; forest mushrooms can account for up to 75–82 % of the internal dose there (Radiation Hygiene, 2023). Only some settlements of each district are listed.",
+    "ru": "В перечне населённых пунктов в зонах радиоактивного загрязнения (постановление Правительства РФ № 1074 от 2015 года) населённые пункты Гордеевского, Злынковского, Клинцовского, Красногорского и Новозыбковского районов отнесены к зоне отселения, часть Красногорского района — к зоне отчуждения, а Климовский район добавлен к зоне проживания с правом на отселение; вклад лесных грибов во внутреннюю дозу там может достигать 75–82 % (журнал «Радиационная гигиена», 2023). В перечне указаны лишь некоторые населённые пункты каждого района."
    },
    "geometry": {
     "type": "polygons",
     "rings": [
-     [[31.6773, 52.8542], [31.6823, 52.8477], [31.707, 52.8455], [31.7224, 52.8318], [31.7286, 52.8324], [31.7102, 52.815], [31.7172, 52.8062], [31.6909, 52.8028], [31.6931, 52.7943], [31.6845, 52.7945], [31.6941, 52.7819], [31.6871, 52.7754], [31.6848, 52.7567], [31.6968, 52.7485], [31.7001, 52.7345], [31.7274, 52.7246], [31.7213, 52.7075], [31.7544, 52.7054], [31.7589, 52.7349], [31.7744, 52.755], [31.773, 52.7684], [31.8437, 52.7756], [31.8637, 52.7909], [31.8973, 52.7912], [31.9014, 52.8151], [31.9112, 52.8185], [31.8982, 52.8368], [31.9203, 52.8316], [31.9233, 52.8433], [31.9549, 52.8449], [31.9671, 52.8403], [31.9802, 52.8487], [31.9703, 52.8569], [31.9743, 52.8698], [31.9891, 52.8697], [31.9954, 52.8805], [32.0336, 52.8833], [32.0508, 52.8966], [32.0467, 52.8993], [32.064, 52.8992], [32.0813, 52.9087], [32.0795, 52.9165], [32.0928, 52.923], [32.0971, 52.9197], [32.1066, 52.9255], [32.1225, 52.9205], [32.1237, 52.9251], [32.1316, 52.9259], [32.1303, 52.9308], [32.1658, 52.9339], [32.1768, 52.9306], [32.1752, 52.9359], [32.1608, 52.938], [32.1577, 52.9679], [32.1492, 52.9793], [32.1618, 53.0019], [32.156, 53.0072], [32.1614, 53.0124], [32.1496, 53.0235], [32.1539, 53.0288], [32.1434, 53.0392], [32.1476, 53.044], [32.1114, 53.0781], [32.0813, 53.0774], [32.018, 53.0909], [32.0191, 53.1001], [31.9926, 53.0933], [31.9926, 53.0853], [31.9347, 53.0831], [31.9135, 53.0889], [31.9225, 53.105], [31.8871, 53.1145], [31.8802, 53.1149], [31.8697, 53.1071], [31.831, 53.1104], [31.8147, 53.1244], [31.7612, 53.1059], [31.7507, 53.0907], [31.7597, 53.0837], [31.7734, 53.0857], [31.7819, 53.0804], [31.766, 53.075], [31.7738, 53.0589], [31.7612, 53.0513], [31.7635, 53.0356], [31.735, 53.0305], [31.7356, 53.0159], [31.747, 53.0109], [31.7462, 52.997], [31.7283, 52.9887], [31.7251, 52.9987], [31.6957, 53.002], [31.7119, 52.9868], [31.716, 52.9637], [31.7008, 52.9302], [31.7191, 52.9057], [31.6958, 52.8962], [31.6845, 52.8777], [31.7048, 52.8727], [31.7018, 52.862], [31.6773, 52.8542]],
-     [[31.5326, 52.486], [31.5375, 52.4738], [31.5449, 52.4713], [31.5602, 52.4766], [31.5649, 52.4664], [31.5764, 52.4635], [31.5812, 52.4768], [31.5746, 52.4836], [31.5326, 52.486]],
-     [[31.5588, 52.5181], [31.561, 52.5059], [31.5714, 52.5055], [31.5735, 52.4978], [31.5795, 52.4962], [31.6001, 52.5054], [31.6156, 52.492], [31.625, 52.4919], [31.6073, 52.4669], [31.5808, 52.4571], [31.6078, 52.4537], [31.6099, 52.4408], [31.5967, 52.4399], [31.6026, 52.4236], [31.5933, 52.4216], [31.5941, 52.4149], [31.6216, 52.4183], [31.6254, 52.3994], [31.6325, 52.3987], [31.6199, 52.3409], [31.6254, 52.3315], [31.6145, 52.3273], [31.5807, 52.3284], [31.6273, 52.2892], [31.63, 52.296], [31.6481, 52.2876], [31.6487, 52.2794], [31.6568, 52.2759], [31.6825, 52.2771], [31.714, 52.2652], [31.7051, 52.2555], [31.6965, 52.2579], [31.7034, 52.2383], [31.7092, 52.2378], [31.7033, 52.2354], [31.7109, 52.2148], [31.7036, 52.2135], [31.6972, 52.2034], [31.6881, 52.2025], [31.6883, 52.1945], [31.7061, 52.1859], [31.735, 52.1929], [31.7735, 52.1857], [31.7857, 52.1926], [31.8166, 52.1947], [31.8311, 52.2007], [31.8375, 52.1997], [31.8375, 52.1946], [31.8664, 52.1877], [31.868, 52.1832], [31.8926, 52.1862], [31.8899, 52.2012], [31.9018, 52.2162], [31.8952, 52.2544], [31.9063, 52.2483], [31.9345, 52.2501], [31.9385, 52.2548], [31.9229, 52.272], [31.9289, 52.2744], [31.9406, 52.266], [31.9439, 52.2706], [31.9611, 52.2711], [31.9594, 52.2772], [31.9898, 52.2804], [31.9914, 52.2884], [32.0424, 52.2906], [32.0392, 52.3006], [32.0176, 52.3012], [32.0209, 52.3237], [32.0065, 52.323], [31.9907, 52.3415], [32.0074, 52.3564], [31.9972, 52.3615], [32.0074, 52.3695], [31.9879, 52.3784], [32.0037, 52.3915], [32.0356, 52.3888], [32.0323, 52.4102], [31.9946, 52.4264], [31.9455, 52.4329], [31.9286, 52.4286], [31.9186, 52.4199], [31.9173, 52.434], [31.8799, 52.4492], [31.852, 52.4507], [31.8307, 52.4452], [31.8398, 52.4588], [31.8228, 52.4625], [31.8414, 52.4772], [31.8317, 52.4852], [31.7265, 52.4795], [31.7155, 52.4857], [31.7244, 52.5019], [31.6676, 52.4982], [31.6681, 52.5049], [31.6824, 52.5029], [31.6819, 52.5085], [31.6735, 52.509], [31.6741, 52.5162], [31.6878, 52.5183], [31.6845, 52.5285], [31.6529, 52.5352], [31.647, 52.5429], [31.6313, 52.5419], [31.6236, 52.5533], [31.6102, 52.5491], [31.6127, 52.5386], [31.5952, 52.5322], [31.5943, 52.5163], [31.5803, 52.5152], [31.5764, 52.5201], [31.5621, 52.521], [31.5588, 52.5181]],
-     [[31.7763, 52.1878], [31.7845, 52.1346], [31.7993, 52.1196], [31.7806, 52.1144], [31.7977, 52.1021], [31.8199, 52.0985], [31.8465, 52.11], [31.8676, 52.1105], [31.9162, 52.0971], [31.9415, 52.0836], [31.9406, 52.08], [31.9538, 52.0819], [31.9606, 52.0746], [31.9582, 52.0683], [31.9427, 52.057], [31.9212, 52.0569], [31.9174, 52.0525], [31.9285, 52.0506], [31.9283, 52.0466], [31.9173, 52.0476], [31.9163, 52.0423], [31.9411, 52.0492], [31.9494, 52.0458], [31.9622, 52.0532], [32.0238, 52.0487], [32.0659, 52.0349], [32.0962, 52.0336], [32.096, 52.0441], [32.1016, 52.0456], [32.1338, 52.0439], [32.1302, 52.0493], [32.1471, 52.0578], [32.1472, 52.0691], [32.1646, 52.072], [32.1758, 52.069], [32.1829, 52.0726], [32.1994, 52.0661], [32.1981, 52.0726], [32.2117, 52.0801], [32.2225, 52.0806], [32.2244, 52.0872], [32.2525, 52.0889], [32.2905, 52.1031], [32.2983, 52.1113], [32.2942, 52.1206], [32.3177, 52.1222], [32.3204, 52.1366], [32.3295, 52.133], [32.3347, 52.1406], [32.3647, 52.1433], [32.3654, 52.156], [32.3307, 52.1565], [32.3238, 52.1516], [32.3262, 52.1631], [32.3391, 52.1739], [32.3347, 52.1763], [32.3472, 52.1834], [32.3447, 52.1954], [32.3306, 52.2031], [32.3244, 52.2237], [32.3467, 52.2447], [32.3616, 52.2388], [32.3821, 52.2405], [32.4017, 52.248], [32.3897, 52.2541], [32.3831, 52.27], [32.3934, 52.2784], [32.3822, 52.2793], [32.3734, 52.2739], [32.3695, 52.277], [32.3629, 52.3023], [32.3517, 52.3165], [32.3562, 52.3283], [32.3766, 52.3376], [32.3943, 52.3337], [32.4007, 52.3381], [32.4319, 52.3221], [32.4603, 52.3269], [32.4894, 52.3145], [32.4995, 52.3212], [32.5181, 52.3617], [32.5245, 52.3647], [32.5443, 52.3629], [32.5766, 52.3751], [32.5649, 52.3896], [32.5382, 52.3911], [32.5332, 52.413], [32.5438, 52.4191], [32.5518, 52.4485], [32.5116, 52.4633], [32.5131, 52.4721], [32.4939, 52.4761], [32.4981, 52.4787], [32.4743, 52.4889], [32.4796, 52.4898], [32.477, 52.4985], [32.4598, 52.5046], [32.4301, 52.5084], [32.4055, 52.5015], [32.3933, 52.5079], [32.3474, 52.5086], [32.3461, 52.4933], [32.3816, 52.4732], [32.3686, 52.4706], [32.3114, 52.5059], [32.2821, 52.5178], [32.2531, 52.5196], [32.2035, 52.5032], [32.203, 52.5061], [32.1841, 52.5051], [32.181, 52.4949], [32.168, 52.503], [32.16, 52.5188], [32.1247, 52.5224], [32.1303, 52.5155], [32.1257, 52.497], [32.1063, 52.4934], [32.1034, 52.4812], [32.0867, 52.4697], [32.0901, 52.4476], [32.0772, 52.4348], [32.0673, 52.4279], [32.0549, 52.4288], [32.052, 52.433], [32.0304, 52.4331], [32.0188, 52.4258], [32.0449, 52.4187], [32.0435, 52.4139], [32.0309, 52.4106], [32.0356, 52.3888], [32.0037, 52.3915], [31.9879, 52.3784], [32.0074, 52.3695], [31.9972, 52.3615], [32.0074, 52.3564], [31.9917, 52.3453], [31.9917, 52.3375], [32.0065, 52.323], [32.0209, 52.3237], [32.0176, 52.3012], [32.0392, 52.3006], [32.0424, 52.2906], [31.9914, 52.2884], [31.9898, 52.2804], [31.9594, 52.2772], [31.9611, 52.2711], [31.9439, 52.2706], [31.9406, 52.266], [31.9289, 52.2744], [31.9229, 52.272], [31.9385, 52.2548], [31.9345, 52.2501], [31.9063, 52.2483], [31.8952, 52.2544], [31.9018, 52.2162], [31.8899, 52.2012], [31.8926, 52.1862], [31.868, 52.1832], [31.8664, 52.1877], [31.8375, 52.1946], [31.8375, 52.1997], [31.8311, 52.2007], [31.7763, 52.1878]],
-     [[31.7567, 52.7194], [31.7947, 52.7344], [31.8098, 52.7168], [31.802, 52.6807], [31.8157, 52.6752], [31.8734, 52.6861], [31.9125, 52.6879], [31.9125, 52.6665], [31.9245, 52.6669], [31.9191, 52.6554], [31.926, 52.6495], [31.9668, 52.6704], [31.9744, 52.6641], [32.059, 52.6527], [32.0765, 52.6429], [32.0684, 52.6378], [32.0692, 52.6317], [32.0966, 52.6344], [32.1166, 52.6305], [32.1317, 52.6465], [32.1221, 52.6524], [32.1646, 52.6505], [32.1461, 52.6396], [32.1435, 52.6289], [32.1615, 52.6323], [32.19, 52.6244], [32.1942, 52.6162], [32.2086, 52.6128], [32.2033, 52.5997], [32.2153, 52.5856], [32.2387, 52.5897], [32.2468, 52.5834], [32.2675, 52.5807], [32.2302, 52.564], [32.2533, 52.5501], [32.256, 52.5417], [32.2673, 52.54], [32.2703, 52.5325], [32.2321, 52.5203], [32.2366, 52.5167], [32.2587, 52.5198], [32.2891, 52.5154], [32.3686, 52.4706], [32.3816, 52.4732], [32.3461, 52.4933], [32.3474, 52.5086], [32.3933, 52.5079], [32.4055, 52.5015], [32.4273, 52.5083], [32.4359, 52.5053], [32.4361, 52.5103], [32.4255, 52.5123], [32.4214, 52.5264], [32.4346, 52.5444], [32.4446, 52.5468], [32.4428, 52.5546], [32.4768, 52.5489], [32.505, 52.5514], [32.5098, 52.5573], [32.5113, 52.5685], [32.5018, 52.5759], [32.5114, 52.5877], [32.4607, 52.6139], [32.4673, 52.6231], [32.4523, 52.6245], [32.4595, 52.6292], [32.453, 52.6358], [32.4618, 52.6405], [32.4385, 52.664], [32.4268, 52.6684], [32.4271, 52.679], [32.411, 52.6864], [32.4066, 52.7031], [32.4378, 52.725], [32.4369, 52.7339], [32.4447, 52.7354], [32.4575, 52.7328], [32.4579, 52.7268], [32.4734, 52.7183], [32.4814, 52.7008], [32.5059, 52.696], [32.5514, 52.6987], [32.5498, 52.7321], [32.5442, 52.7333], [32.5379, 52.7275], [32.5197, 52.7296], [32.5196, 52.7336], [32.5003, 52.7377], [32.4726, 52.769], [32.4462, 52.7675], [32.445, 52.7801], [32.4268, 52.8021], [32.4247, 52.8182], [32.4399, 52.8192], [32.4483, 52.8147], [32.4588, 52.8173], [32.4545, 52.8344], [32.4737, 52.8229], [32.4852, 52.837], [32.4862, 52.8462], [32.4475, 52.8511], [32.4469, 52.8592], [32.4216, 52.8659], [32.4328, 52.8674], [32.4268, 52.8702], [32.453, 52.8949], [32.4401, 52.8912], [32.4402, 52.886], [32.421, 52.8772], [32.4104, 52.864], [32.3915, 52.863], [32.3871, 52.8711], [32.3788, 52.8636], [32.3677, 52.865], [32.3703, 52.8718], [32.3508, 52.8841], [32.2876, 52.8834], [32.2931, 52.8956], [32.257, 52.9277], [32.2058, 52.9304], [32.1989, 52.9369], [32.177, 52.9419], [32.171, 52.9404], [32.1768, 52.9306], [32.1658, 52.9339], [32.1303, 52.9308], [32.1316, 52.9259], [32.1237, 52.9251], [32.1225, 52.9205], [32.1035, 52.9257], [32.0971, 52.9197], [32.0928, 52.923], [32.0821, 52.9183], [32.0813, 52.9087], [32.064, 52.8992], [32.0467, 52.8993], [32.0508, 52.8966], [32.0336, 52.8833], [31.9954, 52.8805], [31.9891, 52.8697], [31.9743, 52.8698], [31.9703, 52.8569], [31.9802, 52.8487], [31.9671, 52.8403], [31.9549, 52.8449], [31.9233, 52.8433], [31.9203, 52.8316], [31.8982, 52.8368], [31.9112, 52.8185], [31.9014, 52.8151], [31.8973, 52.7912], [31.8637, 52.7909], [31.8437, 52.7756], [31.773, 52.7684], [31.7744, 52.755], [31.7589, 52.7349], [31.7567, 52.7194]],
-     [[32.252, 52.7282], [32.2558, 52.723], [32.2658, 52.7244], [32.2636, 52.733], [32.252, 52.7282]],
-     [[31.2419, 53.0288], [31.292, 53.0056], [31.3063, 53.0036], [31.3225, 52.992], [31.3562, 52.9846], [31.3629, 52.963], [31.3789, 52.9518], [31.3751, 52.9271], [31.3939, 52.9158], [31.3935, 52.9113], [31.4127, 52.9076], [31.4394, 52.8813], [31.4593, 52.8757], [31.4808, 52.8605], [31.5334, 52.86], [31.5382, 52.8564], [31.5363, 52.8394], [31.5194, 52.8315], [31.5369, 52.8158], [31.5611, 52.8078], [31.5626, 52.7968], [31.5896, 52.7914], [31.5953, 52.7706], [31.5889, 52.758], [31.5984, 52.7546], [31.6094, 52.7648], [31.6388, 52.7612], [31.6394, 52.7578], [31.6848, 52.7567], [31.6871, 52.7754], [31.6941, 52.7819], [31.6845, 52.7945], [31.6931, 52.7943], [31.6909, 52.8028], [31.7172, 52.8062], [31.7102, 52.815], [31.7286, 52.8324], [31.7224, 52.8318], [31.707, 52.8455], [31.6823, 52.8477], [31.6773, 52.8542], [31.7018, 52.862], [31.7048, 52.8727], [31.6845, 52.8777], [31.6958, 52.8962], [31.7191, 52.9057], [31.7008, 52.9302], [31.716, 52.9637], [31.7119, 52.9868], [31.6957, 53.002], [31.7251, 52.9987], [31.7283, 52.9887], [31.7462, 52.997], [31.747, 53.0109], [31.7356, 53.0159], [31.735, 53.0305], [31.7635, 53.0356], [31.7612, 53.0513], [31.7738, 53.0589], [31.766, 53.075], [31.7819, 53.0804], [31.7734, 53.0857], [31.7597, 53.0837], [31.7507, 53.0907], [31.7612, 53.1059], [31.8147, 53.1244], [31.7958, 53.1458], [31.7906, 53.1772], [31.77, 53.1814], [31.7448, 53.1997], [31.7281, 53.1937], [31.7069, 53.2062], [31.6679, 53.2117], [31.6603, 53.2182], [31.6436, 53.2203], [31.6285, 53.2312], [31.5866, 53.196], [31.564, 53.1923], [31.5433, 53.1908], [31.5385, 53.1988], [31.5197, 53.1977], [31.4592, 53.2105], [31.4018, 53.2118], [31.405, 53.1977], [31.4184, 53.1876], [31.4149, 53.1783], [31.3986, 53.1709], [31.3945, 53.1561], [31.3636, 53.144], [31.3655, 53.1267], [31.3839, 53.1231], [31.3988, 53.1097], [31.3892, 53.1078], [31.3912, 53.0965], [31.3348, 53.0912], [31.3367, 53.082], [31.3275, 53.0664], [31.3306, 53.0418], [31.3069, 53.0365], [31.2623, 53.043], [31.2419, 53.0288]],
-     [[32.1526, 52.7569], [32.1662, 52.7465], [32.1688, 52.7498], [32.1717, 52.7427], [32.1839, 52.7415], [32.1913, 52.7509], [32.211, 52.7502], [32.2047, 52.742], [32.1982, 52.7423], [32.2026, 52.7376], [32.2086, 52.7411], [32.2133, 52.735], [32.2223, 52.7363], [32.2131, 52.7277], [32.2458, 52.7363], [32.252, 52.7282], [32.2636, 52.733], [32.2658, 52.7244], [32.2869, 52.7274], [32.29, 52.7348], [32.281, 52.7386], [32.2825, 52.7456], [32.3068, 52.7518], [32.2978, 52.751], [32.301, 52.7612], [32.2792, 52.7613], [32.2714, 52.7752], [32.2597, 52.7769], [32.2538, 52.7691], [32.2422, 52.7856], [32.2327, 52.7811], [32.2152, 52.7852], [32.2001, 52.7551], [32.1777, 52.7607], [32.1674, 52.7557], [32.1736, 52.7535], [32.1711, 52.7481], [32.1588, 52.7588], [32.1526, 52.7569]],
-     [[31.4978, 52.6952], [31.5695, 52.6352], [31.564, 52.5943], [31.5797, 52.5944], [31.5929, 52.5829], [31.6171, 52.5763], [31.6304, 52.5628], [31.6441, 52.5622], [31.6471, 52.5656], [31.6736, 52.5611], [31.647, 52.5429], [31.6529, 52.5352], [31.6845, 52.5285], [31.6878, 52.5183], [31.6741, 52.5162], [31.6735, 52.509], [31.6819, 52.5085], [31.6824, 52.5029], [31.6681, 52.5049], [31.6676, 52.4982], [31.7244, 52.5019], [31.7155, 52.4857], [31.7265, 52.4795], [31.8317, 52.4852], [31.8414, 52.4772], [31.8228, 52.4625], [31.8398, 52.4588], [31.8307, 52.4452], [31.8655, 52.4517], [31.8912, 52.4462], [31.9173, 52.434], [31.9186, 52.4199], [31.9286, 52.4286], [31.9455, 52.4329], [31.9946, 52.4264], [32.0309, 52.4106], [32.0435, 52.4139], [32.0449, 52.4187], [32.0188, 52.4258], [32.0304, 52.4331], [32.052, 52.433], [32.0549, 52.4288], [32.0673, 52.4279], [32.0772, 52.4348], [32.0901, 52.4476], [32.0867, 52.4697], [32.1034, 52.4812], [32.1063, 52.4934], [32.1257, 52.497], [32.1303, 52.5155], [32.1247, 52.5224], [32.16, 52.5188], [32.168, 52.503], [32.181, 52.4949], [32.1841, 52.5051], [32.2168, 52.5062], [32.2366, 52.5167], [32.2321, 52.5203], [32.2372, 52.5245], [32.2703, 52.5325], [32.2673, 52.54], [32.256, 52.5417], [32.2533, 52.5501], [32.2302, 52.564], [32.2675, 52.5807], [32.2468, 52.5834], [32.2387, 52.5897], [32.2153, 52.5856], [32.2033, 52.5997], [32.2086, 52.6128], [32.1942, 52.6162], [32.19, 52.6244], [32.1615, 52.6323], [32.1435, 52.6289], [32.1461, 52.6396], [32.1646, 52.6505], [32.1221, 52.6524], [32.1317, 52.6465], [32.1166, 52.6305], [32.0966, 52.6344], [32.0692, 52.6317], [32.0684, 52.6378], [32.0765, 52.6429], [32.059, 52.6527], [31.9744, 52.6641], [31.9668, 52.6704], [31.926, 52.6495], [31.9191, 52.6554], [31.9245, 52.6669], [31.9125, 52.6665], [31.9125, 52.6879], [31.8392, 52.6816], [31.8259, 52.6748], [31.802, 52.6807], [31.8098, 52.7168], [31.7947, 52.7344], [31.7567, 52.7194], [31.7544, 52.7054], [31.7213, 52.7075], [31.7274, 52.7246], [31.7001, 52.7345], [31.6968, 52.7485], [31.6848, 52.7567], [31.6394, 52.7578], [31.6388, 52.7612], [31.6094, 52.7648], [31.5984, 52.7546], [31.6006, 52.746], [31.5929, 52.7345], [31.5751, 52.7276], [31.567, 52.7081], [31.4978, 52.6952]]
+     [[31.6773, 52.8542], [31.7286, 52.8324], [31.7172, 52.8062], [31.6845, 52.7945], [31.6848, 52.7567], [31.7274, 52.7246], [31.7213, 52.7075], [31.7544, 52.7054], [31.773, 52.7684], [31.8973, 52.7912], [31.9112, 52.8185], [31.8982, 52.8368], [31.9671, 52.8403], [31.9743, 52.8698], [32.0336, 52.8833], [32.0928, 52.923], [32.1768, 52.9306], [32.1492, 52.9793], [32.1618, 53.0019], [32.1476, 53.044], [32.1114, 53.0781], [32.018, 53.0909], [32.0191, 53.1001], [31.9926, 53.0853], [31.9347, 53.0831], [31.9135, 53.0889], [31.9225, 53.105], [31.8871, 53.1145], [31.831, 53.1104], [31.8147, 53.1244], [31.7612, 53.1059], [31.7507, 53.0907], [31.7819, 53.0804], [31.766, 53.075], [31.7635, 53.0356], [31.735, 53.0305], [31.7462, 52.997], [31.7283, 52.9887], [31.6957, 53.002], [31.7119, 52.9868], [31.7008, 52.9302], [31.7191, 52.9057], [31.6845, 52.8777], [31.7048, 52.8727], [31.7018, 52.862], [31.6773, 52.8542]],
+     [[31.5326, 52.486], [31.5375, 52.4738], [31.5602, 52.4766], [31.5764, 52.4635], [31.5746, 52.4836], [31.5326, 52.486]],
+     [[31.5588, 52.5181], [31.5735, 52.4978], [31.6001, 52.5054], [31.625, 52.4919], [31.5808, 52.4571], [31.6078, 52.4537], [31.5941, 52.4149], [31.6216, 52.4183], [31.6325, 52.3987], [31.6254, 52.3315], [31.5807, 52.3284], [31.6273, 52.2892], [31.714, 52.2652], [31.6965, 52.2579], [31.7109, 52.2148], [31.6883, 52.1945], [31.7735, 52.1857], [31.8311, 52.2007], [31.868, 52.1832], [31.8926, 52.1862], [31.8952, 52.2544], [31.9345, 52.2501], [31.9289, 52.2744], [31.9406, 52.266], [31.9914, 52.2884], [32.0424, 52.2906], [32.0176, 52.3012], [32.0209, 52.3237], [31.9907, 52.3415], [32.0074, 52.3695], [31.9879, 52.3784], [32.0037, 52.3915], [32.0356, 52.3888], [32.0323, 52.4102], [31.9455, 52.4329], [31.9186, 52.4199], [31.9173, 52.434], [31.8799, 52.4492], [31.8307, 52.4452], [31.8317, 52.4852], [31.7265, 52.4795], [31.7244, 52.5019], [31.6676, 52.4982], [31.6845, 52.5285], [31.6236, 52.5533], [31.5943, 52.5163], [31.5588, 52.5181]],
+     [[31.7763, 52.1878], [31.7993, 52.1196], [31.7806, 52.1144], [31.7977, 52.1021], [31.8676, 52.1105], [31.9538, 52.0819], [31.9582, 52.0683], [31.9212, 52.0569], [31.9163, 52.0423], [31.9622, 52.0532], [32.0659, 52.0349], [32.1338, 52.0439], [32.1472, 52.0691], [32.1994, 52.0661], [32.2244, 52.0872], [32.2905, 52.1031], [32.3204, 52.1366], [32.3647, 52.1433], [32.3654, 52.156], [32.3238, 52.1516], [32.3472, 52.1834], [32.3244, 52.2237], [32.3467, 52.2447], [32.4017, 52.248], [32.3831, 52.27], [32.3934, 52.2784], [32.3695, 52.277], [32.3562, 52.3283], [32.4007, 52.3381], [32.4894, 52.3145], [32.5181, 52.3617], [32.5766, 52.3751], [32.5649, 52.3896], [32.5382, 52.3911], [32.5518, 52.4485], [32.4598, 52.5046], [32.3474, 52.5086], [32.3461, 52.4933], [32.3816, 52.4732], [32.3686, 52.4706], [32.2821, 52.5178], [32.1841, 52.5051], [32.181, 52.4949], [32.16, 52.5188], [32.1247, 52.5224], [32.1257, 52.497], [32.0867, 52.4697], [32.0772, 52.4348], [32.0188, 52.4258], [32.0449, 52.4187], [32.0356, 52.3888], [32.0037, 52.3915], [31.9879, 52.3784], [32.0074, 52.3695], [31.9917, 52.3375], [32.0209, 52.3237], [32.0176, 52.3012], [32.0424, 52.2906], [31.9914, 52.2884], [31.9406, 52.266], [31.9289, 52.2744], [31.9345, 52.2501], [31.8952, 52.2544], [31.8926, 52.1862], [31.868, 52.1832], [31.8311, 52.2007], [31.7763, 52.1878]],
+     [[31.7567, 52.7194], [31.7947, 52.7344], [31.8157, 52.6752], [31.9125, 52.6879], [31.926, 52.6495], [31.9668, 52.6704], [32.059, 52.6527], [32.0765, 52.6429], [32.0692, 52.6317], [32.1166, 52.6305], [32.1221, 52.6524], [32.1646, 52.6505], [32.1435, 52.6289], [32.19, 52.6244], [32.2153, 52.5856], [32.2675, 52.5807], [32.2302, 52.564], [32.2703, 52.5325], [32.2321, 52.5203], [32.2891, 52.5154], [32.3686, 52.4706], [32.3816, 52.4732], [32.3461, 52.4933], [32.3474, 52.5086], [32.4359, 52.5053], [32.4214, 52.5264], [32.4428, 52.5546], [32.5098, 52.5573], [32.5114, 52.5877], [32.4607, 52.6139], [32.4618, 52.6405], [32.4066, 52.7031], [32.4447, 52.7354], [32.4814, 52.7008], [32.5514, 52.6987], [32.5498, 52.7321], [32.5197, 52.7296], [32.4726, 52.769], [32.4462, 52.7675], [32.4268, 52.8021], [32.4247, 52.8182], [32.4588, 52.8173], [32.4545, 52.8344], [32.4737, 52.8229], [32.4852, 52.837], [32.4862, 52.8462], [32.4216, 52.8659], [32.453, 52.8949], [32.4104, 52.864], [32.3871, 52.8711], [32.3788, 52.8636], [32.3508, 52.8841], [32.2876, 52.8834], [32.2931, 52.8956], [32.257, 52.9277], [32.177, 52.9419], [32.1768, 52.9306], [32.1035, 52.9257], [32.0336, 52.8833], [31.9743, 52.8698], [31.9671, 52.8403], [31.8982, 52.8368], [31.9112, 52.8185], [31.8973, 52.7912], [31.773, 52.7684], [31.7567, 52.7194]],
+     [[32.252, 52.7282], [32.2658, 52.7244], [32.2636, 52.733], [32.252, 52.7282]],
+     [[31.2419, 53.0288], [31.3562, 52.9846], [31.3751, 52.9271], [31.4394, 52.8813], [31.4808, 52.8605], [31.5382, 52.8564], [31.5194, 52.8315], [31.5626, 52.7968], [31.5896, 52.7914], [31.5889, 52.758], [31.6848, 52.7567], [31.6845, 52.7945], [31.7172, 52.8062], [31.7286, 52.8324], [31.6773, 52.8542], [31.7018, 52.862], [31.7048, 52.8727], [31.6845, 52.8777], [31.7191, 52.9057], [31.7008, 52.9302], [31.7119, 52.9868], [31.6957, 53.002], [31.7283, 52.9887], [31.7462, 52.997], [31.735, 53.0305], [31.7635, 53.0356], [31.766, 53.075], [31.7819, 53.0804], [31.7507, 53.0907], [31.7612, 53.1059], [31.8147, 53.1244], [31.7906, 53.1772], [31.6285, 53.2312], [31.564, 53.1923], [31.4018, 53.2118], [31.4149, 53.1783], [31.3636, 53.144], [31.3655, 53.1267], [31.3988, 53.1097], [31.3912, 53.0965], [31.3348, 53.0912], [31.3306, 53.0418], [31.2623, 53.043], [31.2419, 53.0288]],
+     [[32.1526, 52.7569], [32.1717, 52.7427], [32.211, 52.7502], [32.1982, 52.7423], [32.2223, 52.7363], [32.2131, 52.7277], [32.2458, 52.7363], [32.2658, 52.7244], [32.2869, 52.7274], [32.2825, 52.7456], [32.3068, 52.7518], [32.2714, 52.7752], [32.2538, 52.7691], [32.2422, 52.7856], [32.2152, 52.7852], [32.2001, 52.7551], [32.1777, 52.7607], [32.1711, 52.7481], [32.1526, 52.7569]],
+     [[31.4978, 52.6952], [31.5695, 52.6352], [31.564, 52.5943], [31.6304, 52.5628], [31.6736, 52.5611], [31.647, 52.5429], [31.6845, 52.5285], [31.6676, 52.4982], [31.7244, 52.5019], [31.7265, 52.4795], [31.8317, 52.4852], [31.8307, 52.4452], [31.8912, 52.4462], [31.9186, 52.4199], [31.9455, 52.4329], [32.0435, 52.4139], [32.0188, 52.4258], [32.0772, 52.4348], [32.0867, 52.4697], [32.1257, 52.497], [32.1247, 52.5224], [32.16, 52.5188], [32.181, 52.4949], [32.1841, 52.5051], [32.2168, 52.5062], [32.2703, 52.5325], [32.2302, 52.564], [32.2675, 52.5807], [32.2153, 52.5856], [32.19, 52.6244], [32.1435, 52.6289], [32.1646, 52.6505], [32.1221, 52.6524], [32.1166, 52.6305], [32.0692, 52.6317], [32.0765, 52.6429], [32.059, 52.6527], [31.9668, 52.6704], [31.926, 52.6495], [31.9125, 52.6879], [31.8259, 52.6748], [31.802, 52.6807], [31.8098, 52.7168], [31.7947, 52.7344], [31.7567, 52.7194], [31.7544, 52.7054], [31.7213, 52.7075], [31.7274, 52.7246], [31.6848, 52.7567], [31.6094, 52.7648], [31.567, 52.7081], [31.4978, 52.6952]]
     ]
    },
    "geometry_note": {
-    "en": "Outline from OpenStreetMap (© OpenStreetMap contributors, ODbL), district boundaries (relations 1242315, 1242352, 1242354, 1242351, 1242316, 4464145, 1242353), simplified; whole districts, so the outline overstates the contaminated land",
+    "en": "Outline from OpenStreetMap (© OpenStreetMap contributors, ODbL), district boundaries (relations 1242315, 1242352, 1242354, 1242351, 1242316, 4464145, 1242353), simplified to about 0.8 km; whole districts, so the outline overstates the contaminated land",
     "ru": "Контур из OpenStreetMap (© участники OpenStreetMap, ODbL), границы районов (relations 1242315, 1242352, 1242354, 1242351, 1242316, 4464145, 1242353), упрощены; районы целиком, поэтому контур преувеличивает загрязнённую землю"
    },
    "event": {
@@ -1385,8 +1425,14 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
      "url": "https://www.radhyg.ru/jour/article/download/993/861",
      "title": "Structure of forest mushroom consumption by residents of contaminated territories of the Bryansk region, Radiation Hygiene 2023;16(4):55-63",
      "kind": "primary"
+    },
+    {
+     "url": "http://government.ru/docs/all/103736/",
+     "title": "Government of the Russian Federation, decree No. 1074 of 8 Oct 2015: list of settlements within the Chernobyl radioactive-contamination zones",
+     "kind": "primary"
     }
-   ]
+   ],
+   "advice": "full"
   },
   {
    "id": "kz-semipalatinsk-test-site",
@@ -1407,7 +1453,7 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
    "geometry": {
     "type": "polygons",
     "rings": [
-     [[77.076, 50.665], [77.123, 50.6464], [77.263, 50.5661], [77.199, 50.5081], [77.2296, 50.4327], [77.1823, 50.4385], [77.161, 50.4313], [77.1934, 50.4111], [77.2155, 50.3601], [77.2701, 50.2913], [77.2777, 50.2764], [77.2816, 50.2372], [77.324, 50.2157], [77.4015, 50.1298], [77.4598, 50.0893], [77.4811, 50.0656], [77.4365, 50.029], [77.3917, 50.0217], [77.3528, 50.0056], [77.2703, 49.981], [77.2238, 49.9513], [77.1901, 49.9541], [77.1542, 49.9372], [77.1342, 49.887], [77.1455, 49.8717], [77.1293, 49.78], [77.1638, 49.7655], [77.1596, 49.7129], [77.151, 49.6912], [77.0799, 49.6242], [77.1299, 49.5383], [77.1337, 49.5059], [77.1941, 49.4709], [77.3115, 49.4483], [77.4373, 49.4142], [77.4729, 49.385], [77.488, 49.3604], [77.5117, 49.3538], [77.5249, 49.3446], [78.0732, 49.3566], [78.1399, 49.3509], [78.1293, 49.3294], [78.1912, 49.325], [78.2305, 49.3174], [78.2521, 49.3248], [78.2587, 49.353], [78.3952, 49.3931], [78.4371, 49.4213], [78.5744, 49.4708], [78.6738, 49.5193], [78.6478, 49.5696], [78.6578, 49.5883], [78.6148, 49.6381], [78.6446, 49.675], [78.6898, 49.7016], [78.7873, 49.7046], [78.8186, 49.6935], [78.871, 49.7415], [78.9055, 49.7588], [78.9567, 49.7767], [79.0621, 49.7841], [79.0976, 49.8194], [79.0721, 49.8539], [79.1148, 49.8604], [79.1567, 49.8876], [79.1335, 49.8923], [79.1743, 49.924], [79.081, 50.0037], [79.0966, 50.0235], [79.1252, 50.0348], [78.8926, 50.1302], [78.8046, 50.1389], [78.8094, 50.1656], [78.7947, 50.2136], [78.7836, 50.323], [78.7529, 50.4385], [78.6816, 50.4517], [78.6711, 50.4593], [78.6793, 50.5125], [78.6694, 50.5834], [78.6858, 50.6251], [78.6788, 50.6426], [78.6801, 50.6963], [78.4795, 50.7878], [78.4678, 50.7803], [78.4714, 50.7726], [78.4509, 50.7668], [78.4555, 50.7315], [78.3971, 50.7282], [78.3642, 50.7323], [78.3156, 50.7489], [78.3024, 50.7795], [78.2539, 50.8017], [78.1895, 50.8234], [78.13, 50.8333], [78.0952, 50.8308], [78.0015, 50.8494], [77.9327, 50.8729], [77.8732, 50.9086], [77.8006, 50.9147], [77.7741, 50.9114], [77.6993, 50.9243], [77.6323, 50.9218], [77.5815, 50.9087], [77.4601, 50.9137], [77.3851, 50.8929], [77.2723, 50.8155], [77.247, 50.7879], [77.2096, 50.7693], [77.1457, 50.7207], [77.1123, 50.6864], [77.076, 50.665]]
+     [[77.076, 50.665], [77.263, 50.5661], [77.199, 50.5081], [77.2296, 50.4327], [77.1823, 50.4385], [77.161, 50.4313], [77.1934, 50.4111], [77.2155, 50.3601], [77.2701, 50.2913], [77.2816, 50.2372], [77.324, 50.2157], [77.4015, 50.1298], [77.4811, 50.0656], [77.4365, 50.029], [77.2703, 49.981], [77.2238, 49.9513], [77.1901, 49.9541], [77.1542, 49.9372], [77.1342, 49.887], [77.1455, 49.8717], [77.1293, 49.78], [77.1638, 49.7655], [77.1596, 49.7129], [77.151, 49.6912], [77.0799, 49.6242], [77.1299, 49.5383], [77.1337, 49.5059], [77.1941, 49.4709], [77.4373, 49.4142], [77.488, 49.3604], [77.5249, 49.3446], [78.0732, 49.3566], [78.1399, 49.3509], [78.1293, 49.3294], [78.2305, 49.3174], [78.2521, 49.3248], [78.2587, 49.353], [78.3952, 49.3931], [78.4371, 49.4213], [78.5744, 49.4708], [78.6738, 49.5193], [78.6478, 49.5696], [78.6578, 49.5883], [78.6148, 49.6381], [78.6446, 49.675], [78.6898, 49.7016], [78.7873, 49.7046], [78.8186, 49.6935], [78.871, 49.7415], [78.9055, 49.7588], [78.9567, 49.7767], [79.0621, 49.7841], [79.0976, 49.8194], [79.0721, 49.8539], [79.1148, 49.8604], [79.1567, 49.8876], [79.1335, 49.8923], [79.1743, 49.924], [79.081, 50.0037], [79.0966, 50.0235], [79.1252, 50.0348], [78.8926, 50.1302], [78.8046, 50.1389], [78.7836, 50.323], [78.7529, 50.4385], [78.6711, 50.4593], [78.6801, 50.6963], [78.4795, 50.7878], [78.4714, 50.7726], [78.4509, 50.7668], [78.4555, 50.7315], [78.3971, 50.7282], [78.3156, 50.7489], [78.3024, 50.7795], [78.2539, 50.8017], [78.1895, 50.8234], [78.0952, 50.8308], [78.0015, 50.8494], [77.9327, 50.8729], [77.8732, 50.9086], [77.7741, 50.9114], [77.6993, 50.9243], [77.6323, 50.9218], [77.5815, 50.9087], [77.4601, 50.9137], [77.3851, 50.8929], [77.076, 50.665]]
     ]
    },
    "geometry_note": {
@@ -1424,7 +1470,139 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
      "title": "National Nuclear Center of the Republic of Kazakhstan: radioecological surveys",
      "kind": "primary"
     }
+   ],
+   "advice": "full"
+  },
+  {
+   "id": "ru-central-chernobyl-districts",
+   "severity": "caution",
+   "approximate": true,
+   "name": {
+    "en": "Tula, Kaluga and Orel districts with Chernobyl-contaminated settlements",
+    "ru": "Районы Тульской, Калужской и Орловской областей с загрязнёнными после Чернобыля населёнными пунктами"
+   },
+   "contamination": {
+    "en": "caesium-137 from the 1986 Chernobyl accident",
+    "ru": "цезий-137 после Чернобыльской аварии 1986 года"
+   },
+   "status": {
+    "en": "The government list (decree No. 1074 of 2015) puts settlements of the Arsenyevsky, Belevsky, Plavsky, Chernsky and Shchekinsky districts of the Tula region, the Zhizdra, Ulyanovo and Khvastovichi districts of the Kaluga region and the Bolkhov district of the Orel region into the zone of residence with the right to resettle. Only some settlements of each district are listed.",
+    "ru": "В перечне Правительства РФ (постановление № 1074 от 2015 года) населённые пункты Арсеньевского, Белёвского, Плавского, Чернского и Щёкинского районов Тульской области, Жиздринского, Ульяновского и Хвастовичского районов Калужской области и Болховского района Орловской области отнесены к зоне проживания с правом на отселение. В перечне указаны лишь некоторые населённые пункты каждого района."
+   },
+   "event": {
+    "en": "Chernobyl accident, 1986",
+    "ru": "Чернобыльская авария 1986 года"
+   },
+   "geometry": {
+    "type": "polygons",
+    "rings": [
+     [[36.2705, 53.6757], [36.3142, 53.6557], [36.3, 53.6424], [36.334, 53.6164], [36.3288, 53.5942], [36.3535, 53.6039], [36.3641, 53.5886], [36.2972, 53.5492], [36.2879, 53.5176], [36.3233, 53.5003], [36.3179, 53.4745], [36.3616, 53.4717], [36.3849, 53.4495], [36.4109, 53.4739], [36.4594, 53.4616], [36.48, 53.4901], [36.5327, 53.5114], [36.4856, 53.5168], [36.4588, 53.5587], [36.5047, 53.5635], [36.4981, 53.5552], [36.5496, 53.5446], [36.5656, 53.5283], [36.6124, 53.5432], [36.64, 53.5381], [36.7132, 53.5513], [36.7338, 53.5643], [36.7238, 53.5824], [36.7911, 53.5845], [36.8274, 53.6222], [36.8521, 53.6279], [36.89, 53.6133], [36.9169, 53.6266], [36.994, 53.6729], [36.9507, 53.6892], [36.9553, 53.7014], [37.0428, 53.7338], [37.0304, 53.7502], [36.9833, 53.7522], [36.9929, 53.768], [36.9269, 53.7737], [36.8868, 53.7673], [36.8719, 53.753], [36.8426, 53.7691], [36.8519, 53.7768], [36.786, 53.7751], [36.7741, 53.8013], [36.7218, 53.8041], [36.6429, 53.7803], [36.642, 53.7625], [36.6186, 53.7794], [36.5834, 53.7769], [36.5668, 53.7871], [36.5127, 53.7808], [36.5199, 53.7555], [36.3899, 53.7734], [36.406, 53.7363], [36.3802, 53.7061], [36.3167, 53.6991], [36.3046, 53.7093], [36.3069, 53.691], [36.2868, 53.6948], [36.2705, 53.6757]],
+     [[35.8986, 53.8502], [35.9728, 53.8164], [35.9698, 53.797], [35.9173, 53.777], [35.9335, 53.7528], [35.9584, 53.7519], [35.9585, 53.7185], [36.0288, 53.7262], [36.0304, 53.712], [36.0877, 53.7029], [36.074, 53.6819], [36.028, 53.6731], [35.9925, 53.6414], [35.9912, 53.6263], [36.037, 53.6102], [36.0189, 53.5676], [36.0386, 53.5588], [36.0607, 53.5734], [36.1739, 53.5394], [36.2268, 53.5613], [36.2317, 53.5445], [36.3175, 53.5584], [36.3641, 53.5886], [36.3535, 53.6039], [36.3288, 53.5942], [36.334, 53.6164], [36.3, 53.6424], [36.3142, 53.6557], [36.2705, 53.6757], [36.2828, 53.693], [36.3069, 53.691], [36.3046, 53.7093], [36.3167, 53.6991], [36.3802, 53.7061], [36.406, 53.7363], [36.3899, 53.7734], [36.5199, 53.7555], [36.4883, 53.7742], [36.4826, 53.8014], [36.4458, 53.8079], [36.4815, 53.8542], [36.4654, 53.8507], [36.3976, 53.879], [36.4238, 53.8838], [36.4328, 53.9022], [36.4988, 53.9199], [36.4956, 53.9341], [36.4065, 53.9664], [36.3887, 53.9465], [36.3452, 53.9365], [36.3023, 53.952], [36.2616, 53.95], [36.2615, 53.967], [36.2057, 53.9557], [36.1992, 53.9826], [36.1737, 53.9695], [36.1666, 53.9797], [36.1274, 53.9809], [36.1284, 53.9648], [36.1568, 53.9562], [36.1413, 53.9404], [36.1201, 53.9385], [36.0944, 53.9593], [36.0472, 53.9559], [36.0559, 53.9464], [36.0241, 53.9346], [36.0356, 53.924], [35.9836, 53.9081], [36.0008, 53.8727], [35.9698, 53.8526], [35.8986, 53.8502]],
+     [[36.9507, 53.6892], [36.994, 53.6729], [36.9538, 53.6473], [37.1155, 53.5904], [37.1353, 53.5969], [37.1591, 53.5795], [37.1215, 53.5535], [37.1423, 53.5315], [37.1248, 53.5033], [37.1619, 53.488], [37.1583, 53.4791], [37.1911, 53.4776], [37.1958, 53.4613], [37.2576, 53.4627], [37.3187, 53.3858], [37.3553, 53.4023], [37.3873, 53.3668], [37.4063, 53.3714], [37.3919, 53.3921], [37.4305, 53.4154], [37.3996, 53.445], [37.4075, 53.4824], [37.3866, 53.5065], [37.4262, 53.5206], [37.4375, 53.5459], [37.5353, 53.5809], [37.4377, 53.6265], [37.4801, 53.6338], [37.4805, 53.6579], [37.5135, 53.6592], [37.5114, 53.692], [37.4788, 53.6949], [37.4838, 53.7083], [37.4387, 53.7127], [37.4412, 53.7252], [37.3794, 53.7244], [37.3743, 53.7388], [37.3394, 53.7295], [37.35, 53.7574], [37.3196, 53.7729], [37.3504, 53.7967], [37.257, 53.833], [37.2297, 53.8171], [37.165, 53.8091], [37.0978, 53.8244], [37.0818, 53.7894], [37.0484, 53.7887], [37.0504, 53.7759], [37.0019, 53.7765], [36.9833, 53.7522], [37.0304, 53.7502], [37.0428, 53.7338], [36.9553, 53.7014], [36.9507, 53.6892]],
+     [[36.3849, 53.4495], [36.4299, 53.4206], [36.4683, 53.4292], [36.489, 53.3903], [36.5475, 53.376], [36.6229, 53.3991], [36.6356, 53.4202], [36.6996, 53.395], [36.6959, 53.3705], [36.6757, 53.3636], [36.7312, 53.3437], [36.7391, 53.3256], [36.7615, 53.3246], [36.746, 53.3091], [36.7747, 53.3158], [36.7841, 53.2958], [36.832, 53.2862], [36.9108, 53.2943], [36.8988, 53.273], [36.9962, 53.2902], [36.9967, 53.2993], [37.0125, 53.2963], [37.0078, 53.267], [37.0958, 53.2862], [37.127, 53.2629], [37.2218, 53.256], [37.3669, 53.291], [37.366, 53.3017], [37.4666, 53.2878], [37.4603, 53.3313], [37.4844, 53.3286], [37.5002, 53.3569], [37.4786, 53.3618], [37.4387, 53.3497], [37.4063, 53.3714], [37.3873, 53.3668], [37.3553, 53.4023], [37.3187, 53.3858], [37.2576, 53.4627], [37.1958, 53.4613], [37.1934, 53.4764], [37.1697, 53.4743], [37.1248, 53.5033], [37.1423, 53.5315], [37.1215, 53.5535], [37.1591, 53.5795], [37.1433, 53.5936], [37.1155, 53.5904], [36.9538, 53.6473], [36.8931, 53.6138], [36.8529, 53.619], [36.8521, 53.6279], [36.8274, 53.6222], [36.7911, 53.5845], [36.7238, 53.5824], [36.7338, 53.5643], [36.7132, 53.5513], [36.594, 53.538], [36.5656, 53.5283], [36.5657, 53.5063], [36.5327, 53.5114], [36.48, 53.4901], [36.4594, 53.4616], [36.4109, 53.4739], [36.3849, 53.4495]],
+     [[36.9775, 54.0046], [37.0005, 54.0035], [37.0035, 53.9924], [36.9912, 53.9441], [37.0488, 53.9363], [37.0406, 53.9035], [37.0733, 53.9102], [37.1103, 53.8825], [37.0687, 53.8329], [37.0923, 53.8174], [37.1193, 53.8238], [37.165, 53.8091], [37.2649, 53.8324], [37.2699, 53.8194], [37.3393, 53.8073], [37.3502, 53.7911], [37.3196, 53.7729], [37.35, 53.7574], [37.3394, 53.7295], [37.3743, 53.7388], [37.3794, 53.7244], [37.4412, 53.7252], [37.4387, 53.7127], [37.4838, 53.7083], [37.4788, 53.6949], [37.5114, 53.692], [37.557, 53.697], [37.5609, 53.7274], [37.6217, 53.7489], [37.6691, 53.7378], [37.6828, 53.7507], [37.7099, 53.7496], [37.7226, 53.7932], [37.6793, 53.8065], [37.6692, 53.8248], [37.6963, 53.8408], [37.6958, 53.8808], [37.6752, 53.8826], [37.6792, 53.8917], [37.7207, 53.9], [37.669, 53.9128], [37.6453, 53.9614], [37.7176, 54.0041], [37.6869, 54.0211], [37.6817, 54.0139], [37.631, 54.0219], [37.6058, 54.05], [37.5356, 54.0837], [37.4598, 54.0745], [37.4464, 54.0533], [37.4169, 54.0522], [37.3836, 54.0891], [37.3236, 54.054], [37.2453, 54.0693], [37.1463, 54.068], [37.1095, 54.052], [37.064, 54.0555], [37.0266, 54.0422], [37.0189, 54.0228], [36.9775, 54.0046]],
+     [[34.4018, 53.7477], [34.4255, 53.6937], [34.5007, 53.6707], [34.4951, 53.637], [34.4726, 53.6358], [34.4899, 53.6181], [34.512, 53.6167], [34.519, 53.5883], [34.4976, 53.583], [34.5015, 53.5431], [34.5293, 53.5411], [34.5155, 53.5084], [34.5685, 53.4704], [34.5548, 53.4546], [34.5717, 53.4287], [34.606, 53.4267], [34.6443, 53.3814], [34.6735, 53.3808], [34.6703, 53.4096], [34.652, 53.4161], [34.6769, 53.4263], [34.6666, 53.4328], [34.7084, 53.4287], [34.7129, 53.4606], [34.7336, 53.4578], [34.7647, 53.4978], [34.7847, 53.4971], [34.7729, 53.5197], [34.875, 53.5535], [34.9235, 53.5364], [34.9476, 53.5517], [34.9576, 53.5806], [34.9425, 53.5813], [34.9812, 53.6495], [35.0371, 53.6538], [35.0463, 53.6881], [35.0688, 53.6761], [35.1043, 53.6841], [35.0937, 53.7312], [35.0652, 53.711], [35.0306, 53.7186], [35.0565, 53.7703], [35.0857, 53.7786], [35.0737, 53.7901], [35.0503, 53.785], [34.9964, 53.8023], [34.9343, 53.7795], [34.8627, 53.7813], [34.8536, 53.8201], [34.8139, 53.8402], [34.8286, 53.856], [34.7074, 53.8953], [34.6914, 53.8532], [34.6267, 53.8291], [34.6115, 53.8084], [34.5842, 53.8063], [34.5842, 53.7854], [34.5506, 53.7836], [34.5472, 53.7684], [34.5232, 53.7715], [34.5, 53.751], [34.4018, 53.7477]],
+     [[35.1587, 53.7174], [35.1765, 53.6788], [35.255, 53.6513], [35.2571, 53.6379], [35.3202, 53.6457], [35.3326, 53.6184], [35.3198, 53.6051], [35.3409, 53.5819], [35.3179, 53.5564], [35.3385, 53.5611], [35.3415, 53.5376], [35.3598, 53.537], [35.4365, 53.5882], [35.4765, 53.5911], [35.4912, 53.5798], [35.4536, 53.5655], [35.4484, 53.5332], [35.4618, 53.539], [35.5107, 53.5235], [35.5085, 53.5382], [35.4815, 53.5449], [35.4892, 53.5562], [35.5487, 53.5544], [35.5573, 53.535], [35.5357, 53.5141], [35.5859, 53.5123], [35.6233, 53.5239], [35.6118, 53.5336], [35.626, 53.5383], [35.612, 53.5386], [35.6851, 53.5454], [35.7001, 53.5301], [35.6841, 53.5193], [35.7534, 53.5223], [35.7721, 53.506], [35.8225, 53.5876], [35.8753, 53.5963], [35.9253, 53.6524], [35.9545, 53.6471], [35.9606, 53.6252], [35.9912, 53.6263], [36.0033, 53.6598], [36.074, 53.6819], [36.0877, 53.7029], [36.0304, 53.712], [36.0288, 53.7262], [35.9585, 53.7185], [35.9584, 53.7519], [35.9335, 53.7528], [35.9206, 53.7664], [35.9155, 53.8145], [35.8052, 53.8076], [35.7999, 53.7811], [35.7059, 53.8306], [35.7025, 53.8517], [35.6675, 53.8662], [35.6366, 53.8579], [35.6366, 53.8843], [35.567, 53.903], [35.5027, 53.885], [35.4873, 53.89], [35.5081, 53.9029], [35.4916, 53.9048], [35.4848, 53.8813], [35.4027, 53.871], [35.4073, 53.8638], [35.3684, 53.873], [35.3783, 53.8876], [35.3552, 53.8871], [35.3118, 53.8325], [35.2586, 53.8353], [35.2442, 53.7484], [35.1587, 53.7174]],
+     [[34.652, 53.4161], [34.6703, 53.4096], [34.6739, 53.3806], [34.8051, 53.3863], [34.8326, 53.3775], [34.8607, 53.3896], [34.8708, 53.3534], [34.8564, 53.3429], [34.9065, 53.3462], [34.8991, 53.3733], [35.0017, 53.37], [35.0244, 53.3614], [35.0251, 53.3369], [35.0843, 53.3248], [35.0745, 53.3088], [35.089, 53.296], [35.1541, 53.2772], [35.202, 53.291], [35.1886, 53.2804], [35.2384, 53.2804], [35.2557, 53.2899], [35.2398, 53.3275], [35.2668, 53.3191], [35.3062, 53.3348], [35.3836, 53.3374], [35.3842, 53.3976], [35.4638, 53.4181], [35.4658, 53.4329], [35.4392, 53.4351], [35.4403, 53.4442], [35.5285, 53.444], [35.544, 53.4568], [35.5373, 53.4356], [35.5016, 53.4222], [35.5402, 53.4346], [35.5469, 53.4695], [35.5846, 53.5117], [35.5357, 53.5141], [35.5573, 53.535], [35.5487, 53.5544], [35.4892, 53.5562], [35.4815, 53.5449], [35.5085, 53.5382], [35.5107, 53.5235], [35.4454, 53.5345], [35.4547, 53.5667], [35.4912, 53.5798], [35.4765, 53.5911], [35.4365, 53.5882], [35.3598, 53.537], [35.3415, 53.5376], [35.3385, 53.5611], [35.3179, 53.5564], [35.3409, 53.5819], [35.3198, 53.6051], [35.3326, 53.6184], [35.3202, 53.6457], [35.2571, 53.6379], [35.255, 53.6513], [35.1765, 53.6788], [35.1597, 53.7195], [35.0907, 53.7178], [35.1043, 53.6841], [35.0688, 53.6761], [35.0463, 53.6881], [35.0371, 53.6538], [34.9812, 53.6495], [34.9425, 53.5813], [34.9576, 53.5806], [34.9476, 53.5517], [34.9222, 53.5359], [34.8818, 53.5541], [34.7942, 53.533], [34.7729, 53.5197], [34.7847, 53.4971], [34.7647, 53.4978], [34.7336, 53.4578], [34.7129, 53.4606], [34.7084, 53.4287], [34.6697, 53.4349], [34.6769, 53.4263], [34.652, 53.4161]],
+     [[34.6799, 53.446], [34.6815, 53.4417], [34.687, 53.4422], [34.6887, 53.4429], [34.691, 53.4455], [34.6958, 53.4467], [34.7069, 53.4473], [34.7064, 53.4481], [34.7096, 53.4501], [34.7091, 53.4511], [34.6999, 53.4506], [34.6993, 53.449], [34.6965, 53.4493], [34.6962, 53.4479], [34.6924, 53.4467], [34.6887, 53.4475], [34.6822, 53.4474], [34.6799, 53.446]],
+     [[35.6116, 53.5262], [35.6779, 53.513], [35.6992, 53.4808], [35.662, 53.4677], [35.6959, 53.4685], [35.73, 53.4268], [35.7553, 53.428], [35.7622, 53.4178], [35.7755, 53.4295], [35.7947, 53.4185], [35.7673, 53.3752], [35.7997, 53.3574], [35.8471, 53.3529], [35.8228, 53.3408], [35.8466, 53.3177], [35.8175, 53.2717], [35.9347, 53.2426], [35.9566, 53.2529], [36.012, 53.2523], [36.0477, 53.2258], [36.0858, 53.2394], [36.0835, 53.2183], [36.1005, 53.2186], [36.1031, 53.2557], [36.1655, 53.2533], [36.1798, 53.2646], [36.1786, 53.2912], [36.2113, 53.3161], [36.2007, 53.325], [36.2459, 53.4493], [36.2773, 53.4618], [36.2913, 53.4472], [36.3401, 53.4375], [36.3849, 53.4495], [36.3717, 53.4678], [36.3158, 53.4765], [36.3236, 53.4997], [36.2879, 53.5176], [36.3008, 53.5365], [36.2892, 53.5534], [36.2317, 53.5445], [36.2268, 53.5613], [36.1739, 53.5394], [36.0607, 53.5734], [36.0305, 53.5603], [36.0158, 53.5731], [36.037, 53.6102], [35.9606, 53.6252], [35.9414, 53.6512], [35.9091, 53.6407], [35.8753, 53.5963], [35.8225, 53.5876], [35.7721, 53.506], [35.7534, 53.5223], [35.6841, 53.5193], [35.7001, 53.5301], [35.6851, 53.5454], [35.612, 53.5386], [35.626, 53.5383], [35.6116, 53.5262]]
+    ]
+   },
+   "geometry_note": {
+    "en": "Outline from OpenStreetMap (© OpenStreetMap contributors, ODbL), district boundaries (relations 1748968, 1748969, 1748986, 1453190, 1524022, 1102713, 1102711, 1102715, 1618112), simplified to about 0.8 km; whole districts, so the outline overstates the contaminated land",
+    "ru": "Контур из OpenStreetMap (© участники OpenStreetMap, ODbL), границы районов (relations 1748968, 1748969, 1748986, 1453190, 1524022, 1102713, 1102711, 1102715, 1618112), упрощены; районы целиком, поэтому контур преувеличивает загрязнённую землю"
+   },
+   "sources": [
+    {
+     "url": "http://government.ru/docs/all/103736/",
+     "title": "Government of the Russian Federation, decree No. 1074 of 8 Oct 2015: list of settlements within the Chernobyl radioactive-contamination zones",
+     "kind": "primary"
+    }
+   ],
+   "advice": "full"
+  },
+  {
+   "id": "de-bavaria-wild-food-areas",
+   "severity": "info",
+   "advice": "mushrooms",
+   "approximate": true,
+   "name": {
+    "en": "Bavarian areas where wild mushrooms can still exceed the caesium limit",
+    "ru": "Баварские районы, где дикие грибы всё ещё могут превышать предел по цезию"
+   },
+   "contamination": {
+    "en": "caesium-137 from the 1986 Chernobyl accident",
+    "ru": "цезий-137 после Чернобыльской аварии 1986 года"
+   },
+   "status": {
+    "en": "The German Federal Office for Radiation Protection (BfS, September 2024) names the Bavarian Forest and adjoining areas, the Donaumoos south-west of Ingolstadt, the Mittenwald region and the Berchtesgadener Land, where some mushroom species can still exceed the limit of 600 Bq/kg (the limit applies to mushrooms sold, not to those you pick yourself); moderate consumption is considered harmless everywhere in Germany.",
+    "ru": "Федеральное ведомство по радиационной защите Германии (BfS, сентябрь 2024 года) называет Баварский Лес и прилегающие районы, Донаумос к юго-западу от Ингольштадта, район Миттенвальда и Берхтесгаденер-Ланд, где некоторые виды грибов всё ещё могут превышать предел 600 Бк/кг (предел действует для продаваемых грибов, а не для собранных самостоятельно); умеренное потребление считается безвредным везде в Германии."
+   },
+   "event": {
+    "en": "Chernobyl accident, 1986",
+    "ru": "Чернобыльская авария 1986 года"
+   },
+   "geometry": {
+    "type": "polygons",
+    "rings": [
+     [[12.0933, 49.0647], [12.1101, 49.0226], [12.1853, 49.0073], [12.2188, 49.028], [12.2691, 49.0102], [12.3132, 49.0152], [12.3439, 48.998], [12.3358, 48.9765], [12.372, 48.9711], [12.4068, 48.9821], [12.4647, 48.9663], [12.4716, 48.9522], [12.4936, 48.9589], [12.5222, 48.9443], [12.5089, 48.9296], [12.5196, 48.911], [12.5673, 48.8977], [12.57, 48.8864], [12.6294, 48.9089], [12.6854, 48.9027], [12.7488, 48.8779], [12.7665, 48.8401], [12.7924, 48.8265], [12.8248, 48.8258], [12.8554, 48.8432], [12.9135, 48.8437], [12.9641, 48.8232], [13.0051, 48.7875], [13.0381, 48.7441], [13.0174, 48.7184], [13.0506, 48.7273], [13.0841, 48.7168], [13.0983, 48.7034], [13.0853, 48.687], [13.1124, 48.6842], [13.1188, 48.6631], [13.15, 48.6596], [13.2475, 48.6095], [13.3766, 48.5974], [13.422, 48.5744], [13.4915, 48.5746], [13.5173, 48.5906], [13.567, 48.562], [13.5998, 48.5694], [13.7271, 48.513], [13.7478, 48.5294], [13.7557, 48.565], [13.7701, 48.5536], [13.8059, 48.5798], [13.8013, 48.5974], [13.8272, 48.628], [13.8135, 48.6918], [13.8374, 48.7005], [13.7949, 48.7151], [13.8396, 48.7716], [13.8034, 48.7808], [13.8152, 48.7971], [13.7929, 48.8301], [13.7644, 48.8345], [13.7379, 48.886], [13.6714, 48.8801], [13.6225, 48.9388], [13.6304, 48.9479], [13.6102, 48.9386], [13.5801, 48.9707], [13.5071, 48.9691], [13.4978, 48.9413], [13.4262, 48.9725], [13.4027, 48.9872], [13.3974, 49.0507], [13.2892, 49.1186], [13.2361, 49.1137], [13.1828, 49.1345], [13.1709, 49.1736], [13.1099, 49.2031], [13.1142, 49.2183], [13.0862, 49.2291], [13.0808, 49.2474], [13.034, 49.2639], [13.0291, 49.3043], [13.0067, 49.3058], [13.0105, 49.284], [12.933, 49.286], [12.9419, 49.2637], [12.9282, 49.2444], [12.8909, 49.2589], [12.858, 49.2516], [12.8567, 49.2785], [12.8297, 49.2846], [12.7875, 49.2535], [12.6662, 49.2153], [12.6399, 49.2307], [12.5916, 49.2141], [12.5323, 49.228], [12.5262, 49.2071], [12.4959, 49.1935], [12.5005, 49.1823], [12.4785, 49.1764], [12.3216, 49.1862], [12.264, 49.2068], [12.1887, 49.2109], [12.1763, 49.2233], [12.1436, 49.1557], [12.1546, 49.1467], [12.1183, 49.1256], [12.1066, 49.0997], [12.1182, 49.0862], [12.0933, 49.0647]],
+     [[12.6958, 47.6822], [12.7327, 47.6796], [12.7572, 47.663], [12.7841, 47.6715], [12.7586, 47.6516], [12.8245, 47.6121], [12.7929, 47.6006], [12.7791, 47.5791], [12.8039, 47.5501], [12.8477, 47.546], [12.8517, 47.5308], [12.9087, 47.4969], [12.9682, 47.4745], [12.978, 47.4847], [13.001, 47.464], [13.0476, 47.4922], [13.0473, 47.5215], [13.0309, 47.5326], [13.0575, 47.5621], [13.0437, 47.5834], [13.0706, 47.587], [13.0626, 47.6015], [13.0989, 47.6352], [13.0807, 47.687], [13.0459, 47.7127], [13.0105, 47.7229], [12.9872, 47.7074], [12.9282, 47.7098], [12.9053, 47.7234], [12.9448, 47.7644], [12.9296, 47.773], [13.0041, 47.847], [12.9173, 47.955], [12.8759, 47.9626], [12.8758, 47.9372], [12.8485, 47.9367], [12.8543, 47.9024], [12.8865, 47.888], [12.8751, 47.8767], [12.7714, 47.8915], [12.738, 47.8712], [12.7283, 47.8398], [12.7441, 47.8064], [12.764, 47.8042], [12.7731, 47.7881], [12.8324, 47.7835], [12.8486, 47.7549], [12.7947, 47.7562], [12.7663, 47.7366], [12.7195, 47.7345], [12.7167, 47.698], [12.6958, 47.6822]],
+     [[12.7474, 47.8877], [12.7502, 47.8856], [12.7522, 47.8863], [12.752, 47.889], [12.7559, 47.891], [12.7562, 47.8928], [12.7545, 47.8913], [12.748, 47.8897], [12.7474, 47.8877]],
+     [[11.1567, 47.4344], [11.162, 47.4218], [11.25, 47.4323], [11.2223, 47.3973], [11.2699, 47.3976], [11.2901, 47.4073], [11.291, 47.4271], [11.3386, 47.4499], [11.4214, 47.4449], [11.4094, 47.4667], [11.3838, 47.4722], [11.41, 47.4958], [11.3346, 47.532], [11.3155, 47.5284], [11.2818, 47.4939], [11.27, 47.5001], [11.2358, 47.4753], [11.1969, 47.4727], [11.1942, 47.4441], [11.1647, 47.4443], [11.1567, 47.4344]],
+     [[11.2538, 48.6811], [11.2447, 48.6659], [11.2575, 48.6495], [11.2831, 48.6609], [11.3069, 48.6519], [11.3447, 48.6698], [11.321, 48.6838], [11.323, 48.7007], [11.2825, 48.7055], [11.2468, 48.6882], [11.2538, 48.6811]]
+    ]
+   },
+   "geometry_note": {
+    "en": "Outline from OpenStreetMap (© OpenStreetMap contributors, ODbL), the Bayerischer Wald region (relation 611246), Landkreis Berchtesgadener Land (62712), Mittenwald (939341) and Karlshuld (943728), simplified; the BfS names the Donaumoos only as 'south-west of Ingolstadt', so the municipality of Karlshuld at its centre stands for it",
+    "ru": "Контур из OpenStreetMap (© участники OpenStreetMap, ODbL), регион Bayerischer Wald (relation 611246), Landkreis Berchtesgadener Land (62712), Mittenwald (939341) и Karlshuld (943728), упрощены; BfS называет Донаумос лишь «к юго-западу от Ингольштадта», поэтому его заменяет община Карлсхульд в его центре"
+   },
+   "sources": [
+    {
+     "url": "https://www.bfs.de/SharedDocs/Pressemitteilungen/BfS/DE/2024/013.html",
+     "title": "BfS press release of 10 Sep 2024: radioactive caesium in wild mushrooms — the amount eaten matters",
+     "kind": "primary"
+    }
    ]
+  },
+  {
+   "id": "ru-yenisei-mcc-floodplain",
+   "severity": "caution",
+   "approximate": true,
+   "name": {
+    "en": "Yenisei floodplain downstream of the Zheleznogorsk Mining and Chemical Combine",
+    "ru": "Пойма Енисея ниже Горно-химического комбината (Железногорск)"
+   },
+   "contamination": {
+    "en": "artificial radionuclides from the combine's reactors and radiochemical plant, including radioactive particles",
+    "ru": "искусственные радионуклиды реакторов и радиохимического завода комбината, в том числе радиоактивные частицы"
+   },
+   "status": {
+    "en": "The combine, 60 km downstream from Krasnoyarsk, has operated for about 60 years and has contaminated the downstream floodplain; radioactive particles were found in sediments from near the combine to more than 800 km downstream (Scientific Reports, 2017).",
+    "ru": "Комбинат в 60 км ниже Красноярска работает около 60 лет и загрязнил пойму ниже по течению; радиоактивные частицы найдены в отложениях от района комбината до расстояния более 800 км вниз по течению (Scientific Reports, 2017)."
+   },
+   "event": {
+    "en": "discharges of the Mining and Chemical Combine",
+    "ru": "сбросы Горно-химического комбината"
+   },
+   "geometry": {
+    "type": "buffered_polyline",
+    "lines": [
+     [[93.5264, 56.3085], [93.5383, 56.309], [93.5551, 56.3131], [93.5641, 56.316], [93.5688, 56.3186], [93.5751, 56.324], [93.5789, 56.3337], [93.5799, 56.361], [93.5812, 56.3659], [93.584, 56.3711], [93.5873, 56.3742], [93.5992, 56.382], [93.6199, 56.3934], [93.629, 56.3966], [93.6758, 56.4021], [93.6866, 56.4046], [93.6921, 56.4073], [93.6975, 56.4129], [93.6991, 56.4207], [93.6857, 56.4452], [93.6727, 56.465], [93.6718, 56.4699], [93.6739, 56.475], [93.684, 56.4821], [93.7296, 56.5032], [93.7431, 56.5085], [93.776, 56.5189], [93.7828, 56.5241], [93.7833, 56.5292], [93.7812, 56.5351], [93.7726, 56.5425], [93.7683, 56.5504], [93.7702, 56.5743], [93.7597, 56.5998], [93.741, 56.6282], [93.7032, 56.6435], [93.6912, 56.6501], [93.6446, 56.6852], [93.6258, 56.6965], [93.6209, 56.7026], [93.6196, 56.7064], [93.6188, 56.7192], [93.6175, 56.7217], [93.6155, 56.7233], [93.5959, 56.7321], [93.5901, 56.7372], [93.5872, 56.7458], [93.5882, 56.7522], [93.5909, 56.7557], [93.6113, 56.7719], [93.6148, 56.7763], [93.6168, 56.7812], [93.6166, 56.7855], [93.614, 56.7899], [93.61, 56.7931], [93.603, 56.7966], [93.5916, 56.7997], [93.5722, 56.8012], [93.5544, 56.8002], [93.546, 56.8004], [93.5347, 56.8016], [93.5121, 56.8064], [93.4595, 56.8198], [93.4546, 56.8221], [93.452, 56.8248], [93.4434, 56.8638], [93.4435, 56.8784], [93.4417, 56.8891], [93.4349, 56.8997], [93.4305, 56.9043], [93.425, 56.9086], [93.4081, 56.9182], [93.402, 56.9254], [93.3863, 56.9521], [93.3671, 56.9887], [93.3657, 56.9993], [93.3665, 57.0057]]
+    ],
+    "half_width_km": 2.0
+   },
+   "geometry_note": {
+    "en": "Outline from OpenStreetMap (© OpenStreetMap contributors, ODbL), relation 181988 (the Yenisei), the main channel from the vertex nearest to Zheleznogorsk about 100 km downstream, simplified; the source reports contamination far beyond that stretch, so only the first 100 km are outlined; the half-width of 2 km is an assumption for the floodplain",
+    "ru": "Контур из OpenStreetMap (© участники OpenStreetMap, ODbL), relation 181988 (Енисей), основное русло от вершины, ближайшей к Железногорску, примерно на 100 км вниз по течению, упрощено; источник сообщает о загрязнении гораздо дальше, поэтому оконтурены только первые 100 км; полуширина 2 км — допущение для поймы"
+   },
+   "sources": [
+    {
+     "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5593899/",
+     "title": "Unique diversity of radioactive particles found in the Yenisei River floodplain, Scientific Reports 7:11132 (2017)",
+     "kind": "primary"
+    }
+   ],
+   "advice": "full"
   }
  ]
 }
@@ -1457,7 +1635,12 @@ A hand-curated list of contaminated or closed zones, read by
 
 - `severity`: `danger` for land that is closed or heavily contaminated (a route
   entering it raises a danger warning); `caution` for a wider affected area
-  (a caution warning).
+  (a caution warning); `info` for an advisory area (an info line only, and
+  only when the route is inside it).
+- `advice`: `full` (no mushrooms or berries, no natural water, no dust or open
+  fires, wind and wildfire) or `mushrooms` (moderation and local advice, for
+  advisory areas such as the Bavarian mushroom areas). `danger` zones need
+  `full`, `info` zones use `mushrooms`.
 - Geometry is one of `polygons` (a list of closed outer rings), `circle`
   (`center` `[lon, lat]`, `radius_km`) or `buffered_polyline` (`lines`,
   `half_width_km`). Coordinates are `[longitude, latitude]`.
@@ -1488,12 +1671,20 @@ A hand-curated list of contaminated or closed zones, read by
 | `by-polesie-reserve` | OSM relation 3397849 | Order No. 39 of the Belarus Ministry for Emergency Situations, 1995 (FAOLEX) |
 | `ru-bryansk-contaminated-districts` | OSM boundaries of seven districts | Radiation Hygiene 2023;16(4):55-63 (districts, mushrooms up to 75–82 % of the internal dose) |
 | `kz-semipalatinsk-test-site` | OSM way 932505322 (boundary=hazard) | National Nuclear Center of Kazakhstan, radioecological surveys |
+| `ru-central-chernobyl-districts` | OSM boundaries of nine districts (Tula: Arsenyevsky, Belevsky, Plavsky, Chernsky, Shchekinsky; Kaluga: Zhizdra, Ulyanovo, Khvastovichi; Orel: Bolkhov) | Government decree No. 1074 of 8 Oct 2015 (the list itself, read at government.ru: zone of residence with the right to resettle) |
+| `de-bavaria-wild-food-areas` | OSM: Bayerischer Wald region, Landkreis Berchtesgadener Land, Mittenwald, Karlshuld (stands for the Donaumoos) | BfS press release of 10 Sep 2024 (regions, 600 Bq/kg, moderate consumption harmless) |
+| `ru-yenisei-mcc-floodplain` | OSM relation 181988 (Yenisei), main channel, first 100 km below the vertex nearest to Zheleznogorsk, half-width 2 km assumed | Scientific Reports 7:11132 (2017): floodplain contaminated, particles from the combine to more than 800 km downstream |
 
-Still to research and add (each needs a cited source and a geometry): the Kaluga,
-Tula and Orel Chernobyl spots, Totskoye, Novaya Zemlya, the peaceful
-underground explosions, Zheleznogorsk and the Yenisei, Seversk, Andreeva Bay,
-Wismut, Jachymov, La Hague, Sellafield, the Scandinavian and Bavarian hotspots,
-Balkan depleted-uranium sites.
+## Researched and not added
+
+| Candidate | What the sources say | Why it is not in the registry |
+|---|---|---|
+| Totskoye 1954 (52°38′N 52°48′E) | The IAEA reference (read) lists the exercise but gives no contamination outline. A Radium Institute soil study of 1996–2000 (Radiochemistry, 2005) is reported, in the abstract seen in a search, to find plutonium of global-fallout composition; the full text was not read. | No outline to draw; read the study in full before deciding. |
+| Novaya Zemlya | IAEA reference (read): raised dose rates only on small plots in three test areas (Chernaya Bay, Matochkin Shar, Sukhoy Nos); elsewhere caesium-137 about 3.3 kBq/m², the regional background. | Local plots of at most about 1 km² without published coordinates; the archipelago is a closed test site, which is an access note (`people_hazards`), not a contamination zone. |
+| Seversk (Tomsk-7), 1993 | IAEA report (read): the area above 0.2 µGy/h fell from 30 km² in May 1993 to nothing by January 1994. | No lasting outline. |
+| Peaceful underground explosions (Taiga 61.30°N 56.60°E, Kraton-3 65°N 112°E, Crystal 66.8°N 113.9°E, Globus-1 in the Ivanovo region) | Sites and local raised dose rates appear in search results and news (for Kraton-3 0.5–1.4 µSv/h in places against 0.08 in the forest); the survey papers were not read. | No published extents; read the surveys first. |
+| Norway and Sweden | The Norwegian authority (read) names north-western Eastern Norway, northern Trøndelag and southern Nordland, and gives no current levels. Five Swedish counties come from a search snippet only. | County-sized areas from general statements would warn far too many walkers; needs current per-area figures. |
+| Sellafield, La Hague, Andreeva Bay, Wismut, Jáchymov, Balkan depleted uranium | Not researched. | Operating or closed facilities and point hazards (radon in mine workings, penetrator fragments): access notes rather than land-contamination zones. |
 ````
 
 - [ ] **Step 4: Run the whole suite** — `cd skills/osm-day-route-day-plan && python3 -m pytest tests -q` (all green), and for the show skill `cd skills/osm-day-route-show && python3 -m pytest tests -q`.
@@ -1509,13 +1700,13 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ### Task 4: The Radiation hazard plugin
 
-`RadiationPlugin` reports the zones the route or its points are inside (warning `danger` for a closed or heavily contaminated zone, `caution` for a wider affected area) or near (`caution` / `info`), with the four advisories (no mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires, wind and wildfire), a suggestion to replan when a danger zone is entered, sources, the approximate-outline note and the OpenStreetMap credit. Its warnings are pinned. No hit is "no entry in the registry", never "safe"; a route outside the registry's area (boxes for Europe, Siberia, the Far East north of 49 N and Primorye; not China, Mongolia, Japan or Korea) gets no radiation part. It needs neither the network nor another plugin.
+`RadiationPlugin` reports the zones the route or its points are inside (warning `danger` for a closed or heavily contaminated zone, `caution` for a wider affected area, `info` for an advisory area such as the Bavarian mushroom areas, which is reported only when the route is inside it) or near (`caution` / `info`), with the four advisories (or, for advisory-only zones, the single moderation advice) (no mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires, wind and wildfire), a suggestion to replan when a danger zone is entered, sources, the approximate-outline note and the OpenStreetMap credit. Its warnings are pinned. No hit is "no entry in the registry", never "safe"; a route outside the registry's area (boxes for Europe, Siberia, the Far East north of 49 N and Primorye; not China, Mongolia, Japan or Korea) gets no radiation part. It needs neither the network nor another plugin.
 
 **Files:**
 - Create: `skills/osm-day-route-day-plan/tests/test_radiation.py`
 - Create: `skills/osm-day-route-day-plan/scripts/day_plan/plugins/radiation.py`
 
-- [ ] **Step 1: Add the tests** (10 tests in the file(s) below)
+- [ ] **Step 1: Add the tests** (14 tests in the file(s) below)
 
 Create `skills/osm-day-route-day-plan/tests/test_radiation.py`:
 
@@ -1532,6 +1723,9 @@ NEAR_CHERNOBYL = ((30.3851, 51.0634, 120.0), (30.3861, 51.0634, 120.0))    # abo
 MADRID = ((-3.75, 40.42, 650.0), (-3.74, 40.43, 660.0))
 SYDNEY = ((151.20, -33.86, 20.0), (151.21, -33.85, 25.0))
 BEIJING = ((116.39, 39.90, 50.0), (116.41, 39.92, 50.0))
+BAVARIAN_FOREST = ((13.35, 48.85, 700.0), (13.42, 48.88, 900.0))
+NEAR_BAVARIAN_FOREST = ((14.0, 48.9, 500.0), (14.05, 48.95, 500.0))
+TULA = ((37.50, 54.00, 200.0), (37.55, 54.02, 210.0))
 KYSHTYM = ((60.50, 55.70, 250.0), (60.62, 55.74, 255.0), (60.85, 55.80, 260.0))     # the reserve, Mayak and the trace
 
 
@@ -1576,9 +1770,39 @@ def test_an_affected_area_is_a_caution_inside_and_an_info_when_only_near(make_ro
     inside = run(make_route, fixed_now, BRYANSK)
     assert "(affected area): the route or one of its points is inside the zone" in inside.markdown
     assert [w.severity for w in inside.warnings] == ["caution"]
-    assert "Only part of each district is contaminated." in inside.markdown
+    assert "Only some settlements of each district are listed." in inside.markdown
     assert "Approximate outline:" in inside.markdown and "whole districts" in inside.markdown
     assert "Zone outlines from OpenStreetMap" in inside.markdown
+
+
+def test_an_advisory_area_gets_an_info_line_and_only_the_mushroom_advice(make_route, fixed_now):
+    section = run(make_route, fixed_now, BAVARIAN_FOREST)
+    md = section.markdown
+    assert "(advisory area): the route or one of its points is inside the zone" in md
+    assert "moderate consumption is considered harmless everywhere in Germany" in md
+    assert "- Wild mushrooms and game from these areas can still carry caesium-137: eat them in moderation" in md
+    assert "Springs, streams" not in md and "Do not pick mushrooms or berries." not in md
+    assert [(w.severity, w.pinned) for w in section.warnings] == [("info", False)]
+    assert "Consider changing the route" not in md and section.confidence == "tag-backed"
+    assert "https://www.bfs.de/SharedDocs/Pressemitteilungen/BfS/DE/2024/013.html" in section.sources
+
+
+def test_being_near_an_advisory_area_says_nothing(make_route, fixed_now):
+    section = run(make_route, fixed_now, ((13.2, 49.4, 500.0), (13.21, 49.41, 500.0)), folder="near")
+    assert section.warnings == [] and section.markdown.startswith("- No zone of the radiation registry")
+
+
+def test_the_full_advice_wins_when_both_kinds_of_zone_are_reached(make_route, fixed_now):
+    section = run(make_route, fixed_now, ((13.0, 48.9, 500.0), (13.4, 48.9, 500.0)), folder="mixed")
+    assert "(advisory area)" in section.markdown       # the Bavarian Forest
+    assert "Wild mushrooms and game from these areas" in section.markdown and "Springs, streams" not in section.markdown
+
+
+def test_central_russian_districts_are_a_caution_with_the_decree_as_source(make_route, fixed_now):
+    section = run(make_route, fixed_now, TULA)
+    assert "Tula, Kaluga and Orel districts with Chernobyl-contaminated settlements** (affected area)" in section.markdown
+    assert "decree No. 1074 of 2015" in section.markdown and [w.severity for w in section.warnings] == ["caution"]
+    assert "http://government.ru/docs/all/103736/" in section.sources and "Only some settlements of each district" in section.markdown
 
 
 def test_a_route_with_no_hit_says_no_entry_not_safe(make_route, fixed_now):
@@ -1675,6 +1899,10 @@ class RadiationPlugin(SectionPlugin):
             return Section("hazards", "- " + tr("rad_none", lang, km=f"{margin:g}", areas=tr("rad_areas", lang)),
                            "derived")
 
+        hits = [h for h in hits if h.inside or h.zone["severity"] != "info"]     # an advisory area matters only inside it
+        if not hits:
+            return Section("hazards", "- " + tr("rad_none", lang, km=f"{margin:g}", areas=tr("rad_areas", lang)),
+                           "derived")
         lines, warnings, urls = [], [], []
         any_danger_zone_reached = False
         for hit in hits:
@@ -1683,7 +1911,7 @@ class RadiationPlugin(SectionPlugin):
             contamination = zone["contamination"].get(lang) or zone["contamination"]["en"]
             status = zone["status"].get(lang) or zone["status"]["en"]
             danger_zone = zone["severity"] == "danger"
-            severity_label = tr("rad_sev_danger" if danger_zone else "rad_sev_caution", lang)
+            severity_label = tr("rad_sev_" + zone["severity"], lang)
             if hit.inside:
                 line = tr("rad_inside", lang, name=name, severity=severity_label,
                           contamination=contamination[:1].upper() + contamination[1:], status=status)
@@ -1697,6 +1925,8 @@ class RadiationPlugin(SectionPlugin):
             if hit.inside and danger_zone:
                 any_danger_zone_reached = True
                 warnings.append(PlanWarning("danger", tr("rad_warn_inside_danger", lang, name=name), pinned=True))
+            elif hit.inside and zone["severity"] == "info":
+                warnings.append(PlanWarning("info", tr("rad_warn_inside_info", lang, name=name)))
             elif hit.inside:
                 event = zone["event"].get(lang) or zone["event"]["en"]
                 warnings.append(PlanWarning("caution", tr("rad_warn_inside_caution", lang, name=name, event=event),
@@ -1705,8 +1935,11 @@ class RadiationPlugin(SectionPlugin):
                 warnings.append(PlanWarning("caution" if danger_zone else "info",
                                             tr("rad_warn_near", lang, name=name, km=f"{hit.distance_km:.0f}"),
                                             pinned=True))
-        lines += ["", tr("rad_advice_title", lang), tr("rad_advice_food", lang), tr("rad_advice_water", lang),
-                  tr("rad_advice_dust", lang), tr("rad_advice_wind", lang)]
+        if any(h.zone["advice"] == "full" for h in hits):
+            lines += ["", tr("rad_advice_title", lang), tr("rad_advice_food", lang), tr("rad_advice_water", lang),
+                      tr("rad_advice_dust", lang), tr("rad_advice_wind", lang)]
+        else:
+            lines += ["", tr("rad_advice_title", lang), tr("rad_advice_mushrooms", lang)]
         if any_danger_zone_reached:
             lines += ["", tr("rad_replan", lang)]
         urls = _unique(urls)
@@ -2190,7 +2423,7 @@ Modify `README.md` — apply this patch (`patch -p1`):
    - *Fire danger:* the official Fire Weather Index (Copernicus GWIS, up to 8 days ahead), the Russian Nesterov class for routes in Russia, and active fires detected near the route by satellite.
    - *Ticks and biting insects:* ticks, mosquitoes, blackflies and midges, horseflies, estimated from temperature, wind, humidity and water near the route. Especially useful for Siberia and the Urals.
    - *Air:* pollen (Europe up to about 45° E; for the rest of Russia the plan points to Yandex Weather) and pollution (European AQI, PM10, PM2.5, ozone), up to about 4 days ahead.
-+  - *Radiation*, listed first when it applies: the route and its points are checked against a hand-made registry of contaminated or closed areas (the East Urals trace and reserve, the Techa river, Mayak and Lake Karachay, the Chernobyl zones in Ukraine and Belarus, south-western Bryansk region, the Semipalatinsk test site). A hit gives a warning at the top of the plan: do not pick mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires. No hit means "no entry in the registry", not "safe". The registry is incomplete and some outlines are approximate; the plan says which.
++  - *Radiation*, listed first when it applies: the route and its points are checked against a hand-made registry of contaminated or closed areas (the East Urals trace and reserve, the Techa river, Mayak and Lake Karachay, the Chernobyl zones in Ukraine and Belarus, the Bryansk, Tula, Kaluga and Orel districts, the Semipalatinsk test site, the Yenisei below Zheleznogorsk, wild-food areas in Bavaria). A hit gives a warning at the top of the plan: do not pick mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires. No hit means "no entry in the registry", not "safe". The registry is incomplete and some outlines are approximate; the plan says which.
 +  - *People and access:* only sourced notes Claude recorded (permit or border zones, travel advisories, access restrictions). Animals are recorded with the insect notes.
    - Regional knowledge Claude finds on the web (fire bans, avalanche bulletins, insect seasons) is added with its sources when recorded.
 +- **Mobile coverage:** the masts OpenStreetMap knows near your route, practical advice (offline maps, tell someone your plan, power bank, 112) and links to coverage maps. OpenStreetMap lists only some masts, so this is not a signal forecast.
@@ -2296,7 +2529,7 @@ Modify `skills/osm-day-route-day-plan/SKILL.md` — apply this patch (`patch -p1
  - Every fact needs at least one `http(s)` source, or it is refused (and, if
    found in the file, ignored). Say only what the source says.
  - **Privacy:** facts end up in `day-plan-<date>.md`, embedded in a `map.html`
-@@ -196,8 +208,26 @@
+@@ -196,8 +208,34 @@
    map in Yandex Weather. The Nesterov class is a simplified computation and is
    shown for Russian routes only.
  - Insect levels are a weather and habitat estimate, not a measurement.
@@ -2306,13 +2539,21 @@ Modify `skills/osm-day-route-day-plan/SKILL.md` — apply this patch (`patch -p1
 +  Urals trace (the reserve as the core, the trace as an approximate outline),
 +  the Techa river and floodplain, the Mayak site and Lake Karachay, the
 +  Chernobyl exclusion zone (Ukraine), the Polesie reserve (Belarus), the
-+  south-western Bryansk districts and the Semipalatinsk test site. **Not in
-+  it yet:** the Kaluga, Tula and Orel Chernobyl spots, Totskoye, Novaya
-+  Zemlya, the peaceful underground explosions (Perm, Arkhangelsk, Yakutia),
-+  Zheleznogorsk and the Yenisei, Seversk, Andreeva Bay, Wismut, Jachymov,
-+  La Hague, Sellafield, the Scandinavian and Bavarian Chernobyl hotspots and
-+  Balkan depleted-uranium sites. A route with no hit is told "no entry in
-+  the registry", never "safe". The registry covers Europe with the Urals
++  Chernobyl-contaminated districts of the Bryansk, Tula, Kaluga and Orel
++  regions (government decree No. 1074), the Semipalatinsk test site, the
++  Yenisei floodplain below Zheleznogorsk (first 100 km) and, as an
++  advisory-only tier, four Bavarian areas where wild mushrooms can still
++  exceed the caesium limit (BfS). **Researched and left out on purpose**
++  (the sources show only local plots, a contamination that has decayed away,
++  or no outline): Totskoye 1954, Novaya Zemlya, the Seversk 1993 trace and
++  the peaceful underground explosions. **Not researched yet:** Scandinavian
++  hotspots (the Norwegian authority names regions only in general terms),
++  Wismut, Jachymov, La Hague, Sellafield, Andreeva Bay and Balkan
++  depleted-uranium sites; `data/README.md` says why for each. A route with no hit is told "no entry in
++  the registry", never "safe". Zones have three tiers: `danger` (closed or
++  heavily contaminated land), `caution` (a wide affected area) and `info` (an
++  advisory area, only mushroom and game advice, no pinned warning). The
++  registry covers Europe with the Urals
 +  (north of 36 N), Siberia, northern Kazakhstan and the Far East north of
 +  49 N, and Primorye; a route outside those boxes (China, Mongolia, Japan,
 +  Korea, the Americas, ...) gets no radiation part at all, and a route just
@@ -2325,7 +2566,7 @@ Modify `skills/osm-day-route-day-plan/SKILL.md` — apply this patch (`patch -p1
  
  ## Common Mistakes
  
-@@ -211,6 +241,12 @@
+@@ -211,6 +249,12 @@
  - Editing `facts.json` by hand (use `record_fact.py`: it validates, refuses
    source-less facts and never overwrites a file it cannot parse).
  - Forgetting to re-render `map.html` after adding a plan.

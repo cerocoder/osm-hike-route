@@ -19,8 +19,15 @@ from pathlib import Path
 from day_plan import calendar_info
 from day_plan.context import build_context
 from day_plan.facts import lookup
-from day_plan.http import get_json
+from day_plan.http import get_json, get_text
+from day_plan.osm_features import OsmFeaturesPlugin
+from day_plan.plugins.air import AirPlugin
+from day_plan.plugins.bio_hazards import BioHazardsPlugin, TICK_MONTHS, in_season
+from day_plan.plugins.fire import FirePlugin
 from day_plan.plugins.light import LightPlugin
+from day_plan.plugins.mountain import (
+    MOUNTAIN_MIN_ELEVATION_M, MOUNTAIN_MIN_RELIEF_M, MountainPlugin, elevation_stats,
+)
 from day_plan.plugins.poi_hours import PoiHoursPlugin
 from day_plan.plugins.transit import TransitPlugin
 from day_plan.plugins.weather import WeatherPlugin
@@ -28,7 +35,8 @@ from day_plan.service import build_plan
 
 
 def default_plugins() -> list:
-    return [WeatherPlugin(), LightPlugin(), TransitPlugin(), PoiHoursPlugin()]
+    return [WeatherPlugin(), LightPlugin(), OsmFeaturesPlugin(), TransitPlugin(), PoiHoursPlugin(),
+            MountainPlugin(), FirePlugin(), BioHazardsPlugin(), AirPlugin()]
 
 
 def missing_web_facts(ctx) -> list:
@@ -42,6 +50,18 @@ def missing_web_facts(ctx) -> list:
     return missing
 
 
+def optional_hazard_facts(ctx) -> list:
+    """Hazard plugins whose regional web facts would improve this plan and are not recorded yet: fire
+    restrictions always, mountain notes for mountain routes, insect/animal notes in the tick season."""
+    wanted = ["fire"]
+    stats = elevation_stats(ctx.coords)
+    if stats and (stats[1] >= MOUNTAIN_MIN_ELEVATION_M or stats[2] >= MOUNTAIN_MIN_RELIEF_M):
+        wanted.append("mountain")
+    if in_season(ctx.date.month, TICK_MONTHS, ctx.centroid[0]):
+        wanted.append("bio_hazards")
+    return [pid for pid in wanted if lookup(ctx.facts, ctx.date_iso, pid) is None]
+
+
 def coarse_departure(text: str | None) -> tuple[str | None, bool]:
     """(value_to_write, was_dropped). Digits suggest a street address."""
     if not text:
@@ -51,7 +71,7 @@ def coarse_departure(text: str | None) -> tuple[str | None, bool]:
     return text.strip(), False
 
 
-def main(argv=None, http=get_json, now=None, plugins=None) -> int:
+def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("route_dir")
     parser.add_argument("date", help="YYYY-MM-DD")
@@ -77,7 +97,7 @@ def main(argv=None, http=get_json, now=None, plugins=None) -> int:
               "written to the plan. Pass a city, station or stop.", file=sys.stderr)
 
     ctx = build_context(route_dir, date, lang=args.lang, departure=departure, start_time=start,
-                        http=http, now=now)
+                        http=http, http_text=http_text, now=now)
     result = build_plan(ctx, plugins if plugins is not None else default_plugins())
     out = route_dir / f"day-plan-{date.isoformat()}.md"
     out.write_text(result.markdown, encoding="utf-8")
@@ -92,6 +112,12 @@ def main(argv=None, http=get_json, now=None, plugins=None) -> int:
               + (". calendar: check in the official calendar whether the date is a public holiday, a "
                  "transferred day off or a working Saturday, and record it with --plugin calendar "
                  "--day-type ..." if "calendar" in missing else ""))
+    optional = optional_hazard_facts(ctx)
+    if optional:
+        print(f"hint (optional): regional facts would improve the hazard sections: {', '.join(optional)} — "
+              f"fire: forest-access and open-fire restrictions; mountain: avalanche bulletin, closed huts or passes; "
+              f"bio_hazards: insect season and peaks, animals (bears, snakes, boar) and hunting; record them with "
+              f"record_fact.py --plugin <name>")
     return 0
 
 

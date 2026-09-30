@@ -25,7 +25,8 @@ from pathlib import Path
 from day_plan.base import SEVERITIES
 from day_plan.facts import DAY_TYPES, normalize_entry
 
-PLUGINS = ("transit", "poi_hours", "calendar")
+PLUGINS = ("transit", "poi_hours", "calendar", "fire", "mountain", "bio_hazards", "air")
+WARNING_PLUGINS = ("transit", "poi_hours", "fire", "mountain", "bio_hazards", "air")
 
 
 def record(route_dir, date: str, plugin: str, markdown: str, sources: list, last_departure: str | None = None,
@@ -46,7 +47,7 @@ def record(route_dir, date: str, plugin: str, markdown: str, sources: list, last
     for option, value, uses in (("--day-type", day_type, ("calendar",)),
                                 ("--last-departure", last_departure, ("transit",)),
                                 ("--first-departure", first_departure, ("transit",)),
-                                ("--warning", warnings, ("transit", "poi_hours"))):
+                                ("--warning", warnings, WARNING_PLUGINS)):
         if value and plugin not in uses:
             raise ValueError(f"the {plugin} plugin does not use {option} (only: {', '.join(uses)})")
     entry = {"markdown": markdown, "sources": sources}

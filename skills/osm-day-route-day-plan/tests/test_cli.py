@@ -92,7 +92,7 @@ def test_default_plan_has_getting_there_and_points_of_interest(make_route_with_p
     assert subheadings == ["### Radiation", "### Mountain hazards", "### Fire danger", "### Ticks and biting insects",
                            "### Air: pollen and pollution"]
     assert "| Lago | start |" in text and "| Museo | sight | 10:00–18:00 |" in text and "| Lago | 41 | bus |" in text
-    assert ("<!-- plugins: weather 1, light 1, osm_features 1, radiation 1, transit 1, poi_hours 1, mountain 1, fire 1, "
+    assert ("<!-- plugins: weather 1, light 1, osm_features 1, radiation 1, snow_history 1, trail_passability 1, transit 1, poi_hours 1, mountain 1, fire 1, "
             "bio_hazards 1, air 1, people_hazards 1, cell_coverage 1 -->") in text
 
 
@@ -320,3 +320,111 @@ def test_a_failing_missing_facts_check_never_fails_the_written_plan(make_route, 
     assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), http_text=_text,
                                now=fixed_now) == 0
     assert (route_dir / "day-plan-2026-06-21.md").exists()
+
+
+# ---- winter passability, end to end ------------------------------------------------------------------------------------
+
+WINTER = "2026-12-20"
+WINTER_NOW = datetime.datetime(2026, 12, 18, 12, 0, tzinfo=datetime.timezone.utc)
+ROUTE_SEGMENTS = [{"from": 0, "to": 2, "way_id": 1, "highway": "track", "surface": "gravel"},
+                  {"from": 2, "to": 4, "way_id": 2, "highway": "residential", "surface": "asphalt"}]
+
+
+def _snow_history(date, snow_m=0.30, temp=-8.0):
+    start = datetime.date.fromisoformat(date) - datetime.timedelta(days=14)
+    times = [f"{start + datetime.timedelta(days=d):%Y-%m-%d}T{h:02d}:00" for d in range(15) for h in range(24)]
+    n = len(times)
+    return {"elevation": 250.0, "hourly": {
+        "time": times, "temperature_2m": [temp] * n, "dew_point_2m": [temp - 2] * n, "precipitation": [0.0] * n,
+        "rain": [0.0] * n, "snowfall": [0.0] * n, "snow_depth": [snow_m] * n, "cloud_cover": [80] * n,
+        "weather_code": [3] * n}}
+
+
+def _winter_web(weather_response, date=WINTER, snow_m=0.30, temp=-8.0):
+    def http(url):
+        if "nominatim" in url:
+            return {"address": {"country_code": "ru"}}
+        if "date.nager.at" in url:
+            return []
+        if "overpass" in url:
+            return {"elements": []}
+        if "snowfall" in url:                       # the 14-day history of the snow estimate
+            return _snow_history(date, snow_m, temp)
+        return weather_response(date=date, temperature_2m=temp)
+    return http
+
+
+def _hint_list(output: str) -> str:
+    """The plugin names the optional hint asks for ('fire, bio_hazards, ...'), without the explanations after it."""
+    marker = "regional facts would improve the hazard sections: "
+    return output.split(marker)[1].split(" — ")[0] if marker in output else ""
+
+
+def _winter_route(tmp_path, mode="walk", style=None, folder="winter", segments=ROUTE_SEGMENTS):
+    import json
+    route_dir = tmp_path / folder
+    route_dir.mkdir()
+    coords = [[60.6, 56.84 + i * 0.001, 250.0 + 2 * i] for i in range(5)]
+    props = {"name": "Зимний", "mode": mode, "style": style, "distance_km": 0.4, "duration_estimate_hours": 1.0}
+    if segments is not None:
+        props["segments"] = segments
+    features = [{"type": "Feature", "geometry": {"type": "LineString", "coordinates": coords}, "properties": props},
+                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [60.6, 56.842]},
+                 "properties": {"name": "Озеро", "type": "viewpoint"}}]
+    (route_dir / "route.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": features}),
+                                             encoding="utf-8")
+    return route_dir
+
+
+def test_a_winter_route_gets_the_passability_section_second_after_radiation(tmp_path, weather_response, capsys):
+    route_dir = _winter_route(tmp_path)
+    assert build_day_plan.main([str(route_dir), WINTER], http=_winter_web(weather_response), http_text=_text,
+                               now=WINTER_NOW) == 0
+    text = (route_dir / f"day-plan-{WINTER}.md").read_text(encoding="utf-8")
+    subheadings = [line for line in text.splitlines() if line.startswith("### ")]
+    assert subheadings[:2] == ["### Radiation", "### Trail and road passability"]
+    assert "Assessed for: **on foot**." in text and "| Start → Озеро | 0.2 | gravel 100 % |" in text
+    assert "| not recommended |" in text and "| passable |" in text
+    assert "*Data fetched 2026-12-18 12:00 UTC (" in text and "Mode: on foot" in text
+    summary = text.split("## Daylight")[0]
+    assert "Not recommended (on foot):" in summary
+    assert "trail_conditions" in _hint_list(capsys.readouterr().out)
+
+
+def test_the_bicycle_route_says_cycling_and_studded_tires(tmp_path, weather_response):
+    route_dir = _winter_route(tmp_path, mode="bike", style="leisure", folder="bike")
+    build_day_plan.main([str(route_dir), WINTER], http=_winter_web(weather_response), http_text=_text, now=WINTER_NOW)
+    text = (route_dir / f"day-plan-{WINTER}.md").read_text(encoding="utf-8")
+    assert "Mode: cycling (leisure)" in text and "Assessed for: **cycling (leisure)**. Studded tires are assumed" in text
+
+
+def test_a_warm_bare_day_has_no_passability_section_and_no_hint(tmp_path, weather_response, capsys):
+    route_dir = _winter_route(tmp_path, folder="warm")
+    build_day_plan.main([str(route_dir), "2026-06-21"], http=_winter_web(weather_response, date="2026-06-21",
+                                                                          snow_m=0.0, temp=18.0),
+                        http_text=_text, now=datetime.datetime(2026, 6, 20, 12, 0, tzinfo=datetime.timezone.utc))
+    text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
+    assert "### Trail and road passability" not in text and "trail_conditions" not in _hint_list(capsys.readouterr().out)
+
+
+def test_an_old_archive_without_road_data_is_told_to_be_re_planned(tmp_path, weather_response):
+    route_dir = _winter_route(tmp_path, folder="old", segments=None)
+    build_day_plan.main([str(route_dir), WINTER], http=_winter_web(weather_response), http_text=_text, now=WINTER_NOW)
+    text = (route_dir / f"day-plan-{WINTER}.md").read_text(encoding="utf-8")
+    assert "has no road data" in text and "Re-plan the route" in text
+    assert "Sections without data:" in text.split("## Daylight")[0] and "Trail and road passability" in text.split("## Daylight")[0]
+
+
+def test_record_fact_accepts_trail_conditions_and_the_hint_disappears(tmp_path, weather_response, capsys):
+    import record_fact
+    route_dir = _winter_route(tmp_path, folder="facts")
+    record_fact.record(route_dir, "all", "trail_conditions", "The lake path is groomed on weekends.",
+                       ["https://example.org/report"], warnings=[{"severity": "caution", "text": "Ice at the lake."}])
+    build_day_plan.main([str(route_dir), WINTER], http=_winter_web(weather_response), http_text=_text, now=WINTER_NOW)
+    out = capsys.readouterr().out
+    text = (route_dir / f"day-plan-{WINTER}.md").read_text(encoding="utf-8")
+    assert "trail_conditions" not in _hint_list(out) and _hint_list(out) != ""
+    assert "The lake path is groomed on weekends." in text and "Ice at the lake." in text.split("## Daylight")[0]
+    with pytest.raises(ValueError, match="does not use --last-departure"):
+        record_fact.record(route_dir, "all", "trail_conditions", "x", ["https://example.org/x"], last_departure="21:00")
+

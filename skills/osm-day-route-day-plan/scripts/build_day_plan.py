@@ -32,16 +32,19 @@ from day_plan.plugins.mountain import (
 from day_plan.plugins.people_hazards import PeopleHazardsPlugin
 from day_plan.plugins.poi_hours import PoiHoursPlugin
 from day_plan.plugins.radiation import RadiationPlugin
+from day_plan.plugins.snow_history import SnowHistoryPlugin
+from day_plan.plugins.trail_passability import TrailPassabilityPlugin
 from day_plan.plugins.transit import TransitPlugin
 from day_plan.plugins.weather import WeatherPlugin
 from day_plan.service import build_plan
 
 
 def default_plugins() -> list:
-    # the order inside the Hazards group is the registration order: radiation first, it matters most
-    return [WeatherPlugin(), LightPlugin(), OsmFeaturesPlugin(), RadiationPlugin(), TransitPlugin(), PoiHoursPlugin(),
-            MountainPlugin(), FirePlugin(), BioHazardsPlugin(), AirPlugin(), PeopleHazardsPlugin(),
-            CellCoveragePlugin()]
+    # the order inside the Hazards group is the registration order: radiation first, it matters most, then the
+    # passability of trails and roads
+    return [WeatherPlugin(), LightPlugin(), OsmFeaturesPlugin(), RadiationPlugin(), SnowHistoryPlugin(),
+            TrailPassabilityPlugin(), TransitPlugin(), PoiHoursPlugin(), MountainPlugin(), FirePlugin(),
+            BioHazardsPlugin(), AirPlugin(), PeopleHazardsPlugin(), CellCoveragePlugin()]
 
 
 def missing_web_facts(ctx) -> list:
@@ -55,15 +58,18 @@ def missing_web_facts(ctx) -> list:
     return missing
 
 
-def optional_hazard_facts(ctx) -> list:
+def optional_hazard_facts(ctx, result=None) -> list:
     """Hazard plugins whose regional web facts would improve this plan and are not recorded yet: fire
-    restrictions always, mountain notes for mountain routes, insect/animal notes in the tick season."""
+    restrictions always, mountain notes for mountain routes, insect/animal notes in the tick season, and reports of
+    the current season on trails and roads when the passability section applies (`result` is the built plan)."""
     wanted = ["fire"]
     stats = elevation_stats(ctx.coords)
     if stats and (stats[1] >= MOUNTAIN_MIN_ELEVATION_M or stats[2] >= MOUNTAIN_MIN_RELIEF_M):
         wanted.append("mountain")
     if in_season(ctx.date.month, TICK_MONTHS, ctx.centroid[0]):
         wanted.append("bio_hazards")
+    if result is not None and any(s.shared.get("trail_applies") for s in result.sections):
+        wanted.append("trail_conditions")
     wanted.append("people_hazards")
     return [pid for pid in wanted if lookup(ctx.facts, ctx.date_iso, pid) is None]
 
@@ -122,15 +128,16 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text) -
                  "transferred day off or a working Saturday, and record it with --plugin calendar "
                  "--day-type ..." if "calendar" in missing else ""))
     try:
-        optional = optional_hazard_facts(ctx)
+        optional = optional_hazard_facts(ctx, result)
     except Exception:  # noqa: BLE001 — a hint must never turn a written plan into a failure
         optional = []
     if optional:
         print(f"hint (optional): regional facts would improve the hazard sections: {', '.join(optional)} — "
               f"fire: forest-access and open-fire restrictions; mountain: avalanche bulletin, closed huts or passes; "
-              f"bio_hazards: insect season and peaks, animals (bears, snakes, boar) and hunting; people_hazards: "
-              f"official travel advisories, permit or border-zone rules and access restrictions; record them with "
-              f"record_fact.py --plugin <name>")
+              f"bio_hazards: insect season and peaks, animals (bears, snakes, boar) and hunting; trail_conditions: "
+              f"reports of the current season (forums, clubs, park administrations) on snow clearing, grooming, ice "
+              f"and closed sections; people_hazards: official travel advisories, permit or border-zone rules and "
+              f"access restrictions; record them with record_fact.py --plugin <name>")
     return 0
 
 

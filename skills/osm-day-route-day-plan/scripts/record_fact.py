@@ -3,7 +3,7 @@
 
 Standard-library only. Usage:
     python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all>
-        --plugin <transit|poi_hours|calendar|fire|mountain|bio_hazards|air|people_hazards>
+        --plugin <transit|poi_hours|calendar|fire|mountain|bio_hazards|air|people_hazards|trail_conditions>
         (--markdown TEXT | --markdown-file PATH) --source URL [--source URL ...]
         [--last-departure HH:MM] [--first-departure HH:MM]
         [--warning danger|caution|info:TEXT ...] [--day-type holiday|weekend|workday]
@@ -26,8 +26,10 @@ from pathlib import Path
 from day_plan.base import SEVERITIES
 from day_plan.facts import DAY_TYPES, normalize_entry
 
-PLUGINS = ("transit", "poi_hours", "calendar", "fire", "mountain", "bio_hazards", "air", "people_hazards")
-WARNING_PLUGINS = ("transit", "poi_hours", "fire", "mountain", "bio_hazards", "air", "people_hazards")
+PLUGINS = ("transit", "poi_hours", "calendar", "fire", "mountain", "bio_hazards", "air", "people_hazards",
+           "trail_conditions")
+WARNING_PLUGINS = ("transit", "poi_hours", "fire", "mountain", "bio_hazards", "air", "people_hazards",
+                   "trail_conditions")
 
 
 def record(route_dir, date: str, plugin: str, markdown: str, sources: list, last_departure: str | None = None,

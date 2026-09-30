@@ -125,8 +125,8 @@ def test_all_null_pollution_after_the_model_horizon_is_no_data(make_route, fixed
 
 
 def test_a_service_error_or_a_400_is_a_note_not_a_crash(make_route, fixed_now):
-    down = run(make_route, fixed_now, HttpError("HTTP Error 400: Bad Request"))
-    assert "could not be reached (HTTP Error 400: Bad Request)" in down.markdown and down.confidence == "no-data"
+    down = run(make_route, fixed_now, HttpError("HTTP Error 503: Service Unavailable"))
+    assert "could not be reached (HTTP Error 503: Service Unavailable)" in down.markdown and down.confidence == "no-data"
     odd = run(make_route, fixed_now, {"error": True, "reason": "out of allowed range"}, folder="odd")
     assert "out of allowed range" in odd.markdown
 
@@ -191,3 +191,50 @@ def test_russian_text_and_group_title(make_route, fixed_now):
     section = run(make_route, fixed_now, MOSCOW, lang="ru")
     assert "европейский индекс AQI **68** — плохое" in section.markdown and "Пыльца: по модели" in section.markdown
     assert AirPlugin.title_key == "hz_air" and AirPlugin.depends_on == ("weather", "osm_features")
+
+
+MADRID_ROUTE = ((-3.70, 40.40, 650.0), (-3.72, 40.42, 660.0))
+
+
+def _nulls():
+    out = {k: [None] * 24 for k in hourly()}
+    out["time"] = hourly()["time"]
+    return out
+
+
+def test_beyond_the_model_horizon_says_what_is_missing_and_makes_no_call(make_route, fixed_now):
+    section = run(make_route, fixed_now, hourly(), shared_extra={"weather": {"daytime_rows": DAY_ROWS, "source": "climate"}})
+    assert section.calls == [] and section.confidence == "no-data"
+    assert "the air-quality model reaches only about four days ahead" in section.markdown
+    assert "beyond the model horizon" in section.markdown and "could not be reached" not in section.markdown
+
+
+def test_a_date_more_than_five_days_ahead_makes_no_call(make_route, fixed_now):
+    calls = []
+    route_dir = make_route(coords=ROUTE, folder="far")
+    ctx = build_context(route_dir, fixed_now.date() + datetime.timedelta(days=6), lang="en",
+                        http=lambda u: calls.append(u) or {}, now=fixed_now)
+    section = AirPlugin().run(ctx, {"weather": {"daytime_rows": DAY_ROWS}})
+    assert calls == [] and "beyond the model horizon" in section.markdown
+
+
+def test_an_http_400_for_a_date_is_no_data_but_other_errors_stay_unreachable(make_route, fixed_now):
+    section = run(make_route, fixed_now, HttpError("HTTP Error 400: Bad Request"))
+    assert "could not be reached" not in section.markdown and section.confidence == "no-data"
+    assert "the air-quality model reaches only about four days ahead" in section.markdown
+    assert "beyond the model horizon" in section.markdown
+
+
+def test_all_null_pollen_inside_the_domain_does_not_point_to_yandex(make_route, fixed_now):
+    section = run(make_route, fixed_now, _nulls(), coords=MADRID_ROUTE, folder="mad")
+    assert "yandex" not in section.markdown.lower() and "no data for this location" not in section.markdown
+    assert "Pollen: no values" in section.markdown
+    east = run(make_route, fixed_now, _nulls(), folder="east")
+    assert "https://yandex.ru/pogoda/" in east.markdown
+
+
+def test_a_missing_aqi_prints_a_dash_and_no_class_word(make_route, fixed_now):
+    answer = hourly(pm2_5=10.0)
+    answer["european_aqi"] = [None] * 24
+    section = run(make_route, fixed_now, answer)
+    assert "European AQI **–**." in section.markdown and "good" not in section.markdown

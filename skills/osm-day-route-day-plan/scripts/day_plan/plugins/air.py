@@ -33,6 +33,8 @@ POLLEN_SCALES = {                       # (moderate from, high from, very high f
 POLLEN_GROUP = {"alder_pollen": "tree", "birch_pollen": "tree", "olive_pollen": "tree", "grass_pollen": "grass",
                 "mugwort_pollen": "weed", "ragweed_pollen": "weed"}
 AQI_STEPS = (20, 40, 60, 80, 100)       # European AQI: good, fair, moderate, poor, very poor, extremely poor
+MODEL_HORIZON_DAYS = 5                  # pollution answers with values for about 4 days, nulls for 5; later dates: HTTP 400
+POLLEN_DOMAIN = (30.0, 71.0, 45.0)      # south, north, east limit (degrees) of the CAMS Europe pollen model
 EMISSION_RADIUS_M = 5000.0
 DOWNWIND_TOLERANCE_DEG = 45.0
 DEFAULT_HOURS = range(6, 22)
@@ -114,15 +116,26 @@ class AirPlugin(SectionPlugin):
         hours = {r["hour"] for r in day_rows} or set(DEFAULT_HOURS)
         lines, warnings, has_data = [], [], False
 
-        try:
-            hourly = _fetch(ctx, lat, lon)
-        except HttpError as e:
-            lines.append("- " + tr("air_unavailable", lang, reason=str(e) or "error"))
-        else:
+        beyond = (ctx.date - ctx.today).days > MODEL_HORIZON_DAYS or weather.get("source") == "climate"
+        hourly = None
+        if not beyond:
+            try:
+                hourly = _fetch(ctx, lat, lon)
+            except HttpError as e:
+                if "400" in str(e):                      # the service answers 400 for a date outside its range
+                    beyond = True
+                else:
+                    lines.append("- " + tr("air_unavailable", lang, reason=str(e) or "error"))
+        if beyond:
+            lines.append("- " + tr("air_pollen_beyond", lang))
+            lines.append("- " + tr("air_pollution_no_data", lang))
+        elif hourly is not None:
             # pollen
             peaks = {v: _daytime_max(hourly, v, hours) for v in POLLEN_VARS}
             if all(p is None for p in peaks.values()):
-                lines.append("- " + tr("air_pollen_no_data", lang))
+                south, north, east = POLLEN_DOMAIN
+                inside = south <= lat <= north and lon <= east
+                lines.append("- " + tr("air_pollen_no_data" if not inside else "air_pollen_no_values", lang))
             else:
                 has_data = True
                 present = {v: p for v, p in peaks.items() if p is not None and p > 0}
@@ -145,12 +158,13 @@ class AirPlugin(SectionPlugin):
             else:
                 has_data = True
                 aqi = values["european_aqi"]
-                cls = aqi_class(aqi) if aqi is not None else 0
+                cls = aqi_class(aqi) if aqi is not None else None
                 lines.append("- " + tr("air_pollution_line", lang, pm25=_number(values["pm2_5"]), pm10=_number(values["pm10"]),
                                        o3=_number(values["ozone"]), no2=_number(values["nitrogen_dioxide"]),
                                        so2=_number(values["sulphur_dioxide"]), dust=_number(values["dust"]),
-                                       aqi=_number(aqi), aqi_class=tr("air_aqi", lang)[cls]))
-                if aqi is not None and cls >= 3:
+                                       aqi=_number(aqi),
+                                       aqi_class="" if cls is None else " — " + tr("air_aqi", lang)[cls]))
+                if cls is not None and cls >= 3:
                     warnings.append(PlanWarning("danger" if cls >= 5 else "caution", tr("air_warn_aqi", lang, aqi=f"{aqi:.0f}")))
 
         # industrial emissions carried toward the route by the wind

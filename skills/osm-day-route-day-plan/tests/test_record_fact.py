@@ -51,6 +51,8 @@ def test_calendar_fact_needs_only_a_day_type_and_a_source(tmp_path):
     (["--date", "2026-06-27", "--plugin", "transit", "--markdown", "x", "--source", "ftp://x"], "at least one http(s)"),
     (["--date", "2026-06-27", "--plugin", "transit", "--source", URL], "non-empty text"),
     (["--date", "27-06-2026", "--plugin", "transit", "--markdown", "x", "--source", URL], "bad date"),
+    (["--date", "2026-6-7", "--plugin", "transit", "--markdown", "x", "--source", URL], "bad date"),
+    (["--date", "2026-06-27T10:00", "--plugin", "transit", "--markdown", "x", "--source", URL], "bad date"),
     (["--date", "all", "--plugin", "weather", "--markdown", "x", "--source", URL], "unknown plugin"),
     (["--date", "all", "--plugin", "transit", "--markdown", "x", "--source", URL, "--last-departure", "late"], "bad last_departure_local"),
     (["--date", "all", "--plugin", "calendar", "--day-type", "funday", "--markdown", "x", "--source", URL], "bad day type"),
@@ -94,3 +96,14 @@ def test_bad_arguments(tmp_path, capsys):
     assert "not both" in capsys.readouterr().err
     assert _run(tmp_path, "--date", "all", "--plugin", "transit", "--markdown-file", str(tmp_path / "nope.md"),
                 "--source", URL) == 1
+
+
+def test_temp_file_cleaned_up_on_write_failure(tmp_path, capsys, monkeypatch):
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+    monkeypatch.setattr("record_fact.os.replace", boom)
+    assert _run(tmp_path, "--date", "all", "--plugin", "transit", "--markdown", "x", "--source", URL) == 1
+    assert "disk full" in capsys.readouterr().err
+    assert not (tmp_path / "facts.json").exists()
+    tmp_files = [p.name for p in tmp_path.iterdir() if p.name.startswith(".facts-")]
+    assert tmp_files == []

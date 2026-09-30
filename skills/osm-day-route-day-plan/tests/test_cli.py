@@ -116,3 +116,38 @@ def test_a_broken_overpass_does_not_break_the_plan(make_route_with_points, weath
     assert build_day_plan.main([str(route_dir), "2026-06-21"], http=http, now=fixed_now) == 0
     text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
     assert "OSM lists no lines for these access points" in text and "## Points of interest" in text
+
+
+def test_garbage_facts_json_does_not_break_the_plan(make_route_with_points, weather_response, fixed_now, capsys):
+    import json
+    route_dir = _route_with_points(make_route_with_points)
+    (route_dir / "facts.json").write_text(json.dumps({"2026-06-21": {"transit": {"markdown": "UNSOURCED CLAIM"}, "poi_hours": "not a dict"}, "all": ["x"]}), encoding="utf-8")
+    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), now=fixed_now) == 0
+    text = (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")
+    assert "UNSOURCED CLAIM" not in text
+    out = capsys.readouterr().out
+    assert "hint: no web-sourced facts recorded for transit, poi_hours on 2026-06-21" in out
+
+
+def test_facts_json_as_array_does_not_break_the_plan(make_route_with_points, weather_response, fixed_now, capsys):
+    route_dir = _route_with_points(make_route_with_points)
+    (route_dir / "facts.json").write_text("[]", encoding="utf-8")
+    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), now=fixed_now) == 0
+    out = capsys.readouterr().out
+    assert "hint: no web-sourced facts recorded for transit" in out
+
+
+def test_facts_json_as_string_does_not_break_the_plan(make_route_with_points, weather_response, fixed_now, capsys):
+    route_dir = _route_with_points(make_route_with_points)
+    (route_dir / "facts.json").write_text('"just a string"', encoding="utf-8")
+    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), now=fixed_now) == 0
+    out = capsys.readouterr().out
+    assert "hint: no web-sourced facts recorded for transit" in out
+
+
+def test_facts_json_with_bad_encoding_does_not_break_the_plan(make_route_with_points, weather_response, fixed_now, capsys):
+    route_dir = _route_with_points(make_route_with_points)
+    (route_dir / "facts.json").write_bytes(b"\xff\xfe\x00")
+    assert build_day_plan.main([str(route_dir), "2026-06-21"], http=_web(weather_response), now=fixed_now) == 0
+    out = capsys.readouterr().out
+    assert "hint: no web-sourced facts recorded for transit" in out

@@ -30,10 +30,13 @@ PLUGINS = ("transit", "poi_hours", "calendar")
 
 def record(route_dir, date: str, plugin: str, markdown: str, sources: list, last_departure: str | None = None,
            first_departure: str | None = None, warnings: list | None = None, day_type: str | None = None) -> dict:
-    """Validates and stores the fact; returns the stored entry. Raises ValueError with a readable reason."""
+    """Validates and stores the fact; returns the stored entry. Raises ValueError with a readable reason,
+    or OSError when the file cannot be written."""
     if plugin not in PLUGINS:
         raise ValueError(f"unknown plugin {plugin!r} (use one of: {', '.join(PLUGINS)})")
     if date != "all":
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+            raise ValueError(f"bad date {date!r}: use YYYY-MM-DD or 'all'")
         try:
             datetime.date.fromisoformat(date)
         except ValueError:

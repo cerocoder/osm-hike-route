@@ -15,6 +15,7 @@
 - **Radiation comes first in the Hazards group** (the spec lists it after air) and its warnings are pinned in the Summary.
 - **People hazards: no fact means no section**, not `no-data` (which would put "People and access" in every plan's missing-data list). Animals need no new plugin: `bio_hazards` facts already carry them.
 - **Mobile coverage is info-only**: mast count from OpenStreetMap, advice and links, no terrain model. OpenStreetMap masts are sparse and a model without measured data would be a guess dressed as an estimate. Only nPerf and OpenCellID were confirmed to answer; the operators' own maps (MTS, MegaFon, Beeline, T2) could not be confirmed and are not linked.
+- **Registry area.** The registry covers rectangles for Europe with the Urals (north of 36 N), Siberia, northern Kazakhstan and the Far East north of 49 N, and Primorye. The spec excluded China, Mongolia and the Far East outside Russia; rectangles cannot follow borders, so a route just inside a box edge in China or Mongolia is a known limitation.
 - **The registry starts with nine researched zones**, not the spec's whole list. Every zone has a source read during research and geometry from OpenStreetMap or from published figures. The zones not yet researched (Kaluga, Tula and Orel spots, Totskoye, Novaya Zemlya, peaceful underground explosions, Zheleznogorsk and the Yenisei, Seversk, Andreeva Bay, Wismut, Jachymov, La Hague, Sellafield, the Scandinavian and Bavarian hotspots, Balkan depleted uranium) are listed in `data/README.md` and SKILL.md; a plan says so and never says "safe".
 
 ## Global Constraints
@@ -30,7 +31,7 @@
 ## Review Focus
 
 - A route whose only contact with a zone is one long straight segment (no vertex inside, as with a zone crossed between two far-apart track points): still a hit.
-- No hit, or a route outside the registry: the plan says "no entry in the registry", never "safe"; a route far outside Eurasia gets no radiation part at all.
+- No hit, or a route outside the registry: the plan says "no entry in the registry", never "safe"; a route outside the registry's boxes (China, Mongolia, Japan, Korea, the Americas) gets no radiation part at all.
 - Five weather dangers must not push a radiation danger out of the Summary's top five; radiation must still appear when the network and every other plugin fail.
 - Mobile coverage: a missing OpenStreetMap mast is never "no signal"; Overpass down gives a no-data line that keeps the links and the advice; nothing above `info`.
 - A `people_hazards` fact without a source is ignored; no fact means no section; no text about a group of people.
@@ -623,7 +624,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Create: `skills/osm-day-route-day-plan/data/radiation_zones.json`
 - Create: `skills/osm-day-route-day-plan/data/README.md`
 
-- [ ] **Step 1: Add the tests** (33 tests in the file(s) below)
+- [ ] **Step 1: Add the tests** (39 tests in the file(s) below)
 
 Create `skills/osm-day-route-day-plan/tests/test_radiation_registry.py`:
 
@@ -690,17 +691,20 @@ def test_every_zone_has_a_short_event_and_bilingual_texts():
 
 
 KNOWN_INSIDE = {
+    "Techa upper reach": ((60.7448, 55.7639), "ural-techa-river"),
     "Chernobyl NPP": ((30.099, 51.389), "ua-chernobyl-exclusion-zone"),
     "Polesie reserve": ((30.03, 51.55), "by-polesie-reserve"),
     "Novozybkov": ((31.93, 52.54), "ru-bryansk-contaminated-districts"),
     "Kamensk-Uralsky": ((61.93, 56.41), "ural-eurt-trace"),
-    "Kyshtym": ((60.56, 55.71), "ural-eurt-trace"),
+    "Bogdanovich": ((62.05, 56.78), "ural-eurt-trace"),
     "Degelen": ((78.106, 49.805), "kz-semipalatinsk-test-site"),
     "Karachay": ((60.7997, 55.6783), "ural-karachay"),
     "Mayak": ((60.9, 55.7333), "ural-mayak-site"),
 }
 KNOWN_CLEAN = {"Kyiv": (30.52, 50.45), "Moscow": (37.62, 55.75), "Madrid": (-3.70, 40.42),
-               "Ekaterinburg": (60.60, 56.84), "Chelyabinsk": (61.40, 55.16), "Minsk": (27.56, 53.90)}
+               "Ekaterinburg": (60.60, 56.84), "Chelyabinsk": (61.40, 55.16), "Minsk": (27.56, 53.90),
+               "Argayash (south of Mayak)": (60.87, 55.49), "Shadrinsk (east of the trace)": (63.63, 56.09),
+               "Kyshtym (upwind, west of Mayak)": (60.56, 55.71)}
 
 
 @pytest.mark.parametrize("name", sorted(KNOWN_INSIDE))
@@ -739,15 +743,40 @@ def test_the_techa_buffer_follows_the_river_not_its_bounding_box():
     assert "ural-techa-river" not in [h.zone["id"] for h in far]
 
 
+def test_the_corridor_of_the_trace_does_not_reach_upwind_of_the_release_point():
+    trace = [h for h in find_hits(REGISTRY, [(60.62, 55.70), (60.6201, 55.70)], []) if h.zone["id"] == "ural-eurt-trace"]
+    assert trace == []                                    # Kyshtym-side land west of Mayak: the plume went north-east
+    downwind = find_hits(REGISTRY, [(61.2, 56.0), (61.2001, 56.0)], [])
+    assert "ural-eurt-trace" in [h.zone["id"] for h in downwind]
+
+
+def test_the_trace_spans_about_three_hundred_kilometres_from_mayak():
+    min_lon, min_lat, max_lon, max_lat = zone_bbox(ZONES["ural-eurt-trace"])
+    far = (max_lon, max_lat)
+    assert 250.0 <= km_from_mayak(far) <= 330.0
+
+
+def km_from_mayak(point):
+    import math
+    lon, lat = point
+    return math.hypot((lon - 60.9) * 111.195 * math.cos(math.radians(56.5)), (lat - 55.7333) * 111.195)
+
+
 def test_in_scope():
-    assert in_scope(REGISTRY, 56.84, 60.6) and in_scope(REGISTRY, 40.4, -3.7) and in_scope(REGISTRY, 64.0, 100.0)
-    assert not in_scope(REGISTRY, -33.9, 151.2) and not in_scope(REGISTRY, 40.7, -74.0)
+    for lat, lon in ((56.84, 60.6), (40.4, -3.7), (64.0, 100.0), (43.1, 131.9), (62.0, 129.7), (41.0, 29.0)):
+        assert in_scope(REGISTRY, lat, lon), (lat, lon)
+    for lat, lon in ((-33.9, 151.2), (40.7, -74.0), (39.9, 116.4), (47.9, 106.9), (35.7, 139.7), (37.6, 127.0),
+                     (30.0, 31.2)):
+        assert not in_scope(REGISTRY, lat, lon), (lat, lon)
 
 
 def test_validation_catches_broken_entries():
     zone = copy.deepcopy(ZONES["ua-chernobyl-exclusion-zone"])
     zone["geometry"]["rings"][0][-1] = [0.0, 0.0]
     assert any("closed" in p for p in validate_zone(zone))
+    bad_scope = copy.deepcopy(REGISTRY)
+    bad_scope["scope"] = {"lon": [0, 1], "lat": [0, 1]}
+    assert any("scope needs boxes" in p for p in validate_registry(bad_scope))
     zone = copy.deepcopy(ZONES["ua-chernobyl-exclusion-zone"])
     zone["sources"] = []
     assert any("source" in p for p in validate_zone(zone))
@@ -891,8 +920,11 @@ def validate_registry(data: dict) -> list:
     scope = data.get("scope") or {}
     if not (isinstance(data.get("margin_km"), (int, float)) and data["margin_km"] > 0):
         problems.append("margin_km must be positive")
-    if not (isinstance(scope.get("lon"), list) and isinstance(scope.get("lat"), list)):
-        problems.append("scope needs lon and lat ranges")
+    boxes = scope.get("boxes")
+    if not (isinstance(boxes, list) and boxes and all(
+            isinstance(b, list) and len(b) == 4 and all(isinstance(v, (int, float)) for v in b)
+            and b[0] < b[2] and b[1] < b[3] for b in boxes)):
+        problems.append("scope needs boxes [min_lon, min_lat, max_lon, max_lat]")
     zones = data.get("zones")
     if not (isinstance(zones, list) and zones):
         return problems + ["no zones"]
@@ -989,8 +1021,9 @@ def find_hits(registry: dict, route: list, points: list, margin_km: float | None
 
 
 def in_scope(registry: dict, lat: float, lon: float) -> bool:
-    scope = registry["scope"]
-    return scope["lon"][0] <= lon <= scope["lon"][1] and scope["lat"][0] <= lat <= scope["lat"][1]
+    """True when the place lies in one of the boxes the registry is meant to cover (Europe with the Urals, Siberia and the
+    Far East north of 49 N, Primorye); elsewhere a radiation part would say nothing."""
+    return any(b[0] <= lon <= b[2] and b[1] <= lat <= b[3] for b in registry["scope"]["boxes"])
 ```
 
 Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
@@ -999,8 +1032,26 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
 {
  "version": 1,
  "scope": {
-  "lon": [-25.0, 180.0],
-  "lat": [30.0, 82.0]
+  "boxes": [
+   [
+    -25.0,
+    36.0,
+    70.0,
+    82.0
+   ],
+   [
+    70.0,
+    49.0,
+    180.0,
+    82.0
+   ],
+   [
+    130.0,
+    42.0,
+    135.0,
+    49.0
+   ]
+  ]
  },
  "margin_km": 3.0,
  "zones": [
@@ -1060,19 +1111,19 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
     "ru": "стронций-90; около 300 км в длину и 30–50 км в ширину, до 15 000–20 000 км² с плотностью более 3,7 кБк/м²"
    },
    "status": {
-    "en": "23 rural communities were evacuated after the accident; farming resumed on most of the land, the area is monitored.",
-    "ru": "После аварии эвакуированы 23 сельских населённых пункта; на большей части земли хозяйство возобновлено, территория контролируется."
+    "en": "23 rural communities were evacuated after the accident; after 1961 most of the land was reclaimed for farming.",
+    "ru": "После аварии эвакуированы 23 сельских населённых пункта; после 1961 года большая часть земли возвращена в сельскохозяйственное использование."
    },
    "geometry": {
     "type": "buffered_polyline",
     "lines": [
-     [[60.9, 55.7333], [61.5061, 56.2038], [61.9171, 56.4035], [62.3812, 56.81], [63.6982, 57.9402]]
+     [[61.1341, 55.9157], [61.5061, 56.2038], [61.9171, 56.4035], [62.3812, 56.81], [63.4735, 57.7498]]
     ],
     "half_width_km": 25.0
    },
    "geometry_note": {
-    "en": "Centre line through Mayak, Bagaryak, Kamensk-Uralsky and the area between Bogdanovich and Kamyshlov (the settlements named on the source's map), ending 300 km from Mayak; half-width 25 km is the upper bound of the 30–50 km width given by the source. An outline, not an isoline.",
-    "ru": "Осевая линия через «Маяк», Багаряк, Каменск-Уральский и место между Богдановичем и Камышловом (населённые пункты с карты источника), длиной 300 км от «Маяка»; полуширина 25 км — верхняя граница ширины 30–50 км из источника. Контур, а не изолиния."
+    "en": "Centre line through Mayak, Bagaryak, Kamensk-Uralsky and the area between Bogdanovich and Kamyshlov (the settlements named on the source's map), starting 25 km downwind of Mayak and ending so that the outline spans 300 km from Mayak; half-width 25 km is the upper bound of the 30–50 km width given by the source. An outline, not an isoline.",
+    "ru": "Осевая линия через Багаряк, Каменск-Уральский и место между Богдановичем и Камышловом (населённые пункты с карты источника), начинается в 25 км от «Маяка» по ветру и заканчивается так, чтобы контур занимал 300 км от «Маяка»; полуширина 25 км — верхняя граница ширины 30–50 км из источника. Контур, а не изолиния."
    },
    "event": {
     "en": "Kyshtym accident, 1957",
@@ -1113,13 +1164,16 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
      [[61.4401, 55.5754], [61.4432, 55.5723], [61.4368, 55.5714]],
      [[61.4781, 55.5465], [61.4809, 55.547]],
      [[61.7967, 55.581], [61.7977, 55.5797]],
-     [[61.6257, 55.6142], [61.642, 55.6148], [61.6547, 55.6079], [61.6706, 55.6079], [61.6815, 55.6031], [61.7027, 55.6054], [61.7127, 55.6015], [61.717, 55.6053], [61.74, 55.6063], [61.7494, 55.5953], [61.7745, 55.5938], [61.8059, 55.5755], [61.8498, 55.5664], [61.8863, 55.5684], [61.9008, 55.5597], [61.9181, 55.5642], [61.9405, 55.5564], [62.0003, 55.5717], [62.0239, 55.5704], [62.0286, 55.5756], [62.0407, 55.5727], [62.059, 55.5802], [62.0841, 55.5785], [62.0907, 55.5802], [62.0881, 55.5841], [62.11, 55.5872], [62.1225, 55.6092], [62.117, 55.6192], [62.1275, 55.6285], [62.1218, 55.6342], [62.1356, 55.6409], [62.1416, 55.653], [62.141, 55.6676], [62.128, 55.6787], [62.1338, 55.681], [62.1295, 55.6939], [62.1532, 55.7047], [62.1493, 55.7131], [62.1662, 55.7303], [62.1614, 55.7372], [62.1788, 55.7584], [62.1924, 55.7625], [62.173, 55.7763], [62.1917, 55.7928], [62.201, 55.8121], [62.227, 55.8147], [62.2399, 55.8256], [62.2633, 55.8285], [62.2929, 55.8397], [62.3123, 55.8402], [62.3157, 55.8454], [62.345, 55.8465], [62.3581, 55.855], [62.3624, 55.852], [62.3966, 55.8625], [62.4384, 55.8644], [62.5171, 55.8778], [62.527, 55.8735], [62.5288, 55.877], [62.5331, 55.8735], [62.5448, 55.875], [62.5545, 55.8898], [62.5847, 55.9012], [62.5826, 55.9242], [62.5908, 55.9231], [62.6101, 55.9336], [62.6285, 55.9335], [62.6461, 55.9425], [62.6927, 55.9522], [62.711, 55.967], [62.7058, 55.9713], [62.6963, 55.9701], [62.7005, 55.9795], [62.6949, 55.9817], [62.6992, 56.0011], [62.7121, 56.0045], [62.7036, 56.014], [62.6894, 56.0146], [62.6694, 56.0378], [62.6579, 56.0407], [62.6565, 56.0617], [62.6904, 56.0617], [62.7014, 56.0741], [62.6865, 56.0821], [62.6924, 56.0894], [62.7365, 56.0973], [62.7514, 56.1189], [62.7659, 56.1248], [62.7661, 56.1323], [62.7714, 56.13], [62.7836, 56.138], [62.7815, 56.1438], [62.7647, 56.1469], [62.7664, 56.1582], [62.7867, 56.1739], [62.7875, 56.182], [62.8011, 56.1833], [62.8051, 56.1947], [62.8136, 56.1956], [62.8036, 56.1985], [62.8044, 56.2083], [62.8189, 56.2089], [62.8225, 56.2128], [62.8429, 56.2105], [62.8926, 56.2358], [62.9165, 56.2361], [62.92, 56.2329], [62.9405, 56.2384], [62.9517, 56.237]]
+     [[61.6257, 55.6142], [61.642, 55.6148], [61.6547, 55.6079], [61.6706, 55.6079], [61.6815, 55.6031], [61.7027, 55.6054], [61.7127, 55.6015], [61.717, 55.6053], [61.74, 55.6063], [61.7494, 55.5953], [61.7745, 55.5938], [61.8059, 55.5755], [61.8498, 55.5664], [61.8863, 55.5684], [61.9008, 55.5597], [61.9181, 55.5642], [61.9405, 55.5564], [62.0003, 55.5717], [62.0239, 55.5704], [62.0286, 55.5756], [62.0407, 55.5727], [62.059, 55.5802], [62.0841, 55.5785], [62.0907, 55.5802], [62.0881, 55.5841], [62.11, 55.5872], [62.1225, 55.6092], [62.117, 55.6192], [62.1275, 55.6285], [62.1218, 55.6342], [62.1356, 55.6409], [62.1416, 55.653], [62.141, 55.6676], [62.128, 55.6787], [62.1338, 55.681], [62.1295, 55.6939], [62.1532, 55.7047], [62.1493, 55.7131], [62.1662, 55.7303], [62.1614, 55.7372], [62.1788, 55.7584], [62.1924, 55.7625], [62.173, 55.7763], [62.1917, 55.7928], [62.201, 55.8121], [62.227, 55.8147], [62.2399, 55.8256], [62.2633, 55.8285], [62.2929, 55.8397], [62.3123, 55.8402], [62.3157, 55.8454], [62.345, 55.8465], [62.3581, 55.855], [62.3624, 55.852], [62.3966, 55.8625], [62.4384, 55.8644], [62.5171, 55.8778], [62.527, 55.8735], [62.5288, 55.877], [62.5331, 55.8735], [62.5448, 55.875], [62.5545, 55.8898], [62.5847, 55.9012], [62.5826, 55.9242], [62.5908, 55.9231], [62.6101, 55.9336], [62.6285, 55.9335], [62.6461, 55.9425], [62.6927, 55.9522], [62.711, 55.967], [62.7058, 55.9713], [62.6963, 55.9701], [62.7005, 55.9795], [62.6949, 55.9817], [62.6992, 56.0011], [62.7121, 56.0045], [62.7036, 56.014], [62.6894, 56.0146], [62.6694, 56.0378], [62.6579, 56.0407], [62.6565, 56.0617], [62.6904, 56.0617], [62.7014, 56.0741], [62.6865, 56.0821], [62.6924, 56.0894], [62.7365, 56.0973], [62.7514, 56.1189], [62.7659, 56.1248], [62.7661, 56.1323], [62.7714, 56.13], [62.7836, 56.138], [62.7815, 56.1438], [62.7647, 56.1469], [62.7664, 56.1582], [62.7867, 56.1739], [62.7875, 56.182], [62.8011, 56.1833], [62.8051, 56.1947], [62.8136, 56.1956], [62.8036, 56.1985], [62.8044, 56.2083], [62.8189, 56.2089], [62.8225, 56.2128], [62.8429, 56.2105], [62.8926, 56.2358], [62.9165, 56.2361], [62.92, 56.2329], [62.9405, 56.2384], [62.9517, 56.237]],
+     [[60.7341, 55.7697], [60.7344, 55.766], [60.7383, 55.7648], [60.7485, 55.7641], [60.7471, 55.7624], [60.7483, 55.76], [60.7508, 55.7581], [60.7556, 55.7587]],
+     [[61.1284, 55.647], [61.1341, 55.6465], [61.1362, 55.6442], [61.138, 55.6448], [61.1389, 55.6433], [61.1412, 55.6427], [61.1462, 55.6427], [61.1465, 55.6419], [61.1454, 55.6412], [61.1508, 55.6402], [61.1513, 55.6391], [61.154, 55.6386], [61.1537, 55.6378], [61.1557, 55.6378], [61.1554, 55.637], [61.157, 55.6378], [61.1683, 55.6344]],
+     [[61.2156, 55.6227], [61.2173, 55.6222], [61.2192, 55.6201], [61.222, 55.619], [61.2251, 55.6191], [61.2255, 55.618], [61.2291, 55.6179], [61.2322, 55.616]]
     ],
     "half_width_km": 1.5
    },
    "geometry_note": {
-    "en": "Outline from OpenStreetMap (© OpenStreetMap contributors, ODbL), relation 2124164 (waterway Теча), simplified; a half-width of 1.5 km stands for the floodplain",
-    "ru": "Контур из OpenStreetMap (© участники OpenStreetMap, ODbL), relation 2124164 (водоток Теча), упрощён; полуширина 1,5 км соответствует пойме"
+    "en": "Outline from OpenStreetMap (© OpenStreetMap contributors, ODbL), relation 2124164 (waterway Теча) and ways 1104519187, 125750492, 786464969 upstream of its west end, simplified; a half-width of 1.5 km stands for the floodplain; the Mayak reservoir cascade (Reservoirs 3, 4, 10, 11) is not outlined",
+    "ru": "Контур из OpenStreetMap (© участники OpenStreetMap, ODbL), relation 2124164 (водоток Теча) и ways 1104519187, 125750492, 786464969 выше её западного конца, упрощены; полуширина 1,5 км соответствует пойме; каскад водохранилищ «Маяка» (В-3, В-4, В-10, В-11) не оконтурен"
    },
    "event": {
     "en": "Mayak discharges, 1949–1956",
@@ -1301,8 +1355,8 @@ Create `skills/osm-day-route-day-plan/data/radiation_zones.json`:
     "ru": "цезий-137 после Чернобыльской аварии 1986 года"
    },
    "status": {
-    "en": "Gordeevsky, Zlynkovsky, Klimovsky, Klintsovsky, Krasnogorsky and Novozybkovsky districts hold most of the region's settlements in radioactive-contamination zones (Government decree No. 1074 of 2015); forest mushrooms can account for up to 75–82 % of the internal dose there. Only part of each district is contaminated.",
-    "ru": "В Гордеевском, Злынковском, Климовском, Клинцовском, Красногорском и Новозыбковском районах сосредоточена большая часть населённых пунктов области в зонах радиоактивного загрязнения (постановление Правительства РФ № 1074 от 2015 года); вклад лесных грибов во внутреннюю дозу там может достигать 75–82 %. Загрязнена лишь часть каждого района."
+    "en": "The surveyed settlements of Chernobyl-contaminated territories of the region lie in the Gordeevsky, Zlynkovsky, Klimovsky, Klintsovsky, Krasnogorsky and Novozybkovsky districts; forest mushrooms can account for up to 75–82 % of the internal dose there (Radiation Hygiene, 2023). Only part of each district is contaminated.",
+    "ru": "Обследованные населённые пункты радиоактивно загрязнённых после Чернобыля территорий области расположены в Гордеевском, Злынковском, Климовском, Клинцовском, Красногорском и Новозыбковском районах; вклад лесных грибов во внутреннюю дозу там может достигать 75–82 % (журнал «Радиационная гигиена», 2023). Загрязнена лишь часть каждого района."
    },
    "geometry": {
     "type": "polygons",
@@ -1407,6 +1461,8 @@ A hand-curated list of contaminated or closed zones, read by
 - Geometry is one of `polygons` (a list of closed outer rings), `circle`
   (`center` `[lon, lat]`, `radius_km`) or `buffered_polyline` (`lines`,
   `half_width_km`). Coordinates are `[longitude, latitude]`.
+- `scope.boxes` (in the file's header) are the rectangles the registry is meant
+  to cover; a route outside all of them gets no radiation part.
 - `approximate` is true whenever the shape is not a published outline; the
   `geometry_note` then says how it was made. It is required for approximate
   zones and shown to the reader.
@@ -1424,8 +1480,8 @@ A hand-curated list of contaminated or closed zones, read by
 | id | geometry | sources read for this entry |
 |---|---|---|
 | `ural-eurt-core` | OSM way 256825533 (East Ural reserve) | NRPA Bulletin 8-07 (about 180 km² still off-limits); Wikipedia (not open to the public) |
-| `ural-eurt-trace` | centre line through Mayak, Bagaryak, Kamensk-Uralsky and the area between Bogdanovich and Kamyshlov (the settlements named on the NRPA figure), 300 km long, half-width 25 km | NRPA Bulletin 8-07 (300 km long, 30–50 km wide, 23 communities evacuated) |
-| `ural-techa-river` | OSM relation 2124164 (waterway), half-width 1.5 km | NRPA Report 2008:3 (floodplain 240 km², 80 km² above 3.7×10¹⁰ Bq/km²) |
+| `ural-eurt-trace` | centre line through Bagaryak, Kamensk-Uralsky and the area between Bogdanovich and Kamyshlov (the settlements named on the NRPA figure), starting 25 km downwind of Mayak (the outline has round ends) and spanning 300 km from Mayak, half-width 25 km | NRPA Bulletin 8-07 (300 km long, 30–50 km wide, 23 communities evacuated) |
+| `ural-techa-river` | OSM relation 2124164 (waterway) plus ways 1104519187, 125750492, 786464969 upstream of its west end, half-width 1.5 km; the reservoir cascade is not outlined | NRPA Report 2008:3 (floodplain 240 km², 80 km² above 3.7×10¹⁰ Bq/km²) |
 | `ural-mayak-site` | circle at 55°44′N 60°54′E, r = 6 km | NRPA Report 2008:3 (site about 90 km²) |
 | `ural-karachay` | circle at 55.6783°N 60.7997°E (Wikipedia), r = 3 km assumed | NRPA Report 2008:3 (1967 dispersal); Wikipedia |
 | `ua-chernobyl-exclusion-zone` | OSM relation 3311547 | IAEA/UIAR presentation (evacuated in 1986, 2 122 km²) |
@@ -1453,7 +1509,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ### Task 4: The Radiation hazard plugin
 
-`RadiationPlugin` reports the zones the route or its points are inside (warning `danger` for a closed or heavily contaminated zone, `caution` for a wider affected area) or near (`caution` / `info`), with the four advisories (no mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires, wind and wildfire), a suggestion to replan when a danger zone is entered, sources, the approximate-outline note and the OpenStreetMap credit. Its warnings are pinned. No hit is "no entry in the registry", never "safe"; a route far outside Eurasia gets no radiation part. It needs neither the network nor another plugin.
+`RadiationPlugin` reports the zones the route or its points are inside (warning `danger` for a closed or heavily contaminated zone, `caution` for a wider affected area) or near (`caution` / `info`), with the four advisories (no mushrooms or berries, springs and streams may be contaminated, avoid dust and open fires, wind and wildfire), a suggestion to replan when a danger zone is entered, sources, the approximate-outline note and the OpenStreetMap credit. Its warnings are pinned. No hit is "no entry in the registry", never "safe"; a route outside the registry's area (boxes for Europe, Siberia, the Far East north of 49 N and Primorye; not China, Mongolia, Japan or Korea) gets no radiation part. It needs neither the network nor another plugin.
 
 **Files:**
 - Create: `skills/osm-day-route-day-plan/tests/test_radiation.py`
@@ -1475,7 +1531,8 @@ BRYANSK = ((31.90, 52.54, 150.0), (31.95, 52.56, 150.0))
 NEAR_CHERNOBYL = ((30.3851, 51.0634, 120.0), (30.3861, 51.0634, 120.0))    # about 2.2 km south of the zone
 MADRID = ((-3.75, 40.42, 650.0), (-3.74, 40.43, 660.0))
 SYDNEY = ((151.20, -33.86, 20.0), (151.21, -33.85, 25.0))
-KYSHTYM = ((60.55, 55.70, 300.0), (60.57, 55.72, 300.0))
+BEIJING = ((116.39, 39.90, 50.0), (116.41, 39.92, 50.0))
+KYSHTYM = ((60.50, 55.70, 250.0), (60.62, 55.74, 255.0), (60.85, 55.80, 260.0))     # the reserve, Mayak and the trace
 
 
 def run(make_route, fixed_now, coords, lang="en", folder="route", points=None, make_route_with_points=None):
@@ -1532,8 +1589,9 @@ def test_a_route_with_no_hit_says_no_entry_not_safe(make_route, fixed_now):
 
 
 def test_a_route_far_outside_the_registry_area_gets_no_radiation_part(make_route, fixed_now):
-    section = run(make_route, fixed_now, SYDNEY)
-    assert section.omit is True and section.markdown == "" and section.warnings == []
+    for coords, folder in ((SYDNEY, "syd"), (BEIJING, "bei")):
+        section = run(make_route, fixed_now, coords, folder=folder)
+        assert section.omit is True and section.markdown == "" and section.warnings == []
 
 
 def test_a_point_off_the_track_inside_a_zone_counts(make_route, make_route_with_points, fixed_now):
@@ -1544,6 +1602,7 @@ def test_a_point_off_the_track_inside_a_zone_counts(make_route, make_route_with_
 
 def test_the_east_urals_trace_is_an_approximate_caution_and_the_reserve_a_danger(make_route, fixed_now):
     section = run(make_route, fixed_now, KYSHTYM)
+    assert "East Ural State Nature Reserve (core of the East Urals Radioactive Trace)** (danger zone)" in section.markdown
     assert "East Urals Radioactive Trace (fallout of 1957, approximate outline)** (affected area)" in section.markdown
     assert "Approximate outline: Centre line through Mayak, Bagaryak" in section.markdown
     assert any("(contamination: Kyshtym accident, 1957)" in w.text for w in section.warnings)
@@ -2237,7 +2296,7 @@ Modify `skills/osm-day-route-day-plan/SKILL.md` — apply this patch (`patch -p1
  - Every fact needs at least one `http(s)` source, or it is refused (and, if
    found in the file, ignored). Say only what the source says.
  - **Privacy:** facts end up in `day-plan-<date>.md`, embedded in a `map.html`
-@@ -196,8 +208,21 @@
+@@ -196,8 +208,26 @@
    map in Yandex Weather. The Nesterov class is a simplified computation and is
    shown for Russian routes only.
  - Insect levels are a weather and habitat estimate, not a measurement.
@@ -2253,15 +2312,20 @@ Modify `skills/osm-day-route-day-plan/SKILL.md` — apply this patch (`patch -p1
 +  Zheleznogorsk and the Yenisei, Seversk, Andreeva Bay, Wismut, Jachymov,
 +  La Hague, Sellafield, the Scandinavian and Bavarian Chernobyl hotspots and
 +  Balkan depleted-uranium sites. A route with no hit is told "no entry in
-+  the registry", never "safe"; a route far outside Eurasia gets no radiation
-+  part. Outlines marked *approximate* are built from published figures (a
++  the registry", never "safe". The registry covers Europe with the Urals
++  (north of 36 N), Siberia, northern Kazakhstan and the Far East north of
++  49 N, and Primorye; a route outside those boxes (China, Mongolia, Japan,
++  Korea, the Americas, ...) gets no radiation part at all, and a route just
++  inside a box edge in China or Mongolia is a known limitation of rough
++  rectangles. The Mayak reservoir cascade on the Techa is not outlined.
++  Outlines marked *approximate* are built from published figures (a
 +  centre and an area, named settlements, whole districts) and say how; they
 +  are not survey isolines. There is no live dose-rate feed.
 +- Mobile coverage counts OpenStreetMap masts only and does not model signal.
  
  ## Common Mistakes
  
-@@ -211,6 +236,12 @@
+@@ -211,6 +241,12 @@
  - Editing `facts.json` by hand (use `record_fact.py`: it validates, refuses
    source-less facts and never overwrites a file it cannot parse).
  - Forgetting to re-render `map.html` after adding a plan.
@@ -2293,7 +2357,7 @@ No new code unless a defect is found (then fix it with a test in the owning task
 
 - [ ] **Step 1: A route crossing the East Urals trace.** Write a `route.geojson` (a LineString with `[lon, lat, ele]` points) through Kyshtym, e.g. `[[60.50,55.70,250],[60.62,55.74,255],[60.85,55.80,260]]`, run `python3 build_day_plan.py <route_dir> <a date 2–3 days ahead> --lang ru`. Expected: the Summary starts with the radiation `danger` and `caution` lines, `### Радиация` is the first sub-section, the advice list and the source line are there, the outline note is in Russian, and `## Сотовая связь` closes the plan.
 - [ ] **Step 2: A route in the Bryansk districts** (e.g. around Novozybkov, 52.54 N 31.93 E) with `--lang en`: an affected-area caution, no "danger zone" line, the OpenStreetMap credit.
-- [ ] **Step 3: Clean and out-of-area routes.** Madrid: "No zone of the radiation registry lies within 3 km", no warning. Sydney: no `### Radiation` at all. Yekaterinburg centre: no hit.
+- [ ] **Step 3: Clean and out-of-area routes.** Madrid: "No zone of the radiation registry lies within 3 km", no warning. Sydney and Beijing: no `### Radiation` at all. Yekaterinburg centre: no hit.
 - [ ] **Step 4: Two zones at once.** A route from the Polesie reserve edge to the Chernobyl zone: both zones listed, nearest first, one advice block.
 - [ ] **Step 5: Record a people fact** with `record_fact.py --plugin people_hazards` (a real permit rule with its source), re-run: `### People and access` appears with the source and the hint disappears.
 - [ ] **Step 6: Render `map.html`** (`python3 ../../osm-day-route-show/scripts/render_map.py <route_dir> --user-lang ru`) and check its DOM in a headless browser, or open it in a real one if the Chrome extension is connected: `Радиация` first among the hazard sub-sections, the radiation danger first in the sidebar summary, coverage section last.

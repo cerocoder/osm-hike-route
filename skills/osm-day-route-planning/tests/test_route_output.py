@@ -10,6 +10,7 @@ def _sample_call(**overrides):
         duration_estimate_hours=1.1, duration_warning=None,
         curated_routes_count=3, is_loop=True,
         skipped_interest_points=["Дальняя точка"],
+        way_segments=[{"from": 0, "to": 1, "way_id": 5, "highway": "track", "surface": "gravel"}],
         point_features=[{
             "lon": 37.0005, "lat": 55.0005, "ele": 105.0,
             "name": "Родник", "type": "spring", "tier": "tag-backed",
@@ -76,3 +77,16 @@ def test_linestring_coerces_none_elevation_to_zero():
     result = _sample_call(path_coords=[(37.0, 55.0, 100.0), (37.001, 55.001, None)])
     line = next(f for f in result["features"] if f["geometry"]["type"] == "LineString")
     assert line["geometry"]["coordinates"] == [[37.0, 55.0, 100.0], [37.001, 55.001, 0.0]]
+
+
+def test_linestring_carries_the_way_segments():
+    result = _sample_call()
+    line = next(f for f in result["features"] if f["geometry"]["type"] == "LineString")
+
+    assert line["properties"]["segments"] == [{"from": 0, "to": 1, "way_id": 5, "highway": "track", "surface": "gravel"}]
+
+
+def test_way_segments_have_no_default_so_they_cannot_be_left_out():
+    import inspect
+    assert inspect.signature(build_geojson).parameters["way_segments"].default is inspect.Parameter.empty
+

@@ -25,7 +25,7 @@ def _point_feature(pf: dict) -> dict:
 
 def build_geojson(path_coords, route_name, mode, style, distance_km, elevation_gain_m,
                    elevation_loss_m, duration_estimate_hours, duration_warning,
-                   curated_routes_count, is_loop, skipped_interest_points, point_features):
+                   curated_routes_count, is_loop, skipped_interest_points, point_features, way_segments):
     line_feature = {
         "type": "Feature",
         "geometry": {
@@ -44,6 +44,7 @@ def build_geojson(path_coords, route_name, mode, style, distance_km, elevation_g
             "curated_routes_count": curated_routes_count,
             "is_loop": is_loop,
             "skipped_interest_points": skipped_interest_points,
+            "segments": way_segments,
         },
     }
     features = [line_feature] + [_point_feature(pf) for pf in point_features]

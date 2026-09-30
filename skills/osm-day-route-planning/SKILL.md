@@ -184,12 +184,21 @@ new preset, no code changes).
     route_tags)))` with `route_tags=["hiking", "foot"]` for `walk` or
     `["bicycle", "mtb"]` for `bike`. Mention the count in the summary and
     `notes.md` — it never affects routing.
-17. **Save to the archive**:
+17. **Save to the archive** — first build the path geometry and the way
+    segments **together**: `path_coords, way_segments =
+    route_graph.path_geometry(graph, path, node_coords, elevations)` (one
+    call, one node path, so the `(lon, lat, ele)` coordinates and the
+    `segments` — which road, with `highway`/`surface`/`tracktype`/`sac_scale`/…,
+    each part of the route runs on, as inclusive index ranges into those
+    coordinates — cannot drift apart). The day-plan skill reads `segments` to
+    judge how passable the trails and roads are in winter; a route saved
+    without them gets no such assessment and must be re-planned. Then:
     `weights_io.save_weights(route_dir, weights)` (the merged preset +
     overrides + budget — see spec §3.6/§3.11: this is where **inputs** live),
-    `route_output.build_geojson(...)` (this is where **computed outputs**
-    live — distance, duration, elevation gain/loss, warnings, skipped
-    points; never re-store an input here), and `notes.md` (see
+    `route_output.build_geojson(..., way_segments)` (this is where **computed
+    outputs** live — distance, duration, elevation gain/loss, warnings,
+    skipped points, and the road each part of the route runs on; never
+    re-store an input here), and `notes.md` (see
     reference.md's template). **Write `route.geojson` by serializing exactly
     what `build_geojson(...)` returned — never hand-construct or hand-edit
     the JSON.** `build_geojson`'s parameters (`mode`, `distance_km`,
@@ -360,7 +369,7 @@ from presets import load_preset, build_weights
 from route_graph import (
     fetch_area_data, build_restricted_polygons, filter_excluded_ways,
     build_graph, tag_edges, tag_grades, weighted_shortest_path,
-    route_through_waypoints,
+    route_through_waypoints, path_geometry,
 )
 from waypoints import is_point_restricted, validate_user_waypoint, check_mandatory_budget, select_optional_points
 from elevation import ElevationService
@@ -611,6 +620,7 @@ copy an input here):
 | `curated_routes_count` | From `overpass_query.count_curated_routes` |
 | `is_loop` | `true`/`false` — same start/end access point or not |
 | `skipped_interest_points` | Names from `select_optional_points`'s `skipped` list |
+| `segments` | From `route_graph.path_geometry`: `[{"from": i, "to": j, "way_id": …, "highway": …, "surface": …, …}]` — inclusive vertex indices of the `LineString`, consecutive runs sharing their boundary vertex, together covering every vertex; only the tags the way has (`highway`, `surface`, `smoothness`, `tracktype`, `sac_scale`, `mtb:scale`, `trail_visibility`, `bicycle`, `foot`, `winter_service`, `snowplowing`) |
 
 **Point properties**:
 
@@ -663,6 +673,16 @@ Full query templates (with the header workaround Overpass needs) are in
 `reference.md`. A ready-to-run fetch helper is in `scripts/overpass_query.py`.
 
 ## Common Mistakes
+
+- **Building `path_coords` by hand and `segments` separately** — use
+  `route_graph.path_geometry(graph, path, node_coords, elevations)` for both
+  from the same node path; hand-built coordinates plus segments from another
+  list mismatch by an index and the day plan then reads the wrong road for a
+  part of the route (`archive_validate` catches a wrong total length, not a
+  shifted boundary).
+- **Leaving `segments` out or handing over an old route** — a route saved
+  before `segments` existed, or built without `way_segments`, has no road data;
+  the day-plan skill then says it cannot judge passability. Re-plan it.
 
 - **Hand-writing or hand-editing `route.geojson`'s JSON instead of calling
   `build_geojson`, or skipping pipeline step 18's validation** — this is how

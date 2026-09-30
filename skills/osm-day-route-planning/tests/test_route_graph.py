@@ -526,3 +526,93 @@ def test_highway_avoidance_reaches_path_next_to_routable_secondary():
                           data["forest"], data["fields"])
 
     assert graph[20][0][2]["near_highway"] is True
+
+
+# ---- way tags kept for the archive (winter passability) -----------------------------------------------------------
+
+def _three_way_chain():
+    """Nodes 1-2-3-4 on three ways: a gravel track (1-2, 2-3) and an asphalt residential street (3-4)."""
+    return [
+        {"id": 100, "nodes": [1, 2, 3],
+         "geometry": [{"lat": 55.000, "lon": 37.0}, {"lat": 55.001, "lon": 37.0}, {"lat": 55.002, "lon": 37.0}],
+         "tags": {"highway": "track", "surface": "gravel", "tracktype": "grade2", "name": "ignored", "lit": "yes"}},
+        {"id": 200, "nodes": [3, 4],
+         "geometry": [{"lat": 55.002, "lon": 37.0}, {"lat": 55.003, "lon": 37.0}],
+         "tags": {"highway": "residential", "surface": "asphalt", "winter_service": "yes"}},
+    ]
+
+
+def test_edges_keep_a_compact_description_of_their_way():
+    graph, _ = build_graph(_three_way_chain())
+
+    edge = next(e for e in graph[1] if e[0] == 2)
+    assert edge[2]["way"] == {"way_id": 100, "highway": "track", "surface": "gravel", "tracktype": "grade2"}
+    edge = next(e for e in graph[4] if e[0] == 3)
+    assert edge[2]["way"] == {"way_id": 200, "highway": "residential", "surface": "asphalt", "winter_service": "yes"}
+
+
+def test_forward_and_reverse_edges_do_not_share_their_tag_dict():
+    graph, coords = build_graph(_three_way_chain())
+    forward = next(e for e in graph[1] if e[0] == 2)
+    reverse = next(e for e in graph[2] if e[0] == 1)
+
+    forward[2]["grade_pct"] = 5.0
+
+    assert "grade_pct" not in reverse[2]
+
+
+def test_tag_edges_keeps_the_way_description():
+    graph, coords = build_graph(_three_way_chain())
+
+    route_graph.tag_edges(graph, coords, [], [], [], [])
+
+    edge = next(e for e in graph[2] if e[0] == 3)
+    assert edge[2]["way"]["way_id"] == 100
+    assert edge[2]["near_highway"] is False and edge[2]["landcover"] is None
+
+
+def test_path_way_segments_merge_consecutive_edges_of_one_way():
+    graph, _ = build_graph(_three_way_chain())
+
+    segments = route_graph.path_way_segments(graph, [1, 2, 3, 4])
+
+    assert segments == [
+        {"from": 0, "to": 2, "way_id": 100, "highway": "track", "surface": "gravel", "tracktype": "grade2"},
+        {"from": 2, "to": 3, "way_id": 200, "highway": "residential", "surface": "asphalt", "winter_service": "yes"},
+    ]
+
+
+def test_path_way_segments_cover_the_path_in_reverse_and_for_one_edge():
+    graph, _ = build_graph(_three_way_chain())
+
+    reverse = route_graph.path_way_segments(graph, [4, 3, 2, 1])
+    assert [(s["from"], s["to"], s["way_id"]) for s in reverse] == [(0, 1, 200), (1, 3, 100)]
+    single = route_graph.path_way_segments(graph, [1, 2])
+    assert [(s["from"], s["to"]) for s in single] == [(0, 1)]
+    assert route_graph.path_way_segments(graph, [1]) == []
+
+
+def test_path_way_segments_use_the_shortest_of_parallel_edges_and_reject_a_broken_path():
+    graph, _ = build_graph(_three_way_chain())
+    graph[1].append([2, 5.0, {"way": {"way_id": 999, "highway": "path"}}])       # a much shorter parallel edge
+
+    assert route_graph.path_way_segments(graph, [1, 2])[0]["way_id"] == 999
+    with pytest.raises(ValueError, match="not connected"):
+        route_graph.path_way_segments(graph, [1, 4])
+
+
+def test_ways_without_tags_still_give_a_segment_with_only_the_id():
+    graph, _ = build_graph([{"id": 7, "nodes": [1, 2],
+                             "geometry": [{"lat": 55.0, "lon": 37.0}, {"lat": 55.001, "lon": 37.0}], "tags": {}}])
+
+    assert route_graph.path_way_segments(graph, [1, 2]) == [{"from": 0, "to": 1, "way_id": 7}]
+
+
+def test_path_geometry_returns_coordinates_and_segments_from_the_same_path():
+    graph, coords = build_graph(_three_way_chain())
+
+    path_coords, segments = route_graph.path_geometry(graph, [1, 2, 3, 4], coords, {1: 100.0, 2: 101.0, 4: 103.0})
+
+    assert path_coords == [(37.0, 55.0, 100.0), (37.0, 55.001, 101.0), (37.0, 55.002, None), (37.0, 55.003, 103.0)]
+    assert segments[0]["from"] == 0 and segments[-1]["to"] == len(path_coords) - 1
+

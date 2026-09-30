@@ -346,6 +346,22 @@ def filter_excluded_ways(walkable_ways, restricted_polygons,
     return kept
 
 
+# Tags of a way that describe how it can be used in winter and on a bicycle; kept on every edge so that the
+# archive can say what each part of the route runs on (route.geojson "segments").
+WAY_TAG_KEYS = (
+    "highway", "surface", "smoothness", "tracktype", "sac_scale", "mtb:scale", "trail_visibility",
+    "bicycle", "foot", "winter_service", "snowplowing",
+)
+
+
+def _way_description(way: dict) -> dict:
+    """{"way_id": ..., "highway": ..., ...}: the id and those of WAY_TAG_KEYS the way carries."""
+    tags = way.get("tags", {})
+    description = {"way_id": way.get("id")}
+    description.update({key: tags[key] for key in WAY_TAG_KEYS if key in tags})
+    return description
+
+
 def build_graph(walkable_ways, barrier_nodes=None, blocking_barrier_tags=None, respect_oneway=False):
     """Returns (graph, node_coords). graph: {node_id: [[neighbor_id, length_m, tags_dict], ...]}
     Directed: each physical segment gets its own forward/reverse entries so
@@ -370,6 +386,7 @@ def build_graph(walkable_ways, barrier_nodes=None, blocking_barrier_tags=None, r
             node_coords[node_id] = (pt["lat"], pt["lon"])
 
         forward_allowed, reverse_allowed = _direction_allowed(tags, respect_oneway)
+        description = _way_description(way)
 
         for i in range(len(ids) - 1):
             a, b = ids[i], ids[i + 1]
@@ -380,10 +397,11 @@ def build_graph(walkable_ways, barrier_nodes=None, blocking_barrier_tags=None, r
             length = haversine(lat1, lon1, lat2, lon2)
             graph.setdefault(a, [])
             graph.setdefault(b, [])
+            # one dict per directed edge: tag_grades writes a different grade_pct into each direction
             if forward_allowed:
-                graph[a].append([b, length, {}])
+                graph[a].append([b, length, {"way": description}])
             if reverse_allowed:
-                graph[b].append([a, length, {}])
+                graph[b].append([a, length, {"way": description}])
     return graph, node_coords
 
 
@@ -442,7 +460,7 @@ def tag_edges(graph, node_coords, highway_ways, water_ways, forest_ways, field_w
             elif any(point_in_ring(mid_lat, mid_lon, ring) for ring in field_rings):
                 landcover = "field"
 
-            edge[2] = {"near_highway": near_highway, "near_water": near_water, "landcover": landcover}
+            edge[2].update({"near_highway": near_highway, "near_water": near_water, "landcover": landcover})
 
 
 def tag_grades(graph, node_coords, elevations):
@@ -476,6 +494,35 @@ def _edge_cost(length_m, tags, preferences):
     if grade_pct > threshold:
         cost *= preferences.get("avoid_steep_gradient", 1.0)
     return cost
+
+
+def path_way_segments(graph, node_path):
+    """Runs of the path that stay on one way: [{"from": i, "to": j, "way_id": ..., "highway": ..., ...}, ...] where
+    from/to are inclusive indices into node_path (a route.geojson LineString has one vertex per node). Consecutive
+    runs share their boundary vertex, the runs cover 0 .. len(node_path) - 1. Of parallel edges between two nodes
+    the shortest is used. A path of fewer than two nodes has no segments."""
+    runs = []
+    for i in range(len(node_path) - 1):
+        a, b = node_path[i], node_path[i + 1]
+        candidates = [e for e in graph.get(a, []) if e[0] == b]
+        if not candidates:
+            raise ValueError(f"the path is not connected in the graph between {a} and {b}")
+        description = min(candidates, key=lambda e: e[1])[2].get("way") or {}
+        if runs and {k: v for k, v in runs[-1].items() if k not in ("from", "to")} == description:
+            runs[-1]["to"] = i + 1
+        else:
+            runs.append({"from": i, "to": i + 1, **description})
+    return runs
+
+
+def path_geometry(graph, node_path, node_coords, node_elevations):
+    """(path_coords, way_segments) built from ONE node path, so that the segment indices cannot drift from the
+    coordinates. path_coords is [(lon, lat, ele_or_None), ...] one per node (node_coords holds (lat, lon))."""
+    coords = []
+    for node in node_path:
+        lat, lon = node_coords[node]
+        coords.append((lon, lat, node_elevations.get(node)))
+    return coords, path_way_segments(graph, node_path)
 
 
 def weighted_shortest_path(graph, start, end, preferences):

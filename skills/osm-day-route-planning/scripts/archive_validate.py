@@ -124,6 +124,35 @@ def _validate_geojson(geojson: dict) -> list[str]:
     if "skipped_interest_points" in props and not isinstance(props["skipped_interest_points"], list):
         problems.append(f"skipped_interest_points={props['skipped_interest_points']!r} — ожидался список")
 
+    if "segments" in props:
+        problems.extend(_validate_segments(props["segments"], len(coords)))
+
+    return problems
+
+
+def _validate_segments(segments, vertex_count: int) -> list[str]:
+    """segments (the road each part of the route runs on) is optional — archives saved before it existed have none —
+    but when present its ranges must cover the LineString vertices exactly, otherwise a consumer would read the
+    wrong road for a part of the route."""
+    if not isinstance(segments, list) or not segments:
+        return [f"segments={segments!r} — ожидался непустой список"]
+    problems = []
+    expected_from = 0
+    for index, segment in enumerate(segments):
+        start, end = (segment.get("from"), segment.get("to")) if isinstance(segment, dict) else (None, None)
+        if not (isinstance(start, int) and isinstance(end, int)) or isinstance(start, bool) or isinstance(end, bool):
+            problems.append(f"segments[{index}]: 'from' и 'to' должны быть целыми числами")
+            return problems
+        if start != expected_from or end <= start:
+            problems.append(
+                f"segments[{index}]: диапазон {start}..{end} не продолжает предыдущий "
+                f"(ожидалось from={expected_from}, to > from)")
+            return problems
+        expected_from = end
+    if vertex_count and expected_from != vertex_count - 1:
+        problems.append(
+            f"segments покрывают вершины 0..{expected_from}, а в LineString {vertex_count} вершин "
+            f"(последний индекс должен быть {vertex_count - 1})")
     return problems
 
 

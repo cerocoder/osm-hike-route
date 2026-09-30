@@ -130,3 +130,39 @@ def test_malformed_json_is_reported_not_crashed(tmp_path):
         validate_archive(tmp_path)
 
     assert "route.geojson" in str(exc_info.value)
+
+
+def _archive_with_segments(tmp_path, segments):
+    geojson = _write_complete_archive(tmp_path)
+    geojson["features"][0]["properties"]["segments"] = segments
+    (tmp_path / "route.geojson").write_text(json.dumps(geojson, ensure_ascii=False), encoding="utf-8")
+
+
+def test_an_archive_without_segments_is_still_valid(tmp_path):
+    _write_complete_archive(tmp_path)
+    validate_archive(tmp_path)
+
+
+def test_segments_that_cover_the_vertices_are_valid(tmp_path):
+    _archive_with_segments(tmp_path, [{"from": 0, "to": 1, "way_id": 5, "highway": "track"}])
+    validate_archive(tmp_path)
+
+
+@pytest.mark.parametrize("segments, fragment", [
+    ([], "непустой список"),
+    ("track", "непустой список"),
+    ([{"from": 0, "to": "1"}], "целыми числами"),
+    ([{"from": True, "to": 1}], "целыми числами"),
+    ([{"from": 1, "to": 2}], "не продолжает"),
+    ([{"from": 0, "to": 0}], "не продолжает"),
+    ([{"from": 0, "to": 1}, {"from": 0, "to": 1}], "не продолжает"),
+    ([{"from": 0, "to": 3}], "последний индекс должен быть 1"),
+])
+def test_broken_segments_are_reported(tmp_path, segments, fragment):
+    _archive_with_segments(tmp_path, segments)
+
+    with pytest.raises(ArchiveIncompleteError) as exc_info:
+        validate_archive(tmp_path)
+
+    assert fragment in str(exc_info.value)
+

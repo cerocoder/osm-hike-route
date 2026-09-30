@@ -155,6 +155,23 @@ def test_russian_text_uses_the_russian_names_and_advice(make_route, fixed_now):
     assert section.markdown.count("Источники:") == 1 and "Centre" not in section.markdown and "Outline" not in section.markdown
 
 
+def test_osm_credit_is_its_own_paragraph(make_route, fixed_now):
+    section = run(make_route, fixed_now, CROSSING, folder="osm_en")
+    md = section.markdown
+    assert "\n\n*Zone outlines from OpenStreetMap" in md
+    # The line before the blank lines should be the sources line starting with "Sources:"
+    sources_idx = md.index("Sources:")
+    credit_idx = md.index("\n\n*Zone outlines from OpenStreetMap")
+    assert sources_idx < credit_idx
+    # Also test in Russian
+    section_ru = run(make_route, fixed_now, CROSSING, lang="ru", folder="osm_ru")
+    md_ru = section_ru.markdown
+    assert "\n\n*Контуры зон — из OpenStreetMap" in md_ru
+    sources_idx_ru = md_ru.index("Источники:")
+    credit_idx_ru = md_ru.index("\n\n*Контуры зон — из OpenStreetMap")
+    assert sources_idx_ru < credit_idx_ru
+
+
 def test_radiation_needs_no_network_and_no_other_plugin(make_route, fixed_now):
     calls = []
     route_dir = make_route(coords=CROSSING)

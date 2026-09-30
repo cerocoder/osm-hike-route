@@ -81,7 +81,7 @@ class RadiationPlugin(SectionPlugin):
         urls = _unique(urls)
         lines += ["", sources_line(urls, lang)]
         if any("OpenStreetMap" in h.zone.get("geometry_note", {}).get("en", "") for h in hits):
-            lines.append("*" + tr("rad_osm_credit", lang) + "*")
+            lines += ["", "*" + tr("rad_osm_credit", lang) + "*"]
         primary = all(any(s["kind"] == "primary" for s in h.zone["sources"]) for h in hits)
         return Section("hazards", "\n".join(lines), "tag-backed" if primary else "web-sourced",
                        sources=urls, warnings=warnings,

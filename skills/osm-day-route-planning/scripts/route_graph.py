@@ -420,18 +420,37 @@ def point_in_ring(lat, lon, ring):
     return inside
 
 
-def _min_distance_to_lines(lat, lon, ways_geom):
-    best = float("inf")
-    for coords in ways_geom:
-        for i in range(len(coords) - 1):
-            # cheap approximation: min distance to segment endpoints,
-            # good enough at footpath-to-feature scale (tens of meters)
-            d = min(
-                haversine(lat, lon, coords[i]["lat"], coords[i]["lon"]),
-                haversine(lat, lon, coords[i + 1]["lat"], coords[i + 1]["lon"]),
-            )
-            best = min(best, d)
-    return best
+class _VertexGrid:
+    """Spatial hash over the vertices of a set of lines, answering "is any vertex closer than `radius_m` to this
+    point?" by looking at the 3x3 neighbouring cells only instead of every vertex. The answer is the same as a
+    brute-force haversine scan over the vertices (distance to line vertices, not to segments: good enough at
+    footpath-to-feature scale, tens of metres); the cells are at least `radius_m` wide in both directions, so no
+    vertex that close can lie outside the 3x3 block."""
+
+    METERS_PER_DEGREE = 111000.0            # a little under the real 111195 m, so the cells only get larger
+
+    def __init__(self, ways_geom, radius_m):
+        self.radius_m = radius_m
+        vertices = [(p["lat"], p["lon"]) for coords in ways_geom for p in coords]
+        widest_lat = min(89.0, max((abs(lat) for lat, _ in vertices), default=0.0) + 0.5)
+        self._cell_lat = radius_m / self.METERS_PER_DEGREE
+        self._cell_lon = radius_m / (self.METERS_PER_DEGREE * math.cos(math.radians(widest_lat)))
+        self._cells = {}
+        for lat, lon in vertices:
+            self._cells.setdefault(self._key(lat, lon), []).append((lat, lon))
+
+    def _key(self, lat, lon):
+        return math.floor(lat / self._cell_lat), math.floor(lon / self._cell_lon)
+
+    def near(self, lat, lon):
+        """True when some vertex is strictly closer than the radius."""
+        row, col = self._key(lat, lon)
+        for r in (row - 1, row, row + 1):
+            for c in (col - 1, col, col + 1):
+                for vlat, vlon in self._cells.get((r, c), ()):
+                    if haversine(lat, lon, vlat, vlon) < self.radius_m:
+                        return True
+        return False
 
 
 def tag_edges(graph, node_coords, highway_ways, water_ways, forest_ways, field_ways,
@@ -445,6 +464,9 @@ def tag_edges(graph, node_coords, highway_ways, water_ways, forest_ways, field_w
     field_rings = [[(p["lat"], p["lon"]) for p in w["geometry"]]
                    for w in field_ways if w.get("geometry") and len(w["geometry"]) >= 3]
 
+    highway_grid = _VertexGrid(highway_geoms, highway_buffer_m) if highway_geoms else None
+    water_grid = _VertexGrid(water_geoms, water_buffer_m) if water_geoms else None
+
     for node_id, edges in graph.items():
         for edge in edges:
             neighbor_id = edge[0]
@@ -452,8 +474,8 @@ def tag_edges(graph, node_coords, highway_ways, water_ways, forest_ways, field_w
             lat2, lon2 = node_coords.get(neighbor_id, (lat1, lon1))
             mid_lat, mid_lon = (lat1 + lat2) / 2, (lon1 + lon2) / 2
 
-            near_highway = bool(highway_geoms) and _min_distance_to_lines(mid_lat, mid_lon, highway_geoms) < highway_buffer_m
-            near_water = bool(water_geoms) and _min_distance_to_lines(mid_lat, mid_lon, water_geoms) < water_buffer_m
+            near_highway = highway_grid is not None and highway_grid.near(mid_lat, mid_lon)
+            near_water = water_grid is not None and water_grid.near(mid_lat, mid_lon)
             landcover = None
             if any(point_in_ring(mid_lat, mid_lon, ring) for ring in forest_rings):
                 landcover = "forest"

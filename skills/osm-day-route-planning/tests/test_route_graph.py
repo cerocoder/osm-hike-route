@@ -616,3 +616,33 @@ def test_path_geometry_returns_coordinates_and_segments_from_the_same_path():
     assert path_coords == [(37.0, 55.0, 100.0), (37.0, 55.001, 101.0), (37.0, 55.002, None), (37.0, 55.003, 103.0)]
     assert segments[0]["from"] == 0 and segments[-1]["to"] == len(path_coords) - 1
 
+
+
+# ---- the grid index behind tag_edges must give the answers of a brute-force vertex scan ---------------------------------
+
+def _brute_near(lat, lon, ways_geom, radius_m):
+    from overpass_query import haversine
+    return any(haversine(lat, lon, p["lat"], p["lon"]) < radius_m for coords in ways_geom for p in coords)
+
+
+@pytest.mark.parametrize("lat0,lon0", [(55.79, 37.67), (0.0, 0.0), (69.6, 18.9), (-33.9, 151.2), (55.0, 179.99)])
+def test_vertex_grid_agrees_with_a_brute_force_scan(lat0, lon0):
+    import random
+    rng = random.Random(7)
+    ways = [[{"lat": lat0 + rng.uniform(-0.01, 0.01), "lon": lon0 + rng.uniform(-0.02, 0.02)} for _ in range(6)]
+            for _ in range(40)]
+    for radius in (30, 50):
+        grid = route_graph._VertexGrid(ways, radius)
+        for _ in range(400):
+            lat, lon = lat0 + rng.uniform(-0.012, 0.012), lon0 + rng.uniform(-0.024, 0.024)
+            assert grid.near(lat, lon) == _brute_near(lat, lon, ways, radius)
+
+
+def test_vertex_grid_respects_the_radius_exactly_and_an_empty_set_is_never_near():
+    from overpass_query import haversine
+    vertex = {"lat": 56.0, "lon": 37.0}
+    east = 0.001
+    distance = haversine(56.0, 37.0, 56.0, 37.0 + east)
+    grid = route_graph._VertexGrid([[vertex]], distance + 0.01)
+    assert grid.near(56.0, 37.0 + east) and not route_graph._VertexGrid([[vertex]], distance - 0.01).near(56.0, 37.0 + east)
+    assert route_graph._VertexGrid([], 50).near(56.0, 37.0) is False

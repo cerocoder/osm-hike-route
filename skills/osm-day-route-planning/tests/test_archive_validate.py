@@ -11,6 +11,10 @@ _COMPLETE_LINE_PROPS = {
 }
 
 
+FULL_NOTES = "# Notes\n\n" + "".join(f"## {text}\n- x\n\n" for text in
+                                     ("Request", "Доступ", "Route reasoning", "Puntos de interés", "Distance and duration"))
+
+
 def _write_complete_archive(route_dir):
     route_dir.mkdir(parents=True, exist_ok=True)
     geojson = {
@@ -24,7 +28,7 @@ def _write_complete_archive(route_dir):
     (route_dir / "route.geojson").write_text(json.dumps(geojson, ensure_ascii=False), encoding="utf-8")
     (route_dir / "weights.json").write_text(json.dumps({"mode": "walk"}), encoding="utf-8")
     (route_dir / "requests.md").write_text("# Requests\n", encoding="utf-8")
-    (route_dir / "notes.md").write_text("# Notes\n", encoding="utf-8")
+    (route_dir / "notes.md").write_text(FULL_NOTES, encoding="utf-8")
     return geojson
 
 
@@ -166,3 +170,21 @@ def test_broken_segments_are_reported(tmp_path, segments, fragment):
 
     assert fragment in str(exc_info.value)
 
+
+
+def test_notes_without_the_fixed_required_sections_are_reported_by_name(tmp_path):
+    _write_complete_archive(tmp_path)
+    (tmp_path / "notes.md").write_text("# N\n\n## Запрос\n- x\n\n## Порядок точек\n- x\n", encoding="utf-8")
+    with pytest.raises(ArchiveIncompleteError) as exc_info:
+        validate_archive(tmp_path)
+    message = str(exc_info.value)
+    assert "## Points of interest" in message and "## Access" in message and "## Distance and duration" in message
+    assert "## Request" not in message
+
+
+def test_a_heading_in_any_language_of_the_table_satisfies_the_check(tmp_path):
+    _write_complete_archive(tmp_path)
+    (tmp_path / "notes.md").write_text(
+        "\n".join(f"## {t}" for t in ("Demande", "Accès", "Justification de l'itinéraire", "Points d'intérêt",
+                                      "distance et durée")), encoding="utf-8")
+    validate_archive(tmp_path)

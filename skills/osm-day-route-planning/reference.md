@@ -228,7 +228,11 @@ block per iteration:
 <!-- requests_log entry: {"iteration": N, "timestamp": "...", "request": "...", "summary": "..."} -->
 ```
 
-`routes/<slug>-<date>/notes.md`:
+`routes/<slug>-<date>/notes.md` — the `## ` headings are **fixed**, one wording per
+section and language (`scripts/notes_headings.py`; below in English, e.g. Russian
+"Запрос / Доступ / Обоснование маршрута / Точки интереса / Пропущенные необязательные точки /
+Готовые маршруты рядом / Дистанция и время"). Write the heading of the notes' language
+exactly; `skipped` and `curated` only when there is something to say:
 ```markdown
 # <Location name> — <date>
 
@@ -251,7 +255,7 @@ block per iteration:
 - Segments chosen for greenery / avoided for highway proximity: ...
 - Elevation profile summary (gain/loss, any steep-gradient tradeoffs): ...
 
-## Interest-layer confidence
+## Points of interest
 - <layer>: <tier> — <source or "no data found">
 
 ## Optional points skipped for budget
@@ -260,7 +264,7 @@ block per iteration:
 ## Curated routes nearby
 - N public route=hiking/route=bicycle relations found in OSM within the search radius
 
-## Distance / duration
+## Distance and duration
 - Total distance: X km
 - Estimated duration: Y h (warning: ... / none)
 ```

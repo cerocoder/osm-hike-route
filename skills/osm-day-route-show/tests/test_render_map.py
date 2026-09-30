@@ -561,3 +561,25 @@ def test_interest_block_says_so_when_there_are_no_points_at_all(tmp_path):
     with patch("tile_providers.providers.base.probe_tile", return_value=False):
         html = build_map_html(route_dir / "route.geojson", None, title="T", user_lang="ru", resolve_wiki=False)
     assert "Нет в notes.md" in html.split("Точки интереса</h3>")[1].split("<h3>")[0]
+
+# ---- fixed notes.md headings are found by name, legacy wording by alias ------------------------------------------------
+
+from render_map import NOTES_HEADINGS, extract_md_section
+
+
+@pytest.mark.parametrize("lang", sorted(NOTES_HEADINGS["access"]))
+def test_the_fixed_headings_of_every_language_are_found_by_name(lang):
+    notes = (f"## {NOTES_HEADINGS['request'][lang]}\n- r\n\n## {NOTES_HEADINGS['access'][lang]}\n- a {lang}\n\n"
+             f"## {NOTES_HEADINGS['interest'][lang]}\n- i {lang}\n\n## {NOTES_HEADINGS['distance'][lang]}\n- d\n")
+    assert extract_md_section(notes, "access") == f"- a {lang}"
+    assert extract_md_section(notes, "confidence") == f"- i {lang}"
+
+
+def test_the_exact_heading_wins_over_an_alias_written_earlier():
+    notes = "## Interest layers\n- legacy\n\n## Точки интереса\n- fixed\n"
+    assert extract_md_section(notes, "confidence") == "- fixed"
+
+
+def test_legacy_wording_still_works_through_the_aliases():
+    assert extract_md_section("## Как добраться (Екатеринбург)\n- x\n", "access") == "- x"
+    assert extract_md_section("## 8 точек интереса\n- y\n", "confidence") == "- y"

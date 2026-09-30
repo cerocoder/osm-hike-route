@@ -199,7 +199,10 @@ new preset, no code changes).
     outputs** live — distance, duration, elevation gain/loss, warnings,
     skipped points, and the road each part of the route runs on; never
     re-store an input here), and `notes.md` (see
-    reference.md's template). **Write `route.geojson` by serializing exactly
+    reference.md's template; **its `## ` headings are fixed** — write each
+    exactly as `notes_headings.heading(key, lang)` returns it for the
+    language of the notes, never reword them: the map panel and
+    `archive_validate` find the sections by these names). **Write `route.geojson` by serializing exactly
     what `build_geojson(...)` returned — never hand-construct or hand-edit
     the JSON.** `build_geojson`'s parameters (`mode`, `distance_km`,
     `elevation_gain_m`, `elevation_loss_m`, `duration_estimate_hours`, etc.)
@@ -570,6 +573,9 @@ you're about to write the same number to both files, one of them is wrong.
 
 **An archive is not saved until `archive_validate.validate_archive(route_dir)`
 passes** (pipeline step 18) — it checks that all four files exist, that
+`notes.md` has the fixed headings of the five required sections (request,
+access, route reasoning, points of interest, distance and duration — in any
+language of `notes_headings.py`), that
 `route.geojson`'s `LineString` coordinates are 3D and carry every computed
 property (`mode`, `distance_km`, `elevation_gain_m`, `elevation_loss_m`,
 `duration_estimate_hours`, etc.), and that `weights.json` has a `mode` key.
@@ -673,6 +679,11 @@ Full query templates (with the header workaround Overpass needs) are in
 `reference.md`. A ready-to-run fetch helper is in `scripts/overpass_query.py`.
 
 ## Common Mistakes
+
+- Rewording a `notes.md` heading ("Порядок точек", "Итог", "Interest-layer confidence") instead of
+  the fixed one from `notes_headings.py`: the map panel then says the section is missing and
+  `archive_validate` refuses the archive. Put extra material under a required section or add your own
+  section with another name; do not rename the fixed ones.
 
 - **Building `path_coords` by hand and `segments` separately** — use
   `route_graph.path_geometry(graph, path, node_coords, elevations)` for both

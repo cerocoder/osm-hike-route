@@ -27,8 +27,8 @@ The plan has these sections, always in this order:
    features.
 
 6. **Hazards**, with a `###` sub-heading for each part that applies:
-   **Mountain hazards** (only where the route reaches 600 m or more: cold and
-   freezing level, wind, thunderstorms, snow, terrain from OSM), **Fire
+   **Mountain hazards** (only where the route reaches 600 m or more, or its relief is
+   at least 300 m: cold and freezing level, wind, thunderstorms, snow, terrain from OSM), **Fire
    danger** (official Fire Weather Index from the Copernicus GWIS service,
    the Russian Nesterov class for routes in Russia, active fires near the
    route), **Ticks and biting insects** (ticks, mosquitoes, blackflies and
@@ -211,5 +211,7 @@ public-holiday rule" when the holiday status is unknown.
 - Editing `facts.json` by hand (use `record_fact.py`: it validates, refuses
   source-less facts and never overwrites a file it cannot parse).
 - Forgetting to re-render `map.html` after adding a plan.
-- Recording a `mountain` fact for a flat route or a `bio_hazards` fact in
-  winter: the section does not exist then and the fact is never shown.
+- Recording a `mountain` fact for a flat route (neither 600 m high nor 300 m
+  of relief): the section does not exist then and the fact is never shown. A
+  `bio_hazards` fact recorded out of season is different: it is still shown
+  (it keeps the section alive, for example a bear warning in winter).

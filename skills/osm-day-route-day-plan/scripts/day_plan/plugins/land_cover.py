@@ -16,6 +16,7 @@ AROUND_M = 30
 SAMPLE_STEP_M = 100.0
 SAMPLE_MAX = 300
 POLYLINE_MAX = 100
+ELEMENT_CAP = 1500
 QUERY_VERSION = "1"
 # (tag, value) -> kind; one table, so a region can be tuned
 COVER_KINDS = {
@@ -46,22 +47,52 @@ def route_polyline(coords: list) -> str:
 
 def cover_query(poly: str) -> str:
     return (f'[out:json][timeout:25];(nwr(around:{AROUND_M},{poly})["natural"~"^(wood|scrub|grassland|heath)$"];'
-            f'nwr(around:{AROUND_M},{poly})["landuse"~"^(forest|meadow|grass|farmland)$"];);out tags geom 400;')
+            f'nwr(around:{AROUND_M},{poly})["landuse"~"^(forest|meadow|grass|farmland)$"];);out tags geom {ELEMENT_CAP};')
 
 
 def densify(coords: list, step_m: float = SAMPLE_STEP_M, max_points: int = SAMPLE_MAX) -> list:
     """[(lat, lon)] along the track about every `step_m`, at most `max_points`, both ends included."""
-    points = []
+    if not coords or len(coords) < 2:
+        return [(coords[0][1], coords[0][0])] if coords else []
+
+    # Calculate cumulative distances along the route
+    cumulative_distances = [0.0]
     for (lon1, lat1, *_), (lon2, lat2, *_) in zip(coords, coords[1:]):
-        parts = max(1, math.ceil(haversine_m(lat1, lon1, lat2, lon2) / step_m))
-        for i in range(parts):
-            f = i / parts
-            points.append((lat1 + (lat2 - lat1) * f, lon1 + (lon2 - lon1) * f))
-    last = coords[-1]
-    points.append((last[1], last[0]))
-    if len(points) > max_points:
-        step = (len(points) - 1) / (max_points - 1)
-        points = [points[round(i * step)] for i in range(max_points)]
+        dist = haversine_m(lat1, lon1, lat2, lon2)
+        cumulative_distances.append(cumulative_distances[-1] + dist)
+
+    total_distance = cumulative_distances[-1]
+    if total_distance == 0:
+        return [(coords[-1][1], coords[-1][0])]
+
+    # Calculate the number of points: roughly one every step_m, but at most max_points
+    num_points = min(max_points, max(2, math.ceil(total_distance / step_m)))
+
+    # Emit points at regular distance intervals
+    points = []
+    for i in range(num_points):
+        target_distance = i * total_distance / (num_points - 1) if num_points > 1 else 0
+
+        # Find the segment containing this target distance
+        for j in range(len(cumulative_distances) - 1):
+            if cumulative_distances[j] <= target_distance <= cumulative_distances[j + 1]:
+                # Interpolate within this segment
+                seg_start = cumulative_distances[j]
+                seg_end = cumulative_distances[j + 1]
+                seg_dist = seg_end - seg_start
+
+                if seg_dist == 0:
+                    f = 0
+                else:
+                    f = (target_distance - seg_start) / seg_dist
+
+                lon1, lat1, *_ = coords[j]
+                lon2, lat2, *_ = coords[j + 1]
+                lat = lat1 + (lat2 - lat1) * f
+                lon = lon1 + (lon2 - lon1) * f
+                points.append((lat, lon))
+                break
+
     return points
 
 
@@ -173,6 +204,9 @@ class LandCoverPlugin(SectionPlugin):
                        progress=ctx.progress)
         except OverpassError as e:
             return self._section(0.0, 0.0, str(e))
+        # Check if the response was truncated
+        if len(data.get("elements", [])) >= ELEMENT_CAP:
+            return self._section(0.0, 0.0, "response truncated")
         shares = cover_shares(parse_polygons(data), samples)
         ctx.cache.put(key, shares)
         return self._section(shares["forest"], shares["open"], None)

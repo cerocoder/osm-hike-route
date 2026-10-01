@@ -1,9 +1,10 @@
 import datetime
+import math
 
 from day_plan.context import build_context
 from day_plan.http import HttpError
 from day_plan.plugins.land_cover import (
-    LandCoverPlugin, cover_query, cover_shares, densify, parse_polygons, route_polyline,
+    LandCoverPlugin, cover_query, cover_shares, densify, parse_polygons, route_polyline, ELEMENT_CAP,
 )
 
 DATE = datetime.date(2026, 6, 21)
@@ -21,13 +22,33 @@ def _way(kind_tag, ring):
 def test_query_is_an_around_query_on_the_polyline():
     ql = cover_query("51.45,-0.2,51.55,-0.05")
     assert "around:30,51.45,-0.2,51.55,-0.05" in ql and "wood|scrub|grassland|heath" in ql
-    assert "forest|meadow|grass|farmland" in ql and "out tags geom" in ql
+    assert "forest|meadow|grass|farmland" in ql and f"out tags geom {ELEMENT_CAP}" in ql
 
 
 def test_densify_samples_along_the_distance_not_per_vertex():
     points = densify([(-0.20, 51.45, None), (-0.05, 51.55, None)], step_m=100, max_points=300)
     assert 100 < len(points) <= 300                       # a 15 km two-point line
-    assert points[0] == (51.45, -0.20) and points[-1] == (51.55, -0.05)
+    # Check endpoints with float tolerance
+    assert abs(points[0][0] - 51.45) < 1e-9 and abs(points[0][1] - (-0.20)) < 1e-9
+    assert abs(points[-1][0] - 51.55) < 1e-9 and abs(points[-1][1] - (-0.05)) < 1e-9
+
+
+def test_densify_with_many_vertices_does_not_give_one_per_vertex():
+    # Create a route with 2000 vertices over ~69 km (1 degree longitude at lat 51.45)
+    # Old densify would create ~2000 points
+    # New densify should create ~690 points (69km / 100m step)
+    coords = [(-0.20 + i * 0.0005, 51.45, None) for i in range(2001)]
+
+    points = densify(coords, step_m=100, max_points=1000)
+
+    # Should have far fewer than 2000 points (not one per vertex)
+    assert len(points) < 800  # much less than 2001 vertices
+    assert len(points) > 600   # but expect roughly 690 for 69km
+
+    # Verify endpoints are correct
+    assert abs(points[0][0] - 51.45) < 1e-9
+    assert abs(points[0][1] - (-0.20)) < 1e-6
+    assert abs(points[-1][0] - 51.45) < 1e-9
 
 
 def test_polyline_is_short_enough_for_a_url():
@@ -102,3 +123,24 @@ def test_an_overpass_failure_is_unknown_not_zero(make_route, fixed_now):
 
     section = LandCoverPlugin().run(_ctx(make_route, fixed_now, http), {})
     assert section.shared["known"] is False and section.shared["error"]
+
+
+def test_truncated_response_is_unknown_and_not_cached(make_route, fixed_now):
+    calls = []
+    forest = _way({"natural": "wood"}, _square(-0.3, 51.4, 0.0, 51.6))
+
+    def http(url):
+        calls.append(url)
+        # Return ELEMENT_CAP polygons to trigger truncation detection
+        return {"elements": [forest] * ELEMENT_CAP}
+
+    ctx = _ctx(make_route, fixed_now, http)
+    section = LandCoverPlugin().run(ctx, {})
+    assert section.shared["known"] is False
+    assert "truncated" in section.shared["error"]
+    assert section.shared["total"] == 0.0
+
+    # Second call should fetch again (not cached)
+    section2 = LandCoverPlugin().run(ctx, {})
+    assert len(calls) == 2
+    assert section2.shared["known"] is False

@@ -6,6 +6,7 @@ for the plan (spec, "Skill boundary"). Shape:
         "sources": ["https://..."],                # required: an entry without a source is dropped
         "last_departure_local": "HH:MM",           # optional, transit: compared with the estimated return
         "first_departure_local": "HH:MM",          # optional, transit
+        "first_arrival_local": "HH:MM",            # optional, transit: the earliest time public transport brings one to the start point
         "warnings": [{"severity": "danger|caution|info", "text": "..."}],   # optional, reach the Summary
         "day_type": "holiday|weekend|workday"      # optional, plugin id "calendar": overrides the holiday source
     }}}
@@ -69,7 +70,7 @@ def normalize_entry(entry) -> dict | None:
     clean = {"markdown": markdown, "sources": sources}
     if day_type:
         clean["day_type"] = day_type
-    for key in ("last_departure_local", "first_departure_local"):
+    for key in ("last_departure_local", "first_departure_local", "first_arrival_local"):
         if _valid_time(entry.get(key)):
             clean[key] = entry[key]
     warnings = []

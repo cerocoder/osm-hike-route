@@ -40,6 +40,12 @@ def test_structured_fields_are_validated():
     assert "last_departure_local" not in bad and "first_departure_local" not in bad and "day_type" not in bad
 
 
+def test_first_arrival_is_validated_like_the_other_times():
+    entry = normalize_entry(_entry(first_arrival_local="8:40"))
+    assert entry["first_arrival_local"] == "8:40"
+    assert "first_arrival_local" not in normalize_entry(_entry(first_arrival_local="early"))
+
+
 def test_warnings_keep_only_valid_items():
     entry = normalize_entry(_entry(warnings=[
         {"severity": "danger", "text": "Last bus 21:10"},

@@ -158,3 +158,23 @@ def test_fields_that_the_plugin_uses_are_accepted(tmp_path):
                 "--warning", "info:x") == 0
     assert _run(tmp_path, "--date", "2026-06-27", "--plugin", "calendar", "--day-type", "holiday",
                 "--source", URL) == 0
+
+
+def test_first_arrival_is_stored_for_transit_and_refused_elsewhere(tmp_path, capsys):
+    assert _run(tmp_path, "--date", "2026-06-27", "--plugin", "transit", "--markdown", "Bus 41 from 07:30.",
+                "--source", URL, "--first-arrival", "08:40") == 0
+    assert lookup(load_facts(tmp_path), "2026-06-27", "transit")["first_arrival_local"] == "08:40"
+    capsys.readouterr()
+    assert _run(tmp_path, "--date", "all", "--plugin", "fire", "--markdown", "x", "--source", URL,
+                "--first-arrival", "08:40") == 1
+    assert "does not use --first-arrival" in capsys.readouterr().err
+    assert _run(tmp_path, "--date", "all", "--plugin", "transit", "--markdown", "x", "--source", URL,
+                "--first-arrival", "soon") == 1
+    assert "bad first_arrival_local" in capsys.readouterr().err
+
+
+def test_water_facts_are_recorded_with_warnings(tmp_path):
+    assert _run(tmp_path, "--date", "all", "--plugin", "water", "--markdown", "Bathing water quality: excellent.",
+                "--source", URL, "--warning", "caution:Jellyfish season") == 0
+    entry = lookup(load_facts(tmp_path), "2026-06-27", "water")
+    assert entry["warnings"] == [{"severity": "caution", "text": "Jellyfish season"}]

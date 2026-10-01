@@ -3,9 +3,9 @@
 
 Standard-library only. Usage:
     python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all>
-        --plugin <transit|poi_hours|calendar|fire|mountain|bio_hazards|air|people_hazards|trail_conditions>
+        --plugin <transit|poi_hours|calendar|fire|mountain|bio_hazards|air|people_hazards|trail_conditions|water>
         (--markdown TEXT | --markdown-file PATH) --source URL [--source URL ...]
-        [--last-departure HH:MM] [--first-departure HH:MM]
+        [--last-departure HH:MM] [--first-departure HH:MM] [--first-arrival HH:MM]
         [--warning danger|caution|info:TEXT ...] [--day-type holiday|weekend|workday]
 
 Every fact needs at least one http(s) source: an entry without one is refused
@@ -27,13 +27,14 @@ from day_plan.base import SEVERITIES
 from day_plan.facts import DAY_TYPES, normalize_entry
 
 PLUGINS = ("transit", "poi_hours", "calendar", "fire", "mountain", "bio_hazards", "air", "people_hazards",
-           "trail_conditions")
+           "trail_conditions", "water")
 WARNING_PLUGINS = ("transit", "poi_hours", "fire", "mountain", "bio_hazards", "air", "people_hazards",
-                   "trail_conditions")
+                   "trail_conditions", "water")
 
 
 def record(route_dir, date: str, plugin: str, markdown: str, sources: list, last_departure: str | None = None,
-           first_departure: str | None = None, warnings: list | None = None, day_type: str | None = None) -> dict:
+           first_departure: str | None = None, warnings: list | None = None, day_type: str | None = None,
+           first_arrival: str | None = None) -> dict:
     """Validates and stores the fact; returns the stored entry. Raises ValueError with a readable reason,
     or OSError when the file cannot be written."""
     if plugin not in PLUGINS:
@@ -50,12 +51,13 @@ def record(route_dir, date: str, plugin: str, markdown: str, sources: list, last
     for option, value, uses in (("--day-type", day_type, ("calendar",)),
                                 ("--last-departure", last_departure, ("transit",)),
                                 ("--first-departure", first_departure, ("transit",)),
+                                ("--first-arrival", first_arrival, ("transit",)),
                                 ("--warning", warnings, WARNING_PLUGINS)):
         if value and plugin not in uses:
             raise ValueError(f"the {plugin} plugin does not use {option} (only: {', '.join(uses)})")
     entry = {"markdown": markdown, "sources": sources}
     for key, value in (("last_departure_local", last_departure), ("first_departure_local", first_departure),
-                       ("day_type", day_type)):
+                       ("first_arrival_local", first_arrival), ("day_type", day_type)):
         if value is not None:
             entry[key] = value
     if warnings:
@@ -63,7 +65,7 @@ def record(route_dir, date: str, plugin: str, markdown: str, sources: list, last
     clean = normalize_entry(entry)
     if clean is None:
         raise ValueError("refused: a fact needs a non-empty text (or --day-type) and at least one http(s) --source")
-    for key in ("last_departure_local", "first_departure_local"):
+    for key in ("last_departure_local", "first_departure_local", "first_arrival_local"):
         if key in entry and key not in clean:
             raise ValueError(f"bad {key}: use HH:MM")
     if day_type is not None and "day_type" not in clean:
@@ -111,6 +113,7 @@ def main(argv=None) -> int:
     parser.add_argument("--source", action="append", default=[])
     parser.add_argument("--last-departure", default=None)
     parser.add_argument("--first-departure", default=None)
+    parser.add_argument("--first-arrival", default=None)
     parser.add_argument("--warning", action="append", default=[])
     parser.add_argument("--day-type", default=None)
     args = parser.parse_args(argv)
@@ -124,7 +127,7 @@ def main(argv=None) -> int:
         markdown = args.markdown if args.markdown is not None else (
             Path(args.markdown_file).read_text(encoding="utf-8") if args.markdown_file else "")
         record(args.route_dir, args.date, args.plugin, markdown, args.source, args.last_departure,
-               args.first_departure, [_parse_warning(w) for w in args.warning], args.day_type)
+               args.first_departure, [_parse_warning(w) for w in args.warning], args.day_type, args.first_arrival)
     except (ValueError, OSError, UnicodeDecodeError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

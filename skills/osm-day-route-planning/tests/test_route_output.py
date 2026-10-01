@@ -118,3 +118,10 @@ def test_an_unknown_gain_or_loss_is_written_as_null_not_a_crash():
     result = _sample_call(elevation_gain_m=None, elevation_loss_m=None)
     line = next(f for f in result["features"] if f["geometry"]["type"] == "LineString")
     assert line["properties"]["elevation_gain_m"] is None and line["properties"]["elevation_loss_m"] is None
+
+
+def test_curated_source_is_written_only_when_given():
+    assert "curated_source" not in next(f for f in _sample_call()["features"] if f["geometry"]["type"] == "LineString")["properties"]
+    source = {"relation_id": 42, "name": "Ruta", "fidelity": 0.95}
+    line = next(f for f in _sample_call(curated_source=source)["features"] if f["geometry"]["type"] == "LineString")
+    assert line["properties"]["curated_source"] == source

@@ -188,3 +188,36 @@ def test_a_heading_in_any_language_of_the_table_satisfies_the_check(tmp_path):
         "\n".join(f"## {t}" for t in ("Demande", "Accès", "Justification de l'itinéraire", "Points d'intérêt",
                                       "distance et durée")), encoding="utf-8")
     validate_archive(tmp_path)
+
+
+# ---- curated_source ---------------------------------------------------------------------------------------------------
+
+def _with_source(tmp_path, source):
+    geojson = _write_complete_archive(tmp_path)
+    geojson["features"][0]["properties"]["curated_source"] = source
+    (tmp_path / "route.geojson").write_text(json.dumps(geojson, ensure_ascii=False), encoding="utf-8")
+
+
+def test_an_archive_without_curated_source_stays_valid(tmp_path):
+    _write_complete_archive(tmp_path)
+    validate_archive(tmp_path)
+
+
+def test_a_well_formed_curated_source_is_accepted(tmp_path):
+    _with_source(tmp_path, {"relation_id": 67441, "name": "Ruta", "ref": None, "network": "lwn", "operator": None,
+                            "website": "https://example.org/r", "length_source": "computed", "fidelity": 0.93})
+    validate_archive(tmp_path)
+    _with_source(tmp_path, {"relation_id": 1, "website": None, "fidelity": None})
+    validate_archive(tmp_path)
+
+
+@pytest.mark.parametrize("source,fragment", [
+    ("text", "ожидался объект"), ({"website": None}, "relation_id"), ({"relation_id": "42"}, "relation_id"),
+    ({"relation_id": True}, "relation_id"), ({"relation_id": 1, "website": "javascript:alert(1)"}, "website"),
+    ({"relation_id": 1, "website": 5}, "website"), ({"relation_id": 1, "fidelity": 1.5}, "fidelity"),
+    ({"relation_id": 1, "fidelity": "high"}, "fidelity"), ({"relation_id": 1, "fidelity": True}, "fidelity")])
+def test_a_malformed_curated_source_is_reported(tmp_path, source, fragment):
+    _with_source(tmp_path, source)
+    with pytest.raises(ArchiveIncompleteError) as exc_info:
+        validate_archive(tmp_path)
+    assert fragment in str(exc_info.value)

@@ -32,7 +32,8 @@ def _point_feature(pf: dict) -> dict:
 
 def build_geojson(path_coords, route_name, mode, style, distance_km, elevation_gain_m,
                    elevation_loss_m, duration_estimate_hours, duration_warning,
-                   curated_routes_count, is_loop, skipped_interest_points, point_features, way_segments):
+                   curated_routes_count, is_loop, skipped_interest_points, point_features, way_segments,
+                   curated_source=None):
     line_feature = {
         "type": "Feature",
         "geometry": {
@@ -55,5 +56,7 @@ def build_geojson(path_coords, route_name, mode, style, distance_km, elevation_g
             "segments": way_segments,
         },
     }
+    if curated_source is not None:                      # the route was adopted from a public (OpenStreetMap) route
+        line_feature["properties"]["curated_source"] = curated_source
     features = [line_feature] + [_point_feature(pf) for pf in point_features]
     return {"type": "FeatureCollection", "features": features}

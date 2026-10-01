@@ -135,6 +135,28 @@ def _validate_geojson(geojson: dict) -> list[str]:
     if "segments" in props:
         problems.extend(_validate_segments(props["segments"], len(coords)))
 
+    if "curated_source" in props:
+        problems.extend(_validate_curated_source(props["curated_source"]))
+
+    return problems
+
+
+def _validate_curated_source(source) -> list[str]:
+    """curated_source (the public route this one was adopted from) is optional; when present it must be usable by
+    the map: an integer relation id, an http(s) website or none, a fidelity between 0 and 1 or none."""
+    if not isinstance(source, dict):
+        return [f"curated_source={source!r} — ожидался объект"]
+    problems = []
+    relation_id = source.get("relation_id")
+    if not isinstance(relation_id, int) or isinstance(relation_id, bool):
+        problems.append(f"curated_source.relation_id={relation_id!r} — ожидалось целое число")
+    website = source.get("website")
+    if website is not None and not (isinstance(website, str) and website.startswith(("http://", "https://"))):
+        problems.append(f"curated_source.website={website!r} — ожидалась ссылка http(s) или null")
+    fidelity = source.get("fidelity")
+    if fidelity is not None and (isinstance(fidelity, bool) or not isinstance(fidelity, (int, float))
+                                 or not 0.0 <= fidelity <= 1.0):
+        problems.append(f"curated_source.fidelity={fidelity!r} — ожидалось число от 0 до 1 или null")
     return problems
 
 

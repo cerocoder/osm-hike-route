@@ -291,3 +291,105 @@ def test_num_never_prints_negative_zero():
     assert _num(-0.3, 0) == "0"
     assert _num(-0.04, 1) == "0.0"
     assert _num(-1.6, 0) == "-2"
+
+
+from day_plan.plugins.weather import needs_next_day, trip_rows, window_rows
+
+
+def _day(weather_response, date="2026-06-21"):
+    return parse_hourly(weather_response(date=date))
+
+
+def test_window_without_a_finish_is_the_whole_date(weather_response):
+    window = window_rows(_day(weather_response), None, None)
+    assert [r["hour"] for r in window] == list(range(24)) and not any(r["after"] for r in window)
+
+
+def test_window_marks_rows_after_the_finish_and_adds_four_hours_of_the_next_day(weather_response):
+    today, tomorrow = _day(weather_response), _day(weather_response, "2026-06-22")
+    window = window_rows(today, tomorrow, 22 * 60)
+    assert needs_next_day(22 * 60)
+    assert [r["hour"] for r in window if r["day"] == 1] == [0, 1, 2]          # (22:00 + 4 h) // 60 = 26 -> up to the hour starting at 02:00
+    assert [r["hour"] for r in window if r["after"] and r["day"] == 0] == [22, 23]
+    assert not needs_next_day(14 * 60)
+
+
+def test_window_survives_a_missing_next_day(weather_response):
+    window = window_rows(_day(weather_response), None, 22 * 60)
+    assert len(window) == 24
+
+
+def test_trip_rows_are_the_hours_walked(weather_response):
+    today, tomorrow = _day(weather_response), _day(weather_response, "2026-06-22")
+    window = window_rows(today, tomorrow, 14 * 60)
+    trip, post = trip_rows(window, today, 9 * 60, 14 * 60)
+    assert [r["hour"] for r in trip] == [9, 10, 11, 12, 13]
+    assert all(r["after"] for r in post) and post[0]["hour"] == 14
+
+
+def test_plugin_shows_the_whole_day_and_four_hours_after_midnight(make_route, fixed_now, weather_response):
+    import datetime as dt
+    urls = []
+
+    def http(url):
+        urls.append(url)
+        return weather_response(date="2026-06-22" if "start_date=2026-06-22" in url else "2026-06-21")
+
+    ctx = build_context(make_route(duration_hours=6.0), datetime.date(2026, 6, 21), start_time=dt.time(17, 0),
+                        http=http, now=fixed_now)
+    section = WeatherPlugin().run(ctx, {})
+    assert len(urls) == 2
+    assert "| 00:00 |" in section.markdown and "| 23:00 |" in section.markdown
+    assert "| 03:00 (+1) |" in section.markdown and "| 04:00 (+1) |" not in section.markdown
+    assert "After finish" in section.markdown and "given by you" in section.markdown
+    assert len(section.shared["window_rows"]) == 28
+    assert section.shared["rows"][0]["hour"] == 0 and len(section.shared["rows"]) == 24
+
+
+def test_a_failing_next_day_still_gives_the_day(make_route, fixed_now, weather_response):
+    import datetime as dt
+
+    def http(url):
+        if "start_date=2026-06-22" in url:
+            raise HttpError("boom")
+        return weather_response()
+
+    ctx = build_context(make_route(duration_hours=6.0), datetime.date(2026, 6, 21), start_time=dt.time(17, 0),
+                        http=http, now=fixed_now)
+    section = WeatherPlugin().run(ctx, {})
+    assert "(+1)" not in section.markdown and len(section.shared["window_rows"]) == 24
+
+
+def test_without_a_start_the_table_is_24_hours_with_one_request(make_route, fixed_now, weather_response):
+    urls = []
+
+    def http(url):
+        urls.append(url)
+        return weather_response()
+
+    section = WeatherPlugin().run(_ctx(make_route, fixed_now, http), {})
+    assert len(urls) == 1 and section.markdown.count("\n| ") >= 24
+    assert "After finish" not in section.markdown
+
+
+def test_a_warning_caused_only_by_an_hour_after_the_finish_says_so(make_route, fixed_now, weather_response):
+    import datetime as dt
+    route = make_route(duration_hours=4.0)
+    ctx = build_context(route, datetime.date(2026, 6, 21), start_time=dt.time(9, 0),
+                        http=lambda u: weather_response(weather_code={16: 95}), now=fixed_now)
+    section = WeatherPlugin().run(ctx, {})
+    texts = [w.text for w in section.warnings]
+    assert any(t.startswith("After the finish") and "Thunderstorms" in t for t in texts)
+    route = make_route(duration_hours=4.0, folder="route2")   # a fresh folder: the forecast cache lives in it
+    ctx = build_context(route, datetime.date(2026, 6, 21), start_time=dt.time(9, 0),
+                        http=lambda u: weather_response(weather_code={11: 95}), now=fixed_now)
+    texts = [w.text for w in WeatherPlugin().run(ctx, {}).warnings]
+    assert any("Thunderstorms" in t and not t.startswith("After the finish") for t in texts)
+
+
+def test_russian_start_line(make_route, fixed_now, weather_response):
+    import datetime as dt
+    ctx = build_context(make_route(duration_hours=4.0), datetime.date(2026, 6, 21), lang="ru",
+                        start_time=dt.time(9, 0), http=lambda u: weather_response(), now=fixed_now)
+    ctx.start_source = "recommended"
+    assert "рекомендован планом" in WeatherPlugin().run(ctx, {}).markdown

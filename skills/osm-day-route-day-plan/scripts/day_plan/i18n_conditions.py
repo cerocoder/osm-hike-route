@@ -15,6 +15,11 @@ CONDITION_STRINGS = {
         "st_transport_missing": "Not recorded: {what} — those transport limits are not applied to the recommended start.",
         "st_missing": {"first_arrival": "the first public transport to the start point",
                        "last_departure": "the last public transport back"},
+        # weather window
+        "w_after": "After finish",
+        "w_after_prefix": "After the finish:",
+        "w_start_user": "given by you", "w_start_recommended": "recommended by the plan",
+        "w_start_line": "Start **{start}** ({source}) → estimated finish **{finish}**; the rows after the finish are marked.",
     },
     "ru": {
         "st_limits": {"sunrise": "рассвет", "start_open": "открытие точки старта",
@@ -26,6 +31,10 @@ CONDITION_STRINGS = {
         "st_warn_empty": "Нет старта, подходящего под все ограничения: стартовать можно только с {earliest} ({early}), но не позже {latest} ({late}); взят старт {start}.",
         "st_transport_missing": "Не записано: {what} — эти ограничения по транспорту не учтены в рекомендуемом старте.",
         "st_missing": {"first_arrival": "первый рейс до точки старта", "last_departure": "последний рейс назад"},
+        "w_after": "После финиша",
+        "w_after_prefix": "После финиша:",
+        "w_start_user": "задан вами", "w_start_recommended": "рекомендован планом",
+        "w_start_line": "Старт **{start}** ({source}) → расчётный финиш **{finish}**; строки после финиша отмечены.",
     },
 }
 

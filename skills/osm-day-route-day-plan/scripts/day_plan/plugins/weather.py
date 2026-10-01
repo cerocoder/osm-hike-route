@@ -20,6 +20,7 @@ from ..base import PlanWarning, Section, SectionPlugin
 from ..http import HttpError
 from ..i18n import compass, tr
 from ..sun import sun_times
+from .common import finish_minute
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
@@ -27,6 +28,7 @@ FORECAST_HORIZON_DAYS = 15
 FORECAST_PAST_DAYS = 7  # the forecast API keeps about a week of past days
 CLIMATE_YEARS = 5
 FORECAST_TTL_S = 3 * 3600
+AFTER_FINISH_MIN = 240
 
 FORECAST_VARS = (
     "temperature_2m", "apparent_temperature", "precipitation", "precipitation_probability",
@@ -148,10 +150,11 @@ def _vars_id(variables) -> str:
     return hashlib.sha1(",".join(variables).encode("utf-8")).hexdigest()[:8]
 
 
-def _fetch(ctx, source: str, lat: float, lon: float):
-    """Returns (rows, utc_offset_seconds, fetched_at_epoch, model_elevation_m)."""
+def _fetch(ctx, source: str, lat: float, lon: float, date: datetime.date | None = None):
+    """Returns (rows, utc_offset_seconds, fetched_at_epoch, model_elevation_m) for `date` (default: the plan's date)."""
+    date = date or ctx.date
     variables = FORECAST_VARS if source == "forecast" else ARCHIVE_VARS
-    key = f"weather|{source}|{_vars_id(variables)}|{lat:.3f}|{lon:.3f}|{ctx.date_iso}"
+    key = f"weather|{source}|{_vars_id(variables)}|{lat:.3f}|{lon:.3f}|{date.isoformat()}"
     max_age = FORECAST_TTL_S if source == "forecast" else None
     cached = ctx.cache.get_entry(key, max_age)
     if cached is not None:
@@ -159,20 +162,20 @@ def _fetch(ctx, source: str, lat: float, lon: float):
         return value["rows"], value["utc_offset_seconds"], stored_at, value.get("elevation")
 
     if source == "forecast":
-        response = ctx.http(_url(FORECAST_URL, FORECAST_VARS, lat, lon, ctx.date))
-        rows, offset = parse_hourly(response), utc_offset_for(response, ctx.date)
+        response = ctx.http(_url(FORECAST_URL, FORECAST_VARS, lat, lon, date))
+        rows, offset = parse_hourly(response), utc_offset_for(response, date)
         elevation = response.get("elevation")
     elif source == "archive":
-        response = ctx.http(_url(ARCHIVE_URL, ARCHIVE_VARS, lat, lon, ctx.date))
-        rows, offset = parse_hourly(response), utc_offset_for(response, ctx.date)
+        response = ctx.http(_url(ARCHIVE_URL, ARCHIVE_VARS, lat, lon, date))
+        rows, offset = parse_hourly(response), utc_offset_for(response, date)
         elevation = response.get("elevation")
     else:
         per_year, offset, elevation = [], None, None
         for back in range(1, CLIMATE_YEARS + 1):
-            past = _same_day_in_year(ctx.date, ctx.today.year - back)
+            past = _same_day_in_year(date, ctx.today.year - back)
             response = ctx.http(_url(ARCHIVE_URL, ARCHIVE_VARS, lat, lon, past))
             per_year.append(parse_hourly(response))
-            offset = offset if offset is not None else utc_offset_for(response, ctx.date)
+            offset = offset if offset is not None else utc_offset_for(response, date)
             elevation = elevation if elevation is not None else response.get("elevation")
         rows = average_rows(per_year)
     stored_at = ctx.cache.put(key, {"rows": rows, "utc_offset_seconds": offset, "elevation": elevation})
@@ -202,6 +205,33 @@ def daytime_rows(rows: list[dict], date: datetime.date, lat: float, lon: float,
         return route_window is not None and hi >= route_window[0] and lo <= route_window[1]
 
     return [r for r in rows if wanted(r)]
+
+
+def needs_next_day(finish_min) -> bool:
+    return finish_min is not None and (finish_min + AFTER_FINISH_MIN) // 60 >= 24
+
+
+def window_rows(day_rows: list, next_rows, finish_min) -> list:
+    """The 24 rows of the date plus, when the finish + 4 h passes midnight, the rows of the next day up to that moment.
+    Every row is a copy with `day` (0 | 1) and `after` (the hour starts at or after the finish)."""
+    out = []
+    for row in day_rows:
+        out.append({**row, "day": 0, "after": finish_min is not None and row["hour"] * 60 >= finish_min})
+    if finish_min is not None and next_rows:
+        last_abs = (finish_min + AFTER_FINISH_MIN) // 60
+        for row in next_rows:
+            if 24 + row["hour"] <= last_abs:
+                out.append({**row, "day": 1, "after": (24 + row["hour"]) * 60 >= finish_min})
+    return out
+
+
+def trip_rows(window: list, day_rows: list, start_min, finish_min) -> tuple:
+    """(rows walked, rows after the finish). Without a start and a finish the daylight rows stand for the trip."""
+    if start_min is None or finish_min is None:
+        return day_rows, []
+    trip = [r for r in window if not r.get("after") and (24 * r.get("day", 0) + r["hour"]) * 60 + 59 >= start_min]
+    post = [r for r in window if r.get("after")]
+    return trip or day_rows, post
 
 
 def _sky_key(code) -> str:
@@ -250,15 +280,19 @@ def _precip_cell(row: dict) -> str:
 
 
 def render_table(rows: list[dict], lang: str) -> str:
-    header = [tr(k, lang) for k in ("w_time", "w_temp", "w_feels", "w_precip", "w_cloud", "w_vis",
-                                    "w_wind", "w_gust", "w_snow", "w_sky")]
+    keys = ("w_time", "w_temp", "w_feels", "w_precip", "w_cloud", "w_vis", "w_wind", "w_gust", "w_snow", "w_sky")
+    marked = any(r.get("after") for r in rows)
+    header = [tr(k, lang) for k in keys] + ([tr("w_after", lang)] if marked else [])
     lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
     for r in rows:
         vis_km = r["vis_m"] / 1000.0 if r.get("vis_m") is not None else None
         snow_cm = r["snow_m"] * 100.0 if r.get("snow_m") is not None else None
-        cells = [f"{r['hour']:02d}:00", _num(r["temp"], 0), _num(r["feels"], 0), _precip_cell(r),
+        hour = f"{r['hour']:02d}:00" + (" (+1)" if r.get("day") == 1 else "")
+        cells = [hour, _num(r["temp"], 0), _num(r["feels"], 0), _precip_cell(r),
                  _num(r["cloud"], 0), _num(vis_km, 1), _wind_cell(r, lang), _num(r["gust"], 1),
                  _num(snow_cm, 0), tr(_sky_key(r["code"]), lang)]
+        if marked:
+            cells.append("•" if r.get("after") else "")
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)
 
@@ -322,15 +356,36 @@ class WeatherPlugin(SectionPlugin):
             start = ctx.start_time.hour * 60 + ctx.start_time.minute
             window = (start, min(start + ctx.duration_hours * 60.0, 23 * 60.0))
         day = daytime_rows(rows, ctx.date, lat, lon, offset, route_window=window) or rows
+        start_min = ctx.start_time.hour * 60 + ctx.start_time.minute if ctx.start_time is not None else None
+        finish = finish_minute(ctx)
+        next_rows = None
+        if needs_next_day(finish):
+            try:
+                next_rows = _fetch(ctx, source, lat, lon, ctx.date + datetime.timedelta(days=1))[0]
+            except (HttpError, KeyError, IndexError, ValueError, TypeError):
+                next_rows = None           # the 24 hours of the date are still shown
+        shown = window_rows(rows, next_rows, finish)
+        trip, post = trip_rows(shown, day, start_min, finish)
         note_key = {"forecast": "w_source_forecast", "archive": "w_source_archive",
                     "climate": "w_source_climate"}[source]
         note = tr(note_key, ctx.lang, years=CLIMATE_YEARS) if source == "climate" else tr(note_key, ctx.lang)
-        markdown = render_table(day, ctx.lang) + "\n\n*" + note + "*"
+        start_line = ""
+        if start_min is not None and finish is not None:
+            finish_text = f"{(finish // 60) % 24:02d}:{finish % 60:02d}" + (" (+1)" if finish >= 1440 else "")
+            origin = tr("w_start_recommended" if getattr(ctx, "start_source", "none") == "recommended"
+                        else "w_start_user", ctx.lang)
+            start_line = tr("w_start_line", ctx.lang, start=f"{start_min // 60:02d}:{start_min % 60:02d}",
+                            source=origin, finish=finish_text) + "\n\n"
+        markdown = start_line + render_table(shown, ctx.lang) + "\n\n*" + note + "*"
+        warnings = warnings_for(trip, ctx.lang, source)
+        seen = {w.text for w in warnings}
+        for w in warnings_for(post, ctx.lang, "forecast"):
+            if w.text not in seen:
+                warnings.append(PlanWarning(w.severity, f"{tr('w_after_prefix', ctx.lang)} {w.text}"))
         means = [r["temp"] for r in rows if r.get("temp") is not None]
         return Section(
-            "weather", markdown, "derived", sources=["https://open-meteo.com/"],
-            warnings=warnings_for(day, ctx.lang, source),
-            shared={"utc_offset_seconds": offset, "rows": rows, "daytime_rows": day, "source": source,
-                    "fetched_at": fetched_at, "elevation_m": elevation,
+            "weather", markdown, "derived", sources=["https://open-meteo.com/"], warnings=warnings,
+            shared={"utc_offset_seconds": offset, "rows": rows, "daytime_rows": day, "window_rows": shown,
+                    "source": source, "fetched_at": fetched_at, "elevation_m": elevation,
                     "daily_mean_temp": sum(means) / len(means) if means else None},
         )

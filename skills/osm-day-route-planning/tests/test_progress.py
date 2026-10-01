@@ -223,3 +223,17 @@ def test_a_stream_that_cannot_encode_the_no_break_space_gets_a_plain_space():
     with progress.step("graph"):
         progress.detail("graph_done", nodes=35398, edges=72658)
     assert " " not in stream.getvalue() and "35 398 nodes, 72 658 edges" in stream.getvalue()
+
+def test_the_public_route_steps_exist_and_a_russian_run_has_no_english_words():
+    progress, stream, clock = make("ru", total=None)
+    for key in ("public_candidates", "public_geometry", "public_elevation", "public_keypoints"):
+        with progress.step(key):
+            clock.advance(0.3)
+            progress.tick(1, 2, "public_geometry_batch")
+    with progress.step("public_candidates") as step:
+        step.detail("public_candidates_done", found=12, long=3)
+    with progress.step("public_keypoints") as step:
+        step.detail("public_done", matching=7, shown=7)
+    text = stream.getvalue()
+    assert "найдено 12, дальних (многодневных) пропущено 3" in text and "подходят 7, показано 7" in text
+    assert not re.search(r"\b(Public|routes|geometry|found|match|shown|key points|elevations)\b", text)

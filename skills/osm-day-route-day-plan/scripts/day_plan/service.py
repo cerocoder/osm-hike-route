@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from .base import SECTION_ORDER, Section
 from .i18n import STRINGS, activity_label, tr
 from .progress import NullProgress
+from .start import resolve_start
 from .summary import build_summary_section
 
 
@@ -66,6 +67,10 @@ def run_plugins(ctx, plugins: list, progress=None):
     _validate_registration(plugins)
     progress = progress or NullProgress()
     ctx.progress = progress                     # plugins that wait on a network (Overpass) say why it takes long
+    try:
+        resolve_start(ctx)
+    except Exception:  # noqa: BLE001 — a recommendation must never stop the plan
+        pass
     shared, failures, by_id = {}, [], {}
     for plugin in _ordered(plugins):
         deps = {d: shared[d] for d in plugin.depends_on if d in shared}

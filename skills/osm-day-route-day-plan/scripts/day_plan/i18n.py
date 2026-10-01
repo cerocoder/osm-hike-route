@@ -654,6 +654,13 @@ PLUGIN_NAMES = {
 for _lang, _names in PLUGIN_NAMES.items():
     STRINGS[_lang].update(_names)
 
+from .i18n_conditions import CONDITION_PLUGIN_NAMES, CONDITION_STRINGS  # noqa: E402
+
+for _lang, _extra in CONDITION_PLUGIN_NAMES.items():
+    STRINGS[_lang].update(_extra)
+for _lang, _extra in CONDITION_STRINGS.items():
+    STRINGS[_lang].update(_extra)
+
 
 def tr(key: str, lang: str, **fmt):
     """String for `key` in `lang`, English fallback for any missing key or

@@ -54,6 +54,8 @@ class PlanContext:
     segments: list | None = None                         # which road each part of the route runs on (route.geojson); None in an older archive
     overpass_health: object = field(default_factory=MirrorHealth)   # which Overpass mirrors failed during this run
     progress: object = field(default_factory=NullProgress)          # set by run_plugins; plugins may report to it
+    start_source: str = "none"                                      # "user" | "recommended" | "none" (see start.py)
+    start_info: object = None                                       # StartRecommendation when recommended
 
     def __post_init__(self):
         self.today = self.now.date()
@@ -144,6 +146,7 @@ def build_context(route_dir, date: datetime.date, lang: str = "en", departure: s
     access_points, interest_points = _points(geojson)
     return PlanContext(
         route_dir=route_dir, date=date, lang=lang, departure=departure, start_time=start_time,
+        start_source="user" if start_time is not None else "none",
         mode=props.get("mode") or "walk",
         style=props.get("style") if isinstance(props.get("style"), str) else None,
         segments=_segments(props.get("segments"), len(coords)),

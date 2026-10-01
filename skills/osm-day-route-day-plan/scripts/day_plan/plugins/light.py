@@ -6,6 +6,7 @@ import math
 
 from ..base import PlanWarning, Section, SectionPlugin
 from ..i18n import tr
+from ..start import start_lines
 from ..sun import sun_times
 
 SAFETY_BUFFER_MIN = 60  # finish this long before sunset by default
@@ -64,6 +65,9 @@ class LightPlugin(SectionPlugin):
                 start = ctx.start_time.hour * 60 + ctx.start_time.minute
                 finish = start + duration_min
                 margin = sunset - finish
+                extra_lines, extra_warnings = start_lines(ctx)
+                lines += extra_lines
+                warnings += extra_warnings
                 lines.append("- " + tr("light_finish", lang, start=_hhmm(start), finish=_hhmm(finish),
                                        margin=_duration(margin, lang)))
                 if margin < 0:

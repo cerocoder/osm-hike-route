@@ -70,6 +70,7 @@ UI_STRINGS = {
         "open_osm": "Open area in OpenStreetMap",
         "wikipedia": "Wikipedia",
         "route_title": "Route",
+        "public_route_source": "Public route",
         "no_section": "Not in notes.md",
     },
     "ru": {
@@ -81,6 +82,7 @@ UI_STRINGS = {
         "open_osm": "Открыть область в OpenStreetMap",
         "wikipedia": "Википедия",
         "route_title": "Маршрут",
+        "public_route_source": "Публичный маршрут",
         "no_section": "Нет в notes.md",
     },
     "es": {
@@ -92,6 +94,7 @@ UI_STRINGS = {
         "open_osm": "Abrir la zona en OpenStreetMap",
         "wikipedia": "Wikipedia",
         "route_title": "Ruta",
+        "public_route_source": "Ruta pública",
         "no_section": "No está en notes.md",
     },
     "fr": {
@@ -103,6 +106,7 @@ UI_STRINGS = {
         "open_osm": "Ouvrir la zone dans OpenStreetMap",
         "wikipedia": "Wikipédia",
         "route_title": "Itinéraire",
+        "public_route_source": "Itinéraire public",
         "no_section": "Absent de notes.md",
     },
     "de": {
@@ -114,6 +118,7 @@ UI_STRINGS = {
         "open_osm": "Gebiet in OpenStreetMap öffnen",
         "wikipedia": "Wikipedia",
         "route_title": "Route",
+        "public_route_source": "Öffentliche Route",
         "no_section": "Nicht in notes.md",
     },
     "pt": {
@@ -125,6 +130,7 @@ UI_STRINGS = {
         "open_osm": "Abrir a área no OpenStreetMap",
         "wikipedia": "Wikipédia",
         "route_title": "Percurso",
+        "public_route_source": "Rota pública",
         "no_section": "Não consta em notes.md",
     },
     "it": {
@@ -136,6 +142,7 @@ UI_STRINGS = {
         "open_osm": "Apri l'area in OpenStreetMap",
         "wikipedia": "Wikipedia",
         "route_title": "Percorso",
+        "public_route_source": "Percorso pubblico",
         "no_section": "Non presente in notes.md",
     },
 }
@@ -294,6 +301,22 @@ def activity_label(line_properties: dict, user_lang: str) -> str:
     return f"{label} ({style})" if style else label
 
 
+def public_route_source_html(source: dict, user_lang: str) -> str:
+    """Where an adopted public route came from: its name (and ref), its website when that is an http(s) link, and the
+    OpenStreetMap attribution. Everything from OSM is escaped."""
+    name = " ".join(str(source.get("name") or "").split())
+    ref = " ".join(str(source.get("ref") or "").split())
+    title = f"{name} [{ref}]" if name and ref else name or ref
+    pieces = [f"{_xml_escape(t('public_route_source', user_lang))}: {_xml_escape(title)}" if title
+              else _xml_escape(t("public_route_source", user_lang))]
+    website = source.get("website")
+    if isinstance(website, str) and website.startswith(("http://", "https://")):
+        host = website.split("/")[2] if website.count("/") >= 2 else website
+        pieces.append(f'<a href="{_xml_escape(website)}" target="_blank" rel="noopener">{_xml_escape(host)}</a>')
+    pieces.append("© OpenStreetMap")
+    return f'<p class="public-route-source">{" · ".join(pieces)}</p>'
+
+
 def route_stats_html(line_properties: dict, user_lang: str) -> str:
     """Built from computed LineString properties (spec §3.11), never from
     weights.json — this function never sees weights.json at all. A
@@ -310,6 +333,9 @@ def route_stats_html(line_properties: dict, user_lang: str) -> str:
         )
     if line_properties.get("duration_estimate_hours") is not None:
         parts.append(f"<p>~{line_properties['duration_estimate_hours']:.1f} h</p>")
+    source = line_properties.get("curated_source")
+    if isinstance(source, dict):
+        parts.append(public_route_source_html(source, user_lang))
     if line_properties.get("curated_routes_count"):
         parts.append(f"<p>{line_properties['curated_routes_count']} curated routes nearby</p>")
     if line_properties.get("duration_warning"):

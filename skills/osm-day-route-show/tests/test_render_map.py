@@ -583,3 +583,35 @@ def test_the_exact_heading_wins_over_an_alias_written_earlier():
 def test_legacy_wording_still_works_through_the_aliases():
     assert extract_md_section("## Как добраться (Екатеринбург)\n- x\n", "access") == "- x"
     assert extract_md_section("## 8 точек интереса\n- y\n", "confidence") == "- y"
+
+
+# ---- the source of an adopted public route ------------------------------------------------------------------------------
+
+from render_map import UI_STRINGS, public_route_source_html
+
+
+def test_every_language_has_the_public_route_label():
+    assert {lang: UI_STRINGS[lang]["public_route_source"] for lang in UI_STRINGS} == {
+        "en": "Public route", "ru": "Публичный маршрут", "es": "Ruta pública", "fr": "Itinéraire public",
+        "de": "Öffentliche Route", "pt": "Rota pública", "it": "Percorso pubblico"}
+
+
+def test_the_panel_names_the_public_route_links_its_website_and_credits_openstreetmap():
+    html = route_stats_html({"mode": "walk", "curated_source": {
+        "relation_id": 67441, "name": "Ruta del Boquerón", "ref": "PR-M 10", "website": "https://example.org/ruta"}}, "ru")
+    assert ('<p class="public-route-source">Публичный маршрут: Ruta del Boquerón [PR-M 10] · '
+            '<a href="https://example.org/ruta" target="_blank" rel="noopener">example.org</a> · © OpenStreetMap</p>') in html
+
+
+def test_osm_text_in_the_source_is_escaped_and_only_a_web_link_becomes_a_link():
+    html = public_route_source_html({"name": "<b>x</b>", "ref": None, "website": "javascript:alert(1)"}, "en")
+    assert "<b>" not in html and "&lt;b&gt;x&lt;/b&gt;" in html and "<a " not in html and "javascript" not in html
+    quote = public_route_source_html({"name": "A", "website": 'https://e.org/"onmouseover="x'}, "en")
+    assert 'href="https://e.org/&quot;onmouseover=&quot;x"' in quote
+    bare = public_route_source_html({}, "en")
+    assert bare == '<p class="public-route-source">Public route · © OpenStreetMap</p>'
+
+
+def test_a_route_without_a_source_has_no_source_line():
+    assert "public-route-source" not in route_stats_html({"mode": "walk", "distance_km": 5.0}, "en")
+    assert "public-route-source" not in route_stats_html({"mode": "walk", "curated_source": "text"}, "en")

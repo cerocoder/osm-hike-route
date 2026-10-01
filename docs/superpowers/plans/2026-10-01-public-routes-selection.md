@@ -16,6 +16,7 @@
 - The key-point and start-place queries are optional decoration: they wait at most 40 s with one retry (a live run spent 190 s on Overpass retries for them).
 - `adopt` routes with its own loop that skips a waypoint that cannot be reached (a way missing from the graph) instead of failing the whole route, and counts those in `dropped_samples`.
 - `render_list` also reports how many routes could not be loaded (`lost`).
+- A failing geometry batch is retried once and then **split in halves** (a live run on the Alps lost 20 of 43 relations to one batch that timed out), and four failures in a row end the attempts (a dead server must not cost minutes per batch).
 
 ## Global Constraints
 
@@ -180,7 +181,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ### Task 2: public_routes.py: candidates, geometry, tracks
 
-`find_candidates` (one `out tags center` query; drops proposed, abandoned, disused, private and closed routes and repeated relations; long-distance networks are counted, not listed), `load_tracks` (geometry in batches of 20, one retry, a lost batch is counted not fatal, one progress tick per batch), `build_track` (stitches the member ways into chains joining ends within 20 m, ignores variants and side trips, longest chain is the track, `coverage` and `gaps`, loop detection), `length_km` (the `distance` tag when plausible, else computed), `dedupe`. Three real OpenStreetMap relations are saved as fixtures (a linear route, one with gaps of a few metres, a loop with a detached piece).
+`find_candidates` (one `out tags center` query; drops proposed, abandoned, disused, private and closed routes and repeated relations; long-distance networks are counted, not listed), `load_tracks` (geometry in batches of 20, one retry, then a failing batch is split in halves so one heavy relation does not take the others with it, four failures in a row mean a dead server, what is lost is counted not fatal, one progress tick per batch), `build_track` (stitches the member ways into chains joining ends within 20 m, ignores variants and side trips, longest chain is the track, `coverage` and `gaps`, loop detection), `length_km` (the `distance` tag when plausible, else computed), `dedupe`. Three real OpenStreetMap relations are saved as fixtures (a linear route, one with gaps of a few metres, a loop with a detached piece).
 
 **Files:**
 - Create: `skills/osm-day-route-planning/tests/test_public_routes.py`
@@ -189,7 +190,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Create: `skills/osm-day-route-planning/tests/fixtures/public_vyatichi.json`
 - Create: `skills/osm-day-route-planning/scripts/public_routes.py`
 
-- [ ] **Step 1: Add the tests** (23 tests in the test file(s) below)
+- [ ] **Step 1: Add the tests** (25 tests in the test file(s) below)
 
 Create `skills/osm-day-route-planning/tests/test_public_routes.py`:
 
@@ -347,12 +348,45 @@ def test_geometry_comes_in_batches_with_one_tick_each_and_a_failed_batch_is_retr
     assert all("ways" not in c and c["length_m"] > 0 for c in loaded)
 
 
-def test_a_batch_that_fails_twice_and_a_relation_without_geometry_are_counted_as_lost(monkeypatch):
-    fake = FakeOverpass(RuntimeError("down"), RuntimeError("down"),
-                        {"elements": [relation_geometry(3, way(30, (0.0, 0.0), (0.0, 0.001))), relation_geometry(4)]})
+def test_one_heavy_relation_does_not_take_its_batch_with_it(monkeypatch):
+    class Picky:
+        """Fails whenever relation 2 is part of the query, like a huge route that makes Overpass time out."""
+
+        def __init__(self):
+            self.calls = []
+
+        def __call__(self, ql, **options):
+            ids = [int(i) for i in ql.split("relation(id:")[1].split(")")[0].split(",")]
+            self.calls.append(ids)
+            if 2 in ids:
+                raise RuntimeError("504")
+            return {"elements": [relation_geometry(i, way(i * 10, (0.0, 0.0), (0.0, 0.001))) for i in ids]}
+
+    picky = Picky()
+    monkeypatch.setattr(pr, "query_overpass", picky)
+    loaded, lost = load_tracks([{"id": i, "tags": {}} for i in (1, 2, 3, 4)], batch=4)
+    assert [c["id"] for c in loaded] == [1, 3, 4] and lost == 1
+    assert picky.calls[:2] == [[1, 2, 3, 4], [1, 2, 3, 4]]                 # the retry, then the halves
+    assert [1, 2] in picky.calls and [3, 4] in picky.calls and [1] in picky.calls and [2] in picky.calls
+
+
+def test_a_dead_server_is_given_up_after_four_failures_in_a_row(monkeypatch):
+    calls = []
+
+    def dead(ql, **options):
+        calls.append(ql)
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(pr, "query_overpass", dead)
+    loaded, lost = load_tracks([{"id": i, "tags": {}} for i in range(1, 9)], batch=4)
+    assert loaded == [] and lost == 8 and len(calls) == 4
+
+
+def test_a_relation_without_geometry_is_lost_and_the_rest_of_the_batch_is_kept(monkeypatch):
+    fake = FakeOverpass({"elements": [relation_geometry(3, way(30, (0.0, 0.0), (0.0, 0.001))), relation_geometry(4)]})
     monkeypatch.setattr(pr, "query_overpass", fake)
-    loaded, lost = load_tracks([{"id": i, "tags": {}} for i in (1, 2, 3, 4)], batch=2)
-    assert [c["id"] for c in loaded] == [3] and lost == 3
+    loaded, lost = load_tracks([{"id": 3, "tags": {}}, {"id": 4, "tags": {}}], batch=2)
+    assert [c["id"] for c in loaded] == [3] and lost == 1
 
 
 # ---- length, duplicates -----------------------------------------------------------------------------------------------
@@ -547,30 +581,51 @@ def build_track(ways: list) -> dict:
             "is_loop": None if gaps else haversine(track[0][0], track[0][1], track[-1][0], track[-1][1]) <= LOOP_ENDS_M}
 
 
+MAX_FAILURES_IN_A_ROW = 4           # after this many failed queries in a row the server is taken for dead
+
+
+def _fetch_group(group: list, options: dict, attempts: int, state: dict):
+    """({relation id: element}, number lost) for a group of candidates. A failed query is retried (`attempts`); if
+    it still fails and the group has more than one relation, the group is split in two and each half is tried once:
+    one heavy relation (a long mountain route) must not take the nineteen others with it. After
+    MAX_FAILURES_IN_A_ROW failures in a row nothing more is asked (the rest is lost at once)."""
+    ids = ",".join(str(c["id"]) for c in group)
+    for _attempt in range(attempts):
+        if state["failures"] >= MAX_FAILURES_IN_A_ROW:
+            return {}, len(group)
+        try:
+            data = query_overpass(f"[out:json][timeout:90];relation(id:{ids});out geom;", **options)
+        except RuntimeError:
+            state["failures"] += 1
+            continue
+        state["failures"] = 0
+        return {e["id"]: e for e in data.get("elements", []) if e.get("type") == "relation"}, 0
+    if len(group) == 1:
+        return {}, 1
+    half = len(group) // 2
+    first, lost_first = _fetch_group(group[:half], options, 1, state)
+    second, lost_second = _fetch_group(group[half:], options, 1, state)
+    return {**first, **second}, lost_first + lost_second
+
+
 def load_tracks(candidates: list, cache_dir=None, progress=None, batch: int = GEOMETRY_BATCH):
     """(candidates with their track data, number of candidates lost). Geometry comes `batch` relations per query
-    (one progress tick per query); a failed query is retried once and then its candidates are dropped, never fatal."""
+    (one progress tick per group of `batch`); a failing query is retried once and then split (see _fetch_group),
+    so what is lost is only what could not be loaded, never fatal."""
     progress = progress or NullProgress()
     options = _options(cache_dir, None)
     groups = [candidates[i:i + batch] for i in range(0, len(candidates), batch)]
+    state = {"failures": 0}
     loaded, lost = [], 0
     for number, group in enumerate(groups, 1):
-        ids = ",".join(str(c["id"]) for c in group)
-        data = None
-        for _attempt in (1, 2):
-            try:
-                data = query_overpass(f"[out:json][timeout:90];relation(id:{ids});out geom;", **options)
-                break
-            except RuntimeError:
-                continue
+        by_id, lost_here = _fetch_group(group, options, 2, state)
         progress.tick(number, len(groups), "public_geometry_batch")
-        if data is None:
-            lost += len(group)
-            continue
-        by_id = {e["id"]: e for e in data.get("elements", []) if e.get("type") == "relation"}
+        lost += lost_here
         for candidate in group:
             element = by_id.get(candidate["id"])
-            ways = _member_ways(element) if element else []
+            if element is None:
+                continue
+            ways = _member_ways(element)
             if not ways:
                 lost += 1
                 continue

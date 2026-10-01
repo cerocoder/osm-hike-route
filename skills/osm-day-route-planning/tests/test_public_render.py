@@ -72,7 +72,7 @@ def test_the_list_has_a_header_the_order_the_notes_and_the_own_route_last():
                         "network level and completeness of the data.")
     assert lines[2].startswith("1. ") and lines[3].startswith("2. ")
     assert "~ the length is computed from the track" in lines and any("no elevation data" in l for l in lines)
-    assert "12 more match" in text and "Long-distance routes passing nearby (multi-day, not shown): 3." in lines
+    assert "More matching routes: 12." in text and "Long-distance routes passing nearby (multi-day, not shown): 3." in lines
     assert lines[-2] == "3. Own route" and lines[-1] == "Choose a number, or «Own route»."
 
 
@@ -116,5 +116,22 @@ def test_an_unknown_message_key_is_shown_as_it_is():
 
 def test_routes_that_could_not_be_loaded_are_reported():
     text = render_list([route()], "ru", matching=1, long_nearby=0, rules=["network"], lost=2)
-    assert "Не удалось загрузить маршрутов: 2 (они пропущены)." in text.split("\n")
+    assert "Маршруты, которые не удалось загрузить (пропущены): 2." in text.split("\n")
     assert "geometry" not in render_list([route()], "en", 1, 0, ["network"], lost=0)
+
+
+def test_a_route_with_gaps_says_so_in_its_line():
+    line = describe(route(gaps=True), "en", 1)
+    assert line.endswith("· track has gaps: cannot be followed as it is")
+    assert "трек с разрывами" in describe(route(gaps=True), "ru", 1)
+    assert "gaps" not in describe(route(), "en", 1)
+
+
+@pytest.mark.parametrize("ele", ["inf", "-inf", "nan", "1e400", "abc", "", None])
+def test_a_strange_elevation_never_breaks_the_line(ele):
+    points = [{"kind": "peak", "name": "Cerro", "ele": ele, "position_m": 1}]
+    assert "via Cerro" in describe(route(key_points=points), "en", 1)
+
+
+def test_invisible_formatting_characters_are_removed_from_osm_text():
+    assert pr.clean("Ruta\u200b \u202eevil\u2066") == "Ruta evil"

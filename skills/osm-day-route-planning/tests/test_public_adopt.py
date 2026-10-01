@@ -54,6 +54,8 @@ def test_a_waypoint_that_cannot_be_reached_is_skipped_not_fatal():
     graph[6] = [e for e in graph[6] if e[0] != 5]
     result = adopt(candidate(), graph, coords, {})
     assert result["dropped_samples"] >= 1 and result["path"][0] == 0 and result["path"][-1] == 5
+    assert result["precision"] == 1.0 and result["coverage"] < 0.6          # half of the route was left out ...
+    assert result["fidelity"] == result["coverage"] and result["deviates"] is True    # ... and that is reported, not hidden
 
 
 def test_a_path_that_leaves_the_public_track_is_measured_and_reported():
@@ -111,8 +113,29 @@ def test_progress_ticks_once_per_leg():
 
 
 def test_the_curated_source_property_keeps_only_a_web_link_and_rounds_the_fidelity():
+    assert curated_source(candidate(), 0.895)["fidelity"] == 0.89           # rounded down: never looks better than it is
     source = curated_source(candidate(), 0.93456)
     assert source == {"relation_id": 42, "name": "Test", "ref": "T1", "network": "lwn", "operator": "Club",
                       "website": "https://club.example/t1", "length_source": "computed", "fidelity": 0.93}
     unsafe = curated_source({**candidate(), "tags": {"website": "javascript:alert(1)"}}, 1.0)
     assert unsafe["website"] is None and unsafe["name"] is None and unsafe["ref"] is None
+
+
+def test_a_route_cut_off_at_its_start_is_refused_not_reported_as_faithful():
+    graph, coords = line_graph(12)
+    graph[0] = []                                                    # node 0 is isolated
+    graph[1] = [e for e in graph[1] if e[0] != 0]
+    with pytest.raises(AdoptionError, match="cut off"):
+        adopt(candidate(), graph, coords, {})
+
+
+def test_an_extra_point_that_could_not_be_used_is_not_listed_as_inserted():
+    graph, coords = line_graph(12, extra={50: (0.0007, 6 * STEP, 6)})
+    result = adopt(candidate(), graph, coords, {}, extra_nodes=[50])
+    assert result["inserted"] == [50] and result["precision"] > 0.9 and result["coverage"] == 1.0
+
+
+def test_the_node_index_cells_stay_wide_enough_near_the_pole():
+    coords = {1: (85.0, 0.0), 2: (85.0, 0.0006)}                     # about 58 m apart at 85 degrees
+    assert NodeIndex(coords).nearest(85.0, 0.0, 60.0) in (1, 2)
+    assert NodeIndex(coords).nearest(85.0, 0.00055, 10.0) == 2

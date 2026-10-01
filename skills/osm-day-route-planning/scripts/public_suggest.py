@@ -28,7 +28,18 @@ def suggest(lat: float, lon: float, mode: str, criteria, pace_kmh: float, ascent
             step.detail("public_candidates_done", found=len(found["candidates"]), long=found["long_nearby"])
     except RuntimeError as error:
         return {"text": render_failure(str(error), lang), "shown": [], "matching": 0, "long_nearby": 0, "lost": 0,
-                "failed": True, "rules": []}
+                "failed": True, "rules": [], "found": 0}
+    try:
+        return _after_lookup(found, lat, lon, criteria, pace_kmh, ascent_minutes_per_100m, service, lang, location,
+                             access_points, cache_dir, progress, max_shown)
+    except Exception as error:  # noqa: BLE001 - whatever goes wrong here must not block the planning
+        return {"text": render_failure(f"{type(error).__name__}: {error}", lang), "shown": [], "matching": 0,
+                "long_nearby": found["long_nearby"], "lost": 0, "failed": True, "rules": [],
+                "found": len(found["candidates"]) + found["long_nearby"]}
+
+
+def _after_lookup(found, lat, lon, criteria, pace_kmh, ascent_minutes_per_100m, service, lang, location, access_points,
+                  cache_dir, progress, max_shown) -> dict:
     candidates = [c for c in found["candidates"] if passes_tag_length(c, criteria)]
     with progress.step("public_geometry"):
         loaded, lost = load_tracks(candidates, cache_dir=cache_dir, progress=progress)
@@ -54,4 +65,4 @@ def suggest(lat: float, lon: float, mode: str, criteria, pace_kmh: float, ascent
         step.detail("public_done", matching=len(ordered), shown=len(shown))
     return {"text": render_list(shown, lang, len(ordered), found["long_nearby"], rules, lost=lost), "shown": shown,
             "matching": len(ordered), "long_nearby": found["long_nearby"], "lost": lost, "failed": False,
-            "rules": rules}
+            "rules": rules, "found": len(found["candidates"]) + found["long_nearby"]}

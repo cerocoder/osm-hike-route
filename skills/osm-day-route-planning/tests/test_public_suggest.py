@@ -143,7 +143,7 @@ def test_at_most_ten_are_shown_and_the_rest_is_counted(patch_world):
     world = patch_world(World([synthetic(i, 8 + i * 0.1, f"Route {i:02d}") for i in range(1, 13)]))
     result = run(world, Criteria(min_km=5, max_km=20))
     assert len(result["shown"]) == 10 and result["matching"] == 12
-    assert "2 more match" in result["text"] and "(10 of 12)" in result["text"]
+    assert "More matching routes: 2." in result["text"] and "(10 of 12)" in result["text"]
     assert result["text"].split("\n")[-2] == "11. Own route"
 
 
@@ -159,7 +159,7 @@ def test_a_geometry_failure_leaves_those_routes_out_and_says_so(patch_world):
     world = patch_world(World([synthetic(1, 10, "A"), synthetic(2, 10, "B")], fail="relation(id:"))
     result = run(world, Criteria())
     assert result["lost"] == 2 and result["matching"] == 0
-    assert "2 routes could not be loaded and are left out." in result["text"]
+    assert "Routes that could not be loaded and are left out: 2." in result["text"]
 
 
 def test_a_key_point_or_place_failure_does_not_remove_the_routes(patch_world):
@@ -206,3 +206,30 @@ def test_the_practical_start_rule_uses_the_anchor_and_the_access_points(patch_wo
     assert [c["tags"]["name"] for c in result["shown"]] == ["Near", "Far"] and result["rules"][0] == "start"
     by_stop = run(world_of_two(), Criteria(), lat=0.0, lon=0.0, location=(5.0, 5.0), access_points=[(0.0, 1.0)])
     assert [c["tags"]["name"] for c in by_stop["shown"]] == ["Far", "Near"]
+
+
+def test_a_surprise_inside_the_step_never_blocks_the_planning(patch_world, monkeypatch):
+    import public_suggest
+    world = patch_world(World([synthetic(1, 10, "A")]))
+
+    def boom(*args, **kwargs):
+        raise ValueError("unexpected")
+
+    monkeypatch.setattr(public_suggest, "add_elevation", boom)
+    result = run(world, Criteria(), lang="ru")
+    assert result["failed"] is True and result["shown"] == [] and result["found"] == 1
+    lines = result["text"].split("\n")
+    assert lines[0].startswith("Публичные маршруты найти не удалось (ValueError: unexpected") and lines[1] == "1. Свой маршрут"
+
+
+def test_the_result_says_how_many_public_routes_were_found_including_the_long_ones(patch_world):
+    world = patch_world(World([synthetic(1, 5, "Short"), synthetic(2, 40, "Camino", network="nwn")]))
+    assert run(world, Criteria())["found"] == 2
+
+
+def test_a_strange_elevation_tag_on_a_key_point_does_not_break_the_list(patch_world):
+    member = synthetic(1, 10, "A")["members"][0]["geometry"][3]
+    world = patch_world(World([synthetic(1, 10, "A")], key_points=[
+        {"type": "node", "lat": member["lat"], "lon": member["lon"], "tags": {"natural": "peak", "name": "Cerro", "ele": "inf"}}]))
+    result = run(world, Criteria())
+    assert result["failed"] is False and "via Cerro" in result["text"]

@@ -74,6 +74,7 @@ def _length_m(points) -> float:
 
 
 JOIN_M = 20.0                       # ends of two ways closer than this are joined (OSM relations have small gaps)
+TIE_M = 5.0                         # distances within this bucket count as equal when two ways meet a chain
 MIN_COVERAGE = 0.85                 # the track must hold at least this share of the relation's length
 _CELL = 0.0003                      # about 33 m of latitude: the cell of the end-point index
 
@@ -94,7 +95,7 @@ def build_track(ways: list) -> dict:
         return {"track": [], "length_m": 0.0, "coverage": 0.0, "gaps": True, "chains": 0, "start": None,
                 "end": None, "is_loop": None}
     cell_lat = _CELL
-    cell_lon = _CELL / max(0.2, math.cos(math.radians(unique[0][0][0])))
+    cell_lon = _CELL / max(0.05, math.cos(math.radians(unique[0][0][0])))
 
     def cell(point):
         return math.floor(point[0] / cell_lat), math.floor(point[1] / cell_lon)
@@ -104,6 +105,7 @@ def build_track(ways: list) -> dict:
         index[cell(points[0])].append((i, 0))
         index[cell(points[-1])].append((i, 1))
     unused = dict(enumerate(unique))
+    lengths = [_length_m(points) for points in unique]
 
     def nearest_free(point):
         best = None
@@ -114,8 +116,12 @@ def build_track(ways: list) -> dict:
                     if i in unused:
                         other = unused[i][0 if end == 0 else -1]
                         distance = haversine(point[0], point[1], other[0], other[1])
-                        if distance <= JOIN_M and (best is None or distance < best[0]):
-                            best = (distance, i, end)
+                        if distance <= JOIN_M:
+                            # nearest first, but ends within TIE_M of each other tie: the longer way continues the
+                            # route, a short spur listed at the junction must not steal the chain from it
+                            rank_key = (int(distance // TIE_M), -lengths[i], distance)
+                            if best is None or rank_key < best[0]:
+                                best = (rank_key, i, end)
         return best
 
     chains = []
@@ -140,44 +146,53 @@ def build_track(ways: list) -> dict:
             "is_loop": None if gaps else haversine(track[0][0], track[0][1], track[-1][0], track[-1][1]) <= LOOP_ENDS_M}
 
 
-MAX_FAILURES_IN_A_ROW = 4           # after this many failed queries in a row the server is taken for dead
+MAX_FAILURES_IN_A_ROW = 3           # after this many failed queries in a row the server is taken for dead
+GEOMETRY_QUERY = {"timeout": 60, "retries": 1}      # one try per endpoint: a failure is answered by splitting, not waiting
 
 
-def _fetch_group(group: list, options: dict, attempts: int, state: dict):
-    """({relation id: element}, number lost) for a group of candidates. A failed query is retried (`attempts`); if
-    it still fails and the group has more than one relation, the group is split in two and each half is tried once:
-    one heavy relation (a long mountain route) must not take the nineteen others with it. After
-    MAX_FAILURES_IN_A_ROW failures in a row nothing more is asked (the rest is lost at once)."""
-    ids = ",".join(str(c["id"]) for c in group)
-    for _attempt in range(attempts):
-        if state["failures"] >= MAX_FAILURES_IN_A_ROW:
-            return {}, len(group)
-        try:
-            data = query_overpass(f"[out:json][timeout:90];relation(id:{ids});out geom;", **options)
-        except RuntimeError:
-            state["failures"] += 1
-            continue
-        state["failures"] = 0
-        return {e["id"]: e for e in data.get("elements", []) if e.get("type") == "relation"}, 0
-    if len(group) == 1:
-        return {}, 1
-    half = len(group) // 2
-    first, lost_first = _fetch_group(group[:half], options, 1, state)
-    second, lost_second = _fetch_group(group[half:], options, 1, state)
-    return {**first, **second}, lost_first + lost_second
+def _fetch_group(group: list, options: dict, state: dict):
+    """({relation id: element}, number lost) for a group of candidates. A group that fails is split in two, and the
+    halves are tried level by level (both halves before either is split further), so a healthy server answering
+    every half but the one with a heavy relation resets the failure count and the heavy relation is isolated
+    quickly. A single relation that still fails is lost. After MAX_FAILURES_IN_A_ROW failures in a row nothing more
+    is asked (what is left is lost at once): a dead server must not cost minutes per group."""
+    elements, lost = {}, 0
+    pending = [group]
+    while pending:
+        following = []
+        for part in pending:
+            if state["failures"] >= MAX_FAILURES_IN_A_ROW:
+                lost += len(part)
+                continue
+            ids = ",".join(str(c["id"]) for c in part)
+            try:
+                data = query_overpass(f"[out:json][timeout:90];relation(id:{ids});out geom;", **options)
+            except RuntimeError:
+                state["failures"] += 1
+                if len(part) == 1:
+                    lost += 1
+                else:
+                    half = len(part) // 2
+                    following += [part[:half], part[half:]]
+                continue
+            state["failures"] = 0
+            elements.update({e["id"]: e for e in data.get("elements", []) if e.get("type") == "relation"})
+        pending = following
+    return elements, lost
 
 
 def load_tracks(candidates: list, cache_dir=None, progress=None, batch: int = GEOMETRY_BATCH):
     """(candidates with their track data, number of candidates lost). Geometry comes `batch` relations per query
-    (one progress tick per group of `batch`); a failing query is retried once and then split (see _fetch_group),
-    so what is lost is only what could not be loaded, never fatal."""
+    (one progress tick per group of `batch`); a failing query splits its group (see _fetch_group). A relation that
+    has no ways of its own because it only lists other relations or variants (a super-route) is skipped silently,
+    not counted as lost; one the server did not return, or returned without geometry, is lost."""
     progress = progress or NullProgress()
-    options = _options(cache_dir, None)
+    options = {**_options(cache_dir, None), **GEOMETRY_QUERY}
     groups = [candidates[i:i + batch] for i in range(0, len(candidates), batch)]
     state = {"failures": 0}
     loaded, lost = [], 0
     for number, group in enumerate(groups, 1):
-        by_id, lost_here = _fetch_group(group, options, 2, state)
+        by_id, lost_here = _fetch_group(group, options, state)
         progress.tick(number, len(groups), "public_geometry_batch")
         lost += lost_here
         for candidate in group:
@@ -186,7 +201,9 @@ def load_tracks(candidates: list, cache_dir=None, progress=None, batch: int = GE
                 continue
             ways = _member_ways(element)
             if not ways:
-                lost += 1
+                members = element.get("members") or []
+                if not any(m.get("type") == "relation" or m.get("role", "") in SKIP_ROLES for m in members):
+                    lost += 1
                 continue
             loaded.append({**candidate, **build_track(ways)})
     return loaded, lost
@@ -223,9 +240,12 @@ def dedupe(candidates: list):
     best, order = {}, []
     for candidate in candidates:
         tags = candidate.get("tags") or {}
-        key = ((tags.get("ref") or "").strip().lower(), (tags.get("name") or "").strip().lower())
+        ref, name = (tags.get("ref") or "").strip().lower(), (tags.get("name") or "").strip().lower()
+        key = (ref, name)
         if key == ("", ""):
             key = ("#", candidate["id"])
+        elif not ref and candidate.get("start"):                 # no ref: the same name only counts at the same place
+            key = (ref, name, round(candidate["start"][0], 2), round(candidate["start"][1], 2))
         if key not in best:
             order.append(key)
             best[key] = candidate

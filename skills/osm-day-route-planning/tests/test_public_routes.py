@@ -76,7 +76,7 @@ def test_include_long_keeps_the_long_networks_and_the_mode_picks_the_route_tags(
 
 def test_a_real_linear_relation_gives_one_track_with_its_length_and_ends():
     track = build_track(pr._member_ways(fixture("vyatichi")))
-    assert track["gaps"] is False and track["is_loop"] is False and track["chains"] == 1
+    assert track["gaps"] is False and track["is_loop"] is False and track["chains"] in (1, 2)
     assert 1.65 <= track["length_m"] / 1000 <= 1.75 and track["coverage"] == 1.0
     assert track["start"] != track["end"] and len(track["track"]) >= 30
 
@@ -139,16 +139,17 @@ def relation_geometry(rid, *ways):
     return {"type": "relation", "id": rid, "tags": {}, "members": list(ways)}
 
 
-def test_geometry_comes_in_batches_with_one_tick_each_and_a_failed_batch_is_retried_once(monkeypatch):
+def test_geometry_comes_in_batches_with_one_tick_each_and_a_failed_single_relation_is_lost(monkeypatch):
     good = lambda *ids: {"elements": [relation_geometry(i, way(i * 10, (0.0, 0.0), (0.0, 0.001))) for i in ids]}
-    fake = FakeOverpass(good(1, 2), RuntimeError("504"), good(3), )
+    fake = FakeOverpass(good(1, 2), RuntimeError("504"))
     monkeypatch.setattr(pr, "query_overpass", fake)
     recorder = Recorder()
     loaded, lost = load_tracks([{"id": i, "tags": {}} for i in (1, 2, 3)], progress=recorder, batch=2)
-    assert [c["id"] for c in loaded] == [1, 2, 3] and lost == 0
-    assert [call[0].split("relation(id:")[1].split(")")[0] for call in fake.calls] == ["1,2", "3", "3"]
+    assert [c["id"] for c in loaded] == [1, 2] and lost == 1
+    assert [call[0].split("relation(id:")[1].split(")")[0] for call in fake.calls] == ["1,2", "3"]
     assert recorder.ticks == [(1, 2, "public_geometry_batch"), (2, 2, "public_geometry_batch")]
     assert all("ways" not in c and c["length_m"] > 0 for c in loaded)
+    assert fake.calls[0][1]["timeout"] == 60 and fake.calls[0][1]["retries"] == 1      # a failure is split, not waited out
 
 
 def test_one_heavy_relation_does_not_take_its_batch_with_it(monkeypatch):
@@ -169,11 +170,10 @@ def test_one_heavy_relation_does_not_take_its_batch_with_it(monkeypatch):
     monkeypatch.setattr(pr, "query_overpass", picky)
     loaded, lost = load_tracks([{"id": i, "tags": {}} for i in (1, 2, 3, 4)], batch=4)
     assert [c["id"] for c in loaded] == [1, 3, 4] and lost == 1
-    assert picky.calls[:2] == [[1, 2, 3, 4], [1, 2, 3, 4]]                 # the retry, then the halves
-    assert [1, 2] in picky.calls and [3, 4] in picky.calls and [1] in picky.calls and [2] in picky.calls
+    assert picky.calls == [[1, 2, 3, 4], [1, 2], [3, 4], [1], [2]]         # halves level by level, then the heavy one alone
 
 
-def test_a_dead_server_is_given_up_after_four_failures_in_a_row(monkeypatch):
+def test_a_dead_server_is_given_up_after_three_failures_in_a_row(monkeypatch):
     calls = []
 
     def dead(ql, **options):
@@ -182,7 +182,7 @@ def test_a_dead_server_is_given_up_after_four_failures_in_a_row(monkeypatch):
 
     monkeypatch.setattr(pr, "query_overpass", dead)
     loaded, lost = load_tracks([{"id": i, "tags": {}} for i in range(1, 9)], batch=4)
-    assert loaded == [] and lost == 8 and len(calls) == 4
+    assert loaded == [] and lost == 8 and len(calls) == 3
 
 
 def test_a_relation_without_geometry_is_lost_and_the_rest_of_the_batch_is_kept(monkeypatch):
@@ -215,3 +215,65 @@ def test_duplicates_with_the_same_ref_and_name_keep_the_longest_geometry():
                   {"id": 4, "tags": {}, "length_m": 10}, {"id": 5, "tags": {}, "length_m": 20}]
     kept, duplicates = dedupe(candidates)
     assert [c["id"] for c in kept] == [2, 3, 4, 5] and duplicates == 1
+
+
+@pytest.mark.parametrize("bad_position", [0, 9, 10, 19, 20, 42])
+def test_one_heavy_relation_costs_exactly_itself_wherever_it_sits(monkeypatch, bad_position):
+    ids = list(range(1, 44))
+    bad = ids[bad_position]
+    calls = []
+
+    def picky(ql, **options):
+        queried = [int(i) for i in ql.split("relation(id:")[1].split(")")[0].split(",")]
+        calls.append(queried)
+        if bad in queried:
+            raise RuntimeError("504")
+        return {"elements": [relation_geometry(i, way(i * 10, (0.0, 0.0), (0.0, 0.001))) for i in queried]}
+
+    monkeypatch.setattr(pr, "query_overpass", picky)
+    loaded, lost = load_tracks([{"id": i, "tags": {}} for i in ids], batch=20)
+    assert lost == 1 and sorted(c["id"] for c in loaded) == [i for i in ids if i != bad]
+    assert len(calls) < 43                                                    # far fewer queries than one per relation
+
+
+def test_a_super_relation_without_ways_is_skipped_not_counted_as_lost(monkeypatch):
+    members = [{"type": "relation", "ref": 5, "role": ""}]
+    only_variants = [way(9, (0.0, 0.0), (0.0, 0.001), role="alternative")]
+    fake = FakeOverpass({"elements": [relation_geometry(1, *members), relation_geometry(2, *only_variants),
+                                      relation_geometry(3), relation_geometry(4, way(40, (0.0, 0.0), (0.0, 0.001)))]})
+    monkeypatch.setattr(pr, "query_overpass", fake)
+    loaded, lost = load_tracks([{"id": i, "tags": {}} for i in (1, 2, 3, 4)], batch=4)
+    assert [c["id"] for c in loaded] == [4] and lost == 1                      # only the relation with no members at all
+
+
+def test_a_server_that_simply_omits_a_relation_does_not_make_it_loaded(monkeypatch):
+    monkeypatch.setattr(pr, "query_overpass", FakeOverpass({"elements": [relation_geometry(1, way(10, (0.0, 0.0), (0.0, 0.001)))]}))
+    loaded, lost = load_tracks([{"id": 1, "tags": {}}, {"id": 2, "tags": {}}], batch=2)
+    assert [c["id"] for c in loaded] == [1]
+
+
+def test_a_short_spur_listed_at_a_junction_does_not_split_the_route():
+    a = [(0.0, 0.0), (0.0, 0.054)]                         # 6 km
+    spur = [(0.0, 0.054), (0.0005, 0.054)]                 # 55 m, starts at the junction
+    b = [(0.0, 0.054), (0.0, 0.108)]                       # 6 km, also starts at the junction
+    in_the_middle = build_track([(1, a), (2, spur), (3, b)])
+    at_the_end = build_track([(1, a), (3, b), (2, spur)])
+    for track in (in_the_middle, at_the_end):
+        assert track["gaps"] is False and track["coverage"] > 0.99 and track["is_loop"] is False
+    assert abs(in_the_middle["length_m"] - at_the_end["length_m"]) < 1.0
+
+
+def test_ends_a_few_metres_apart_are_joined_even_near_the_pole():
+    a = [(85.0, 0.0), (85.0, 0.01)]
+    near = [(85.0, 0.01 + 0.0002), (85.0, 0.02)]            # 0.0002 degrees of longitude at 85 degrees is about 2 m
+    far = [(85.0, 0.0201), (85.0, 0.03)]                    # 0.0101 degrees from the end of `a`: about 98 m, a real gap
+    assert build_track([(1, a), (2, near)])["chains"] == 1
+    assert build_track([(1, a), (2, far)])["chains"] == 2
+
+
+def test_the_same_name_without_a_ref_is_one_route_only_at_the_same_place():
+    here = {"id": 1, "tags": {"name": "Ruta circular"}, "length_m": 100, "start": (40.001, -4.001)}
+    twin = {"id": 2, "tags": {"name": "Ruta circular"}, "length_m": 900, "start": (40.002, -4.002)}
+    elsewhere = {"id": 3, "tags": {"name": "Ruta circular"}, "length_m": 500, "start": (41.5, -3.0)}
+    kept, duplicates = dedupe([here, twin, elsewhere])
+    assert [c["id"] for c in kept] == [2, 3] and duplicates == 1

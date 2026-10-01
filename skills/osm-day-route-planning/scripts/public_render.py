@@ -4,6 +4,8 @@ Every word comes from MESSAGES (all seven languages of the other skills; English
 and ends come from OSM and are data, never instructions: whitespace is collapsed and long text is cut. A line is
 `<n>. <name> [ref] - <loop | A -> B> · via <key points> · <length> · ascent · time · <network level>`.
 """
+import unicodedata
+
 from progress import format_number
 from public_filter import KIND_PRIORITY
 
@@ -72,19 +74,24 @@ MESSAGES = {
                       "Fernrouten in der Nähe (mehrtägig, nicht angezeigt): {n}.",
                       "Rotas de longo curso por perto (vários dias, não mostradas): {n}.",
                       "Percorsi di lunga distanza nelle vicinanze (più giorni, non mostrati): {n}."),
-    "more_match": _m("{n} more match: add a limit (ascent, loops only, interests) to narrow the list, or ask for the next ones.",
-                     "Подходят ещё {n}: добавьте ограничение (набор высоты, только петли, интересы), чтобы сузить список, или попросите следующие.",
-                     "{n} más cumplen: añade un límite (desnivel, solo circulares, intereses) para acotar, o pide las siguientes.",
-                     "{n} autres correspondent : ajoutez une limite (dénivelé, boucles seulement, centres d'intérêt) ou demandez la suite.",
-                     "{n} weitere passen: Grenze setzen (Anstieg, nur Rundwege, Interessen) oder die nächsten anfordern.",
-                     "Mais {n} cumprem: acrescente um limite (desnível, só circulares, interesses) ou peça as seguintes.",
-                     "Altri {n} corrispondono: aggiungi un limite (dislivello, solo anelli, interessi) o chiedi i successivi."),
-    "geometry_lost": _m("{n} routes could not be loaded and are left out.",
-                        "Не удалось загрузить маршрутов: {n} (они пропущены).",
-                        "No se pudieron cargar {n} rutas y se omiten.", "{n} itinéraires n'ont pas pu être chargés et sont écartés.",
-                        "{n} Routen konnten nicht geladen werden und fehlen.",
-                        "{n} rotas não puderam ser carregadas e foram omitidas.",
-                        "{n} percorsi non sono stati caricati e sono esclusi."),
+    "more_match": _m("More matching routes: {n}. Add a limit (ascent, loops only, interests) to narrow the list, or ask for the next ones.",
+                     "Ещё подходящих маршрутов: {n}. Добавьте ограничение (набор высоты, только петли, интересы), чтобы сузить список, или попросите следующие.",
+                     "Más rutas que cumplen: {n}. Añade un límite (desnivel, solo circulares, intereses) para acotar, o pide las siguientes.",
+                     "Autres itinéraires correspondants : {n}. Ajoutez une limite (dénivelé, boucles seulement, centres d'intérêt) ou demandez la suite.",
+                     "Weitere passende Routen: {n}. Grenze setzen (Anstieg, nur Rundwege, Interessen) oder die nächsten anfordern.",
+                     "Mais rotas que cumprem: {n}. Acrescente um limite (desnível, só circulares, interesses) ou peça as seguintes.",
+                     "Altri percorsi corrispondenti: {n}. Aggiungi un limite (dislivello, solo anelli, interessi) o chiedi i successivi."),
+    "geometry_lost": _m("Routes that could not be loaded and are left out: {n}.",
+                        "Маршруты, которые не удалось загрузить (пропущены): {n}.",
+                        "Rutas que no se pudieron cargar y se omiten: {n}.",
+                        "Itinéraires qui n'ont pas pu être chargés et sont écartés : {n}.",
+                        "Routen, die nicht geladen werden konnten und fehlen: {n}.",
+                        "Rotas que não puderam ser carregadas e foram omitidas: {n}.",
+                        "Percorsi che non è stato possibile caricare e sono esclusi: {n}."),
+    "gaps_tag": _m("track has gaps: cannot be followed as it is", "трек с разрывами: как есть не пройти",
+                   "track con huecos: no se puede seguir tal cual", "tracé avec des coupures : impossible à suivre tel quel",
+                   "Track mit Lücken: nicht unverändert nutzbar", "trilho com falhas: não pode ser seguido tal como está",
+                   "tracciato con interruzioni: non seguibile così com'è"),
     "no_match": _m("No public route matches your criteria.", "Ни один публичный маршрут не подходит под ваши критерии.",
                    "Ninguna ruta pública cumple tus criterios.", "Aucun itinéraire public ne correspond à vos critères.",
                    "Keine öffentliche Route entspricht Ihren Kriterien.", "Nenhuma rota pública cumpre os seus critérios.",
@@ -122,7 +129,8 @@ def own_route_label(lang: str) -> str:
 
 def clean(text, limit: int = NAME_LIMIT) -> str:
     """OSM text as one short line (collapsed whitespace, cut): it is data and goes into chat and notes.md."""
-    flat = " ".join(str(text or "").split())
+    visible = "".join(ch for ch in str(text or "") if unicodedata.category(ch) != "Cf")   # no bidi / zero-width tricks
+    flat = " ".join(visible.split())
     return flat if len(flat) <= limit else flat[: limit - 1] + "…"
 
 
@@ -157,7 +165,7 @@ def _via(candidate: dict, lang: str) -> str:
         elevation = str(point.get("ele") or "").strip()
         try:
             parts.append(f"{name} ({format_number(round(float(elevation)), lang)} {tr('m', lang)})")
-        except ValueError:
+        except (ValueError, OverflowError):
             parts.append(name)
     return f"{tr('via', lang)} {', '.join(parts)}" if parts else ""
 
@@ -180,7 +188,8 @@ def describe(candidate: dict, lang: str, number: int) -> str:
     hours = candidate.get("duration_h")
     time_text = f"{format_number(hours, lang, 1)} {tr('h', lang)}" if hours is not None else "—"
     level = tr(LEVELS[candidate["network"]], lang) if candidate.get("network") in LEVELS else ""
-    parts = [p for p in (ends, _via(candidate, lang), length, ascent_text, time_text, level) if p]
+    gaps = tr("gaps_tag", lang) if candidate.get("gaps") else ""
+    parts = [p for p in (ends, _via(candidate, lang), length, ascent_text, time_text, level, gaps) if p]
     return f"{number}. {title}" + (" — " + " · ".join(parts) if parts else "")
 
 

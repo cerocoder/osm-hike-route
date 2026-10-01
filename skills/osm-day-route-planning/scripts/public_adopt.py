@@ -16,6 +16,7 @@ from route_graph import _VertexGrid, shortest_costs, weighted_shortest_path
 RESAMPLE_M = 100.0
 SNAP_M = 60.0
 FIDELITY_M = 30.0
+COVERAGE_M = 60.0                        # a track sample is covered when the path has a node this close
 FIDELITY_WARN = 0.9
 DENSIFY_M = 10.0
 NEAR_WAYPOINTS = 4
@@ -33,7 +34,7 @@ class NodeIndex:
         items = [(n, node_coords[n]) for n in (nodes if nodes is not None else node_coords)]
         mean_lat = sum(c[0] for _, c in items) / len(items) if items else 0.0
         self._cell_lat = _CELL
-        self._cell_lon = _CELL / max(0.2, math.cos(math.radians(mean_lat)))
+        self._cell_lon = _CELL / max(0.05, math.cos(math.radians(mean_lat)))
         self._cells = defaultdict(list)
         for node, (lat, lon) in items:
             self._cells[self._key(lat, lon)].append((node, lat, lon))
@@ -95,10 +96,13 @@ def _insert(waypoints, node, graph, node_coords, preferences):
 
 def adopt(candidate: dict, graph: dict, node_coords: dict, preferences: dict, extra_nodes=(), progress=None,
           index: NodeIndex | None = None) -> dict:
-    """{"path": [node ids], "fidelity": share of the path within FIDELITY_M of the public track, "deviates":
-    fidelity below FIDELITY_WARN, "dropped_samples": samples with no node (or no road) near, "inserted": the added
-    nodes}. `extra_nodes` are graph nodes of the user's own points, in the order given. Raises AdoptionError for a
-    route with real gaps or one that is not on the graph."""
+    """{"path": [node ids], "fidelity": the smaller of precision and coverage, "precision": the share of the path
+    within FIDELITY_M of the public track, "coverage": the share of the track (sampled every RESAMPLE_M) with a path
+    node within COVERAGE_M, "deviates": fidelity below FIDELITY_WARN, "dropped_samples": samples with no node (or no
+    road) near, "inserted": the added nodes that are on the path}. `extra_nodes` are graph nodes of the user's own
+    points, in the order given. Precision alone would call a route that was cut short "faithful", so a path that
+    covers only part of the track has a low fidelity. Raises AdoptionError for a route with real gaps, one that is not
+    on the graph, or one that could not be followed beyond its first node."""
     progress = progress or NullProgress()
     if candidate.get("gaps"):
         raise AdoptionError("the route has gaps: it cannot be followed as one line")
@@ -116,12 +120,18 @@ def adopt(candidate: dict, graph: dict, node_coords: dict, preferences: dict, ex
     for node in extra_nodes:
         waypoints = _insert(waypoints, node, graph, node_coords, preferences)
     path, skipped = _route(graph, waypoints, preferences, progress)
+    if len(path) < 2:
+        raise AdoptionError("the route could not be followed on the graph (its start is cut off from the rest)")
     track_points = [{"lat": lat, "lon": lon} for lat, lon, _ in sample_positions(candidate["track"], DENSIFY_M)]
-    grid = _VertexGrid([track_points], FIDELITY_M)
-    near = sum(1 for node in path if grid.near(*node_coords[node]))
-    fidelity = near / len(path)
-    return {"path": path, "fidelity": round(fidelity, 3), "deviates": fidelity < FIDELITY_WARN,
-            "dropped_samples": dropped + skipped, "inserted": list(extra_nodes)}
+    track_grid = _VertexGrid([track_points], FIDELITY_M)
+    precision = sum(1 for node in path if track_grid.near(*node_coords[node])) / len(path)
+    path_grid = _VertexGrid([[{"lat": node_coords[n][0], "lon": node_coords[n][1]} for n in path]], COVERAGE_M)
+    coverage = sum(1 for lat, lon, _ in samples if path_grid.near(lat, lon)) / len(samples)
+    fidelity = min(precision, coverage)
+    on_path = set(path)
+    return {"path": path, "fidelity": round(fidelity, 3), "precision": round(precision, 3),
+            "coverage": round(coverage, 3), "deviates": fidelity < FIDELITY_WARN,
+            "dropped_samples": dropped + skipped, "inserted": [n for n in extra_nodes if n in on_path]}
 
 
 def curated_source(candidate: dict, fidelity: float) -> dict:
@@ -132,4 +142,4 @@ def curated_source(candidate: dict, fidelity: float) -> dict:
     return {"relation_id": candidate["id"], "name": tags.get("name"), "ref": tags.get("ref"),
             "network": candidate.get("network"), "operator": tags.get("operator"),
             "website": website if isinstance(website, str) and website.startswith(("http://", "https://")) else None,
-            "length_source": candidate.get("length_source"), "fidelity": round(fidelity, 2)}
+            "length_source": candidate.get("length_source"), "fidelity": math.floor(fidelity * 100) / 100}

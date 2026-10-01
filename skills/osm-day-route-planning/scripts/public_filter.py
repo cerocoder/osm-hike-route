@@ -16,6 +16,7 @@ from public_routes import NETWORK_RANK, _options, length_km, parse_distance_km
 RANGE_TOLERANCE = 0.25            # a single number from the user means that number +- 25 %
 TAG_MARGIN = 1.15                 # a `distance` tag is trusted to within this factor before the geometry is loaded
 KEYPOINT_RADIUS_M = 80.0
+START_BUCKET_M = 1000.0           # starts closer than this to the reference count as equally practical
 START_PLACE_RADIUS_M = 3000.0
 KIND_PRIORITY = ("peak", "viewpoint", "historic", "water", "hut", "sight")
 MIN_SAMPLES_SHARE = 0.8           # elevations are trusted when at least this share of the samples resolved
@@ -145,9 +146,12 @@ def classify(tags: dict):
 
 
 def _union_bbox(candidates: list, margin_deg: float):
+    """(south, west, north, east) of the tracks plus a margin of `margin_deg` of latitude (the longitude margin is
+    widened by 1 / cos(latitude) so that it is the same distance on the ground)."""
     lats = [p[0] for c in candidates for p in c["track"]]
     lons = [p[1] for c in candidates for p in c["track"]]
-    return min(lats) - margin_deg, min(lons) - margin_deg, max(lats) + margin_deg, max(lons) + margin_deg
+    margin_lon = margin_deg / max(0.05, math.cos(math.radians((min(lats) + max(lats)) / 2.0)))
+    return min(lats) - margin_deg, min(lons) - margin_lon, max(lats) + margin_deg, max(lons) + margin_lon
 
 
 def find_key_points(candidates: list, cache_dir=None, progress=None) -> list:
@@ -266,22 +270,24 @@ def _completeness(candidate: dict) -> int:
 
 def rank(candidates: list, criteria: Criteria, location=None, access_points=()):
     """(ordered candidates, rules): lexicographic, no hidden score - the interests the user named (the number of
-    matching key points), then how practical the start is (distance from the place or an access point), then how
-    close the length and time are to the middle of the requested range, then the network level (local before
-    national) and the completeness of the data (name, website, marking), then the id. `rules` lists the rules
-    that actually applied, in order, for the sentence shown above the list."""
+    matching key points), then how practical the start is (the distance of the nearer end of the track from the
+    place or an access point, in steps of START_BUCKET_M so that the later rules can still decide), then how close
+    the length and time are to the middle of the requested range, then the network level (local before national)
+    and the completeness of the data (name, website, marking), then the id. `rules` lists the rules that actually
+    applied, in order, for the sentence shown above the list; "range" only when a range (both bounds) was asked."""
     references = ([tuple(location)] if location else []) + [tuple(p) for p in access_points]
-    has_range = any(v is not None for v in (criteria.min_km, criteria.max_km, criteria.min_h, criteria.max_h))
+    has_range = (criteria.min_km is not None and criteria.max_km is not None) \
+        or (criteria.min_h is not None and criteria.max_h is not None)
     rules = (["interests"] if criteria.interests else []) + (["start"] if references else []) \
         + (["range"] if has_range else []) + ["network"]
 
     def start_distance(candidate):
-        lat, lon = candidate["start"]
-        return min(haversine(lat, lon, r[0], r[1]) for r in references) if references else 0.0
+        ends = [candidate["start"], candidate.get("end") or candidate["start"]]
+        return min(haversine(e[0], e[1], r[0], r[1]) for e in ends for r in references) if references else 0.0
 
     def key(candidate):
         return (-interest_match(candidate, criteria.interests) if criteria.interests else 0,
-                start_distance(candidate), _range_distance(candidate, criteria),
+                int(start_distance(candidate) // START_BUCKET_M), _range_distance(candidate, criteria),
                 NETWORK_RANK.get(candidate.get("network"), 1), -_completeness(candidate), candidate["id"])
 
     return sorted(candidates, key=key), rules

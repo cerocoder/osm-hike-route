@@ -228,3 +228,32 @@ def test_the_optional_queries_never_wait_as_long_as_the_main_ones(monkeypatch):
     find_key_points([cand(1)])
     find_start_places([cand(1)])
     assert [call[1]["timeout"] for call in fake.calls] == [40, 40] and [call[1]["retries"] for call in fake.calls] == [1, 1]
+
+
+def test_starts_within_a_kilometre_are_equally_practical_so_the_range_can_decide():
+    criteria = Criteria(min_km=8, max_km=12)
+    closer_but_off = cand(1, start=(40.0001, -4.0), length_km=11.9, network="rwn")
+    farther_on_target = cand(2, start=(40.004, -4.0), length_km=10.0)
+    ordered, rules = rank([closer_but_off, farther_on_target], criteria, location=(40.0, -4.0))
+    assert [c["id"] for c in ordered] == [2, 1] and rules == ["start", "range", "network"]
+
+
+def test_the_nearer_end_of_the_track_counts_for_the_start():
+    reversed_route = cand(1, start=(41.0, -4.0), end=(40.0, -4.0))          # listed backwards: its other end is at the place
+    elsewhere = cand(2, start=(40.5, -4.0), end=(40.6, -4.0))
+    ordered, _ = rank([elsewhere, reversed_route], Criteria(), location=(40.0, -4.0))
+    assert [c["id"] for c in ordered] == [1, 2]
+
+
+def test_range_is_listed_only_when_both_bounds_of_length_or_time_were_asked():
+    assert rank([], Criteria(max_h=4.0))[1] == ["network"]
+    assert rank([], Criteria(min_km=5))[1] == ["network"]
+    assert rank([], Criteria(min_km=5, max_km=9))[1] == ["range", "network"]
+    assert rank([], Criteria(min_h=2, max_h=4))[1] == ["range", "network"]
+
+
+def test_the_bounding_box_margin_is_the_same_distance_east_west_at_any_latitude():
+    equator = pf._union_bbox([{"track": [(0.0, 0.0), (0.0, 0.01)]}], 0.001)
+    north = pf._union_bbox([{"track": [(60.0, 0.0), (60.0, 0.01)]}], 0.001)
+    assert equator[1] == pytest.approx(-0.001, abs=1e-6) and north[1] == pytest.approx(-0.002, abs=1e-6)
+    assert equator[0] == pytest.approx(-0.001) and north[0] == pytest.approx(59.999)

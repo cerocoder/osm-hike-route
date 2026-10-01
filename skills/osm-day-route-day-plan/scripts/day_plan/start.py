@@ -132,6 +132,10 @@ def _limit(minute, key, lang) -> str:
     return f"{_clock(minute)} ({tr('st_limits', lang)[key]})" if minute is not None and key else tr("st_no_limit", lang)
 
 
+def _limit_name(key, lang) -> str:
+    return tr("st_limits", lang)[key] if key else tr("st_no_limit", lang)
+
+
 def start_lines(ctx) -> tuple[list, list]:
     """Plan lines and warnings that explain a recommended start; nothing for a start the person gave."""
     info = getattr(ctx, "start_info", None)
@@ -141,12 +145,12 @@ def start_lines(ctx) -> tuple[list, list]:
     lines, warnings = [], []
     if info.status == "empty_window":
         warnings.append(PlanWarning("danger", tr(
-            "st_warn_empty", lang, earliest=_clock(info.earliest), early=tr("st_limits", lang)[info.earliest_limit],
-            latest=_clock(info.latest), late=tr("st_limits", lang)[info.latest_limit], start=_clock(info.start_min))))
+            "st_warn_empty", lang, earliest=_clock(info.earliest), early=_limit_name(info.earliest_limit, lang),
+            latest=_clock(info.latest), late=_limit_name(info.latest_limit, lang), start=_clock(info.start_min))))
     else:
         pref = tr("st_pref", lang) if info.start_min == PREFERRED_FROM_MIN and info.earliest < PREFERRED_FROM_MIN else ""
         lines.append("- " + tr("st_recommended", lang, start=_clock(info.start_min),
-                               early=_limit(info.earliest if info.earliest_limit else None, info.earliest_limit, lang),
+                               early=_limit(info.earliest, info.earliest_limit, lang),
                                late=_limit(info.latest, info.latest_limit, lang), pref=pref))
     if info.missing and ctx.access_points:
         what = ", ".join(tr("st_missing", lang)[name] for name in info.missing)

@@ -169,3 +169,35 @@ def test_missing_transport_facts_are_said_when_there_are_access_points(make_rout
     resolve_start(ctx)
     lines, _ = start_lines(ctx)
     assert any("Not recorded" in line for line in lines)
+
+
+def _polar_day_empty(make_route, fixed_now, weather_response, lang=None):
+    # polar day, no lower limit; the last departure at 04:00 is far too early for a 20 h route
+    route_dir = make_route(duration_hours=20.0, coords=((15.6, 78.2, 10.0), (15.7, 78.25, 20.0)))
+    _facts(route_dir, last_departure_local="04:00")
+    http = lambda url: weather_response(date="2026-06-21")  # noqa: E731
+    kwargs = {"lang": lang} if lang else {}
+    return build_context(route_dir, JUNE, http=http, now=fixed_now, **kwargs)
+
+
+def test_an_empty_window_without_a_lower_limit_does_not_raise(make_route, fixed_now, weather_response):
+    ctx = _polar_day_empty(make_route, fixed_now, weather_response)
+    resolve_start(ctx)
+    _, warnings = start_lines(ctx)
+    assert ctx.start_info.status == "empty_window" and ctx.start_info.earliest_limit is None
+    assert [w.severity for w in warnings] == ["danger"] and "no limit" in warnings[0].text
+
+
+def test_the_light_section_survives_an_empty_window_without_a_lower_limit(make_route, fixed_now, weather_response):
+    ctx = _polar_day_empty(make_route, fixed_now, weather_response)
+    resolve_start(ctx)
+    section = LightPlugin().run(ctx, {"weather": {"utc_offset_seconds": 3600}})
+    # the polar-day branch of the light plugin does not render start_lines at all; the point is that nothing raises
+    assert section.markdown
+
+
+def test_the_empty_window_warning_without_a_lower_limit_in_russian(make_route, fixed_now, weather_response):
+    ctx = _polar_day_empty(make_route, fixed_now, weather_response, lang="ru")
+    resolve_start(ctx)
+    _, warnings = start_lines(ctx)
+    assert "без ограничения" in warnings[0].text

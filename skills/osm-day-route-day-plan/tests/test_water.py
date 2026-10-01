@@ -45,12 +45,12 @@ def _http(sst=21.0, air=20.0):
     return http
 
 
-def _run(make_route, fixed_now, near, http=None, lang="en", facts=None, weather=None, folder="route"):
+def _run(make_route, fixed_now, near, http=None, lang="en", facts=None, weather=None, folder="route", date=DATE, now=None):
     import json
     route_dir = make_route(folder=folder)
     if facts:
         (route_dir / "facts.json").write_text(json.dumps(facts), encoding="utf-8")
-    ctx = build_context(route_dir, DATE, lang=lang, http=http or _http(), now=fixed_now)
+    ctx = build_context(route_dir, date, lang=lang, http=http or _http(), now=now or fixed_now)
     return WaterPlugin().run(ctx, {"water_near": near, "weather": weather or _weather()})
 
 
@@ -198,3 +198,55 @@ def test_truncated_overpass_adds_a_note(make_route, fixed_now):
 def test_no_truncation_note_otherwise(make_route, fixed_now):
     text = _run(make_route, fixed_now, _near([_body("Lago", 5.0)])).markdown
     assert "size limit" not in text
+
+
+def _recording_http(urls):
+    base = _http()
+
+    def http(url):
+        urls.append(url)
+        return base(url)
+    return http
+
+
+def _range(url):
+    import re
+    return (re.search(r"start_date=([\d-]+)", url).group(1), re.search(r"end_date=([\d-]+)", url).group(1))
+
+
+def test_january_beyond_the_horizon_keeps_a_valid_climatology_window(make_route, fixed_now):
+    urls = []
+    section = _run(make_route, fixed_now, _near([_body("Lago", 5.0)]), http=_recording_http(urls),
+                   date=datetime.date(2027, 1, 15))
+    archive = [_range(u) for u in urls if "archive" in u and "temperature_2m_mean" in u]
+    assert len(archive) == 3 and all(a <= b for a, b in archive)
+    row = next(l for l in section.markdown.splitlines() if "Lago" in l)
+    assert "| – |" not in row and "estimate" in row
+
+
+def test_a_distant_past_date_reads_the_archive(make_route, fixed_now):
+    urls = []
+    _run(make_route, fixed_now, _near([_body("Lago", 5.0)]), http=_recording_http(urls), date=datetime.date(2026, 3, 1))
+    means = [u for u in urls if "temperature_2m_mean" in u]
+    assert len(means) == 1 and "archive" in means[0]
+    assert _range(means[0]) == ("2026-01-30", "2026-02-28")
+
+
+def test_a_near_date_reads_the_forecast_api(make_route, fixed_now):
+    urls = []
+    _run(make_route, fixed_now, _near([_body("Lago", 5.0)]), http=_recording_http(urls))
+    means = [u for u in urls if "temperature_2m_mean" in u]
+    assert len(means) == 1 and "archive" not in means[0]
+    assert _range(means[0]) == ("2026-05-22", "2026-06-20")
+
+
+def test_a_swim_spot_far_from_the_sea_does_not_make_the_sea_bathable(make_route, fixed_now):
+    near = _near([_body("Lago", 5.0)], sea=SEA, spots=[("Playa fluvial", 40.5, -3.0)])
+    row = next(l for l in _run(make_route, fixed_now, near).markdown.splitlines() if l.startswith("| Sea or ocean"))
+    assert "not stated" in row and "allowed (OSM)" not in row
+
+
+def test_a_swim_spot_at_the_sea_point_makes_it_allowed(make_route, fixed_now):
+    near = _near([_body("Lago", 5.0)], sea=SEA, spots=[("Playa", 43.5005, -3.5)])
+    row = next(l for l in _run(make_route, fixed_now, near).markdown.splitlines() if l.startswith("| Sea or ocean"))
+    assert "allowed (OSM)" in row

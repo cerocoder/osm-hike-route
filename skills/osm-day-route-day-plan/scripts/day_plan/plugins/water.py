@@ -73,9 +73,8 @@ def air_history(ctx, lat: float, lon: float):
         else:                                              # beyond the forecast: the same weeks of previous years
             per_year = []
             for back in range(1, AIR_YEARS + 1):
-                year = ctx.today.year - back
-                per_year.append(_daily_means(ctx, ARCHIVE_URL, lat, lon, _same_day_in_year(start, year),
-                                             _same_day_in_year(end, year)))
+                per_year.append(_daily_means(ctx, ARCHIVE_URL, lat, lon, _same_day_in_year(start, start.year - back),
+                                             _same_day_in_year(end, end.year - back)))
             length = min(len(m) for m in per_year)
             means = []
             for i in range(length):
@@ -144,7 +143,9 @@ class WaterPlugin(SectionPlugin):
                 key = "wt_temp_model" if data["kind"] == "model" else "wt_temp_climate"
                 temp_text = tr(key, lang, temp=f"{data['temp']:.0f}")
                 coldest = (data["temp"], tr("wt_sea", lang), "unknown")
-            bathing = "allowed" if spots else "unknown"
+            near_sea = any(rect_distance_m(s_lat, s_lon, (sea["lat"], sea["lon"], sea["lat"], sea["lon"])) <= SWIM_SPOT_M
+                           for _, s_lat, s_lon in spots)
+            bathing = "allowed" if near_sea else "unknown"
             rows.append("| " + " | ".join([
                 tr("wt_sea", lang), _near_text(sea["near_kind"], sea["near_name"], sea["distance_m"], lang),
                 temp_text, tr("wt_bathing", lang)[bathing]]) + " |")

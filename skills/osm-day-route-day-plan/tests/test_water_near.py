@@ -4,8 +4,10 @@ import urllib.parse
 from day_plan.context import build_context
 from day_plan.http import HttpError
 from day_plan.plugins.water_near import (
-    Anchor, WaterNearPlugin, parse_water, place_bodies, rect_distance_m, water_query,
+    Anchor, POINT_MAX, WaterNearPlugin, parse_water, place_bodies, rect_distance_m, water_query,
 )
+from day_plan.overpass import MIRRORS
+from day_plan.plugins.land_cover import cover_query, route_polyline
 
 DATE = datetime.date(2026, 6, 21)
 
@@ -27,6 +29,36 @@ def test_query_has_a_clause_for_the_track_and_for_each_point():
     assert "around:500,40.42,-3.75,40.43,-3.74" in ql
     assert "around:500,40.43000,-3.74000" in ql and "around:500,40.42000,-3.75000" in ql
     assert "coastline" in ql and "swimming_area" in ql and "river|canal" in ql and "out tags bb center" in ql
+    assert "[timeout:9]" in ql
+
+
+def _long_track():
+    return [(-3.75 + i * 0.0001, 40.40 + i * 0.0001 + (i % 7) * 0.00003, 0) for i in range(1000)]
+
+
+def _longest_url(ql):
+    return max(m + "?data=" + urllib.parse.quote(ql) for m in MIRRORS)
+
+
+def test_water_query_url_stays_short_enough_for_every_mirror():
+    poly = route_polyline(_long_track())
+    anchors = [Anchor("poi", "P", 40.40123 + i * 0.01, -3.74123 - i * 0.01) for i in range(POINT_MAX)]
+    ql = water_query(poly, anchors)
+    assert len(_longest_url(ql)) < 8000
+    assert ql.count(poly) == 1
+
+
+def test_cover_query_url_stays_short_enough_for_every_mirror():
+    ql = cover_query(route_polyline(_long_track()))
+    assert len(_longest_url(ql)) < 8000
+    assert "[timeout:9]" in ql
+
+
+def test_parse_ignores_matches_of_the_key_regex_that_are_not_water():
+    data = {"elements": [_el({"leisure": "water"}, (1, 1, 2, 2)), _el({"natural": "river"}, (1, 1, 2, 2)),
+                         _el({"waterway": "water"}, (1, 1, 2, 2)), _el({"leisure": "bathing_place"}, lat=1, lon=1)]}
+    bodies, coast, spots = parse_water(data)
+    assert bodies == [] and coast == [] and len(spots) == 1
 
 
 def test_rect_distance_is_zero_inside_and_grows_outside():
@@ -91,7 +123,7 @@ def test_plugin_finds_the_sea_and_the_lakes_and_caches(make_route_with_points, f
     assert section.shared["sea"]["near_kind"] in ("track", "start", "poi", "access")
     assert [b.name for b in section.shared["bodies"]] == ["Lago"]
     # Check that the point of interest is in the query (URL-encoded as part of the around clause)
-    assert "40.42800" in urllib.parse.unquote(calls[0]) and "-3.74200" in urllib.parse.unquote(calls[0])
+    assert "around:500,40.42800,-3.74200" in urllib.parse.unquote(calls[0])
     WaterNearPlugin().run(ctx, {})
     assert len(calls) == 1
 

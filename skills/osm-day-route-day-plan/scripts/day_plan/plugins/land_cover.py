@@ -46,7 +46,7 @@ def route_polyline(coords: list) -> str:
 
 
 def cover_query(poly: str) -> str:
-    return (f'[out:json][timeout:25];(nwr(around:{AROUND_M},{poly})["natural"~"^(wood|scrub|grassland|heath)$"];'
+    return (f'[out:json][timeout:9];(nwr(around:{AROUND_M},{poly})["natural"~"^(wood|scrub|grassland|heath)$"];'
             f'nwr(around:{AROUND_M},{poly})["landuse"~"^(forest|meadow|grass|farmland)$"];);out tags geom {ELEMENT_CAP};')
 
 

@@ -186,6 +186,7 @@ def test_tides_over_midnight_use_the_next_day(make_route, fixed_now):
 def test_russian(make_route, fixed_now):
     text = _run(make_route, fixed_now, _near([_body("Lago", 5.0)], sea=SEA), lang="ru").markdown
     assert "Побережье моря или океана" in text and "Приливы" in text and "у точки старта" in text
+    assert "м)" in text and " m)" not in text
 
 
 def test_truncated_overpass_adds_a_note(make_route, fixed_now):

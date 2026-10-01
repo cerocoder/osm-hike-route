@@ -17,8 +17,8 @@ POINT_MAX = 12
 ELEMENT_CAP = 800
 QUERY_VERSION = "1"
 KEEP_TAGS = ("swimming", "bathing", "access", "sport", "water", "salt")
-_FILTERS = ('["natural"~"^(water|coastline)$"]', '["waterway"~"^(river|canal)$"]',
-            '["leisure"~"^(swimming_area|bathing_place)$"]')
+# One key-regex selector per centre keeps the GET URL short; parse_water classifies the matches locally.
+_SELECTOR = '[~"^(natural|waterway|leisure)$"~"^(water|coastline|river|canal|swimming_area|bathing_place)$"]'
 
 
 @dataclass
@@ -60,8 +60,8 @@ def point_anchors(ctx) -> list:
 
 def water_query(poly: str, points: list) -> str:
     around = [f"around:{RADIUS_M},{poly}"] + [f"around:{RADIUS_M},{a.lat:.5f},{a.lon:.5f}" for a in points]
-    body = "".join(f"nwr({a}){f};" for a in around for f in _FILTERS)
-    return f"[out:json][timeout:25];({body});out tags bb center {ELEMENT_CAP};"
+    body = "".join(f"nwr({a}){_SELECTOR};" for a in around)
+    return f"[out:json][timeout:9];({body});out tags bb center {ELEMENT_CAP};"
 
 
 def _bbox(element: dict):

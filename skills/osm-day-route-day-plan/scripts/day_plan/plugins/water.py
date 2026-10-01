@@ -216,7 +216,8 @@ class WaterPlugin(SectionPlugin):
         if not events or not shown:
             return ["*" + tr("wt_tides_unavailable", lang) + "*"]
         names = tr("wt_tide_names", lang)
-        text = ", ".join(f"{names[kind]} {_clock(hours)} ({level:+.1f} m)" for kind, hours, level in events)
+        unit = tr("wt_unit_m", lang)
+        text = ", ".join(f"{names[kind]} {_clock(hours)} ({level:+.1f} {unit})" for kind, hours, level in events)
         tidal_range = max(shown) - min(shown)
         if tidal_range >= BIG_TIDE_M:
             warnings.append(PlanWarning("info", tr("wt_warn_tide", lang, range=f"{tidal_range:.1f}")))

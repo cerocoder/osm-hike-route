@@ -153,9 +153,10 @@ plugin would ignore.
   `00:20`, is read as the night after the date): the plan compares it with the
   estimated return and warns (danger if the return is later, caution if the
   margin is under 30 minutes). The same return check, and the warning that the
-  return point closes before the return, need `--start` and a route duration
-  (`duration_estimate_hours` in the route file); without them nothing is
-  compared. `--first-departure` is stored but not compared. `--first-arrival` (local
+  return point closes before the return, run on the given or recommended start
+  whenever the route has a duration (`duration_estimate_hours` in the route
+  file); without a duration (or in a polar night, when no start can be
+  recommended) nothing is compared. `--first-departure` is stored but not compared. `--first-arrival` (local
   `HH:MM`) is the time public transport first brings one to the route's start
   point: record it together with the last departure back; the recommended start
   is not earlier than it. Use `--warning

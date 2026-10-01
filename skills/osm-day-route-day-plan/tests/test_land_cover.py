@@ -22,7 +22,7 @@ def _way(kind_tag, ring):
 def test_query_is_an_around_query_on_the_polyline():
     ql = cover_query("51.45,-0.2,51.55,-0.05")
     assert "around:30,51.45,-0.2,51.55,-0.05" in ql and "wood|scrub|grassland|heath" in ql
-    assert "forest|meadow|grass|farmland" in ql and f"out tags geom {ELEMENT_CAP}" in ql
+    assert "[timeout:9]" in ql and "forest|meadow|grass|farmland" in ql and f"out tags geom {ELEMENT_CAP}" in ql
 
 
 def test_densify_samples_along_the_distance_not_per_vertex():

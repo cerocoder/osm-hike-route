@@ -25,8 +25,11 @@ def water(kind="water", dlat=0.001, detail=""):
     return OsmFeature(kind, 56.84 + dlat, 60.60, "", detail)
 
 
+FOREST = {"known": True, "forest": 0.6, "open": 0.1, "total": 0.7, "error": None}
+
+
 def run(make_route, fixed_now, weather_rows, mean=18.0, features=None, error=None, date=JULY, lang="en", facts=None,
-        coords=ROUTE, light=True, with_osm=True, folder="route"):
+        coords=ROUTE, light=True, with_osm=True, folder="route", cover=FOREST):
     route_dir = make_route(coords=coords, folder=folder)
     if facts is not None:
         (route_dir / "facts.json").write_text(json.dumps(facts), encoding="utf-8")
@@ -34,6 +37,8 @@ def run(make_route, fixed_now, weather_rows, mean=18.0, features=None, error=Non
     shared = {"weather": {"daytime_rows": weather_rows, "rows": weather_rows, "daily_mean_temp": mean}}
     if light:
         shared["light"] = {"sunrise_local_min": SUNRISE, "sunset_local_min": SUNSET}
+    if cover is not None:
+        shared["land_cover"] = cover
     if with_osm:
         shared["osm_features"] = {"features": features or [], "samples": [(c[1], c[0]) for c in ctx.coords], "error": error}
     return BioHazardsPlugin().run(ctx, shared)
@@ -168,7 +173,7 @@ def test_russian_text(make_route, fixed_now):
 
 def test_group_title_and_dependencies():
     assert BioHazardsPlugin.title_key == "hz_bio"
-    assert BioHazardsPlugin.depends_on == ("weather", "light", "osm_features")
+    assert BioHazardsPlugin.depends_on == ("weather", "light", "osm_features", "land_cover")
 
 
 MARCH = datetime.date(2026, 3, 20)
@@ -181,3 +186,45 @@ def test_no_tick_line_on_a_freezing_day_even_in_a_tick_month(make_route, fixed_n
     assert "Ticks: **high**" in mild.markdown
     chilly = run(make_route, fixed_now, rows(temp=2.0), mean=2.0, date=MARCH, folder="chilly")
     assert "Ticks: **low**" in chilly.markdown
+
+
+def test_no_forest_and_no_grass_means_no_tick_lines(make_route, fixed_now):
+    section = run(make_route, fixed_now, rows(), cover={"known": True, "forest": 0.0, "open": 0.02, "total": 0.02,
+                                                       "error": None})
+    assert "Ticks" not in section.markdown and not any("tick" in w.text.lower() for w in section.warnings)
+
+
+def test_a_beach_in_australia_has_no_tick_warning(make_route, fixed_now):
+    section = run(make_route, fixed_now, rows(), date=datetime.date(2026, 1, 15), mean=22.0,
+                  coords=((151.28, -33.89, 5.0), (151.29, -33.90, 8.0)),
+                  cover={"known": True, "forest": 0.0, "open": 0.0, "total": 0.0, "error": None})
+    assert "Ticks" not in section.markdown
+
+
+def test_forest_route_shows_the_terrain_and_a_caution(make_route, fixed_now):
+    section = run(make_route, fixed_now, rows())
+    assert "Ticks: **high**" in section.markdown
+    assert "forest ~60 %" in section.markdown and "open ground" in section.markdown and "~10 %" in section.markdown
+    assert any(w.severity == "caution" and "tick" in w.text.lower() for w in section.warnings)
+
+
+def test_unknown_terrain_keeps_the_line_with_a_note_and_only_an_info(make_route, fixed_now):
+    unknown = {"known": False, "forest": 0.0, "open": 0.0, "total": 0.0, "error": "503"}
+    for n, cover in enumerate((unknown, None)):         # Overpass failed / the plugin did not run
+        section = run(make_route, fixed_now, rows(), cover=cover, folder=f"route{n}")
+        assert "Ticks:" in section.markdown and "terrain type not determined" in section.markdown.lower()
+        tick_warnings = [w for w in section.warnings if "tick" in w.text.lower()]
+        assert tick_warnings and all(w.severity == "info" for w in tick_warnings)
+
+
+def test_regional_facts_are_still_shown_without_ticks(make_route, fixed_now):
+    facts = {"all": {"bio_hazards": {"markdown": "Paralysis ticks and snakes in the bush.",
+                                     "sources": ["https://example.org/a"]}}}
+    section = run(make_route, fixed_now, rows(), facts=facts,
+                  cover={"known": True, "forest": 0.0, "open": 0.0, "total": 0.0, "error": None})
+    assert "Paralysis ticks" in section.markdown
+
+
+def test_russian_terrain_line(make_route, fixed_now):
+    section = run(make_route, fixed_now, rows(), lang="ru")
+    assert "лес ~60 %" in section.markdown

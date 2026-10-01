@@ -19,6 +19,7 @@ from ..osm_features import near
 from .common import hour_ranges, sources_line
 
 TICK_ACTIVE_C = 5.0          # ticks become active at about +5..+7 C
+TICK_MIN_COVER = 0.05        # share of forest + open ground below which ticks are not assessed
 TICK_HOT_C = 25.0            # dry heat lowers their activity
 TICK_MONTHS = (3, 4, 5, 6, 7, 8, 9, 10, 11)      # northern hemisphere
 INSECT_MONTHS = {"mosquito": (5, 6, 7, 8, 9), "blackfly": (5, 6, 7, 8, 9), "horsefly": (6, 7, 8)}
@@ -71,7 +72,7 @@ def horsefly_band(row: dict) -> int:
 class BioHazardsPlugin(SectionPlugin):
     plugin_id = "bio_hazards"
     section_id = "hazards"
-    depends_on = ("weather", "light", "osm_features")
+    depends_on = ("weather", "light", "osm_features", "land_cover")
     title_key = "hz_bio"
 
     def run(self, ctx, shared: dict) -> Section:
@@ -84,15 +85,24 @@ class BioHazardsPlugin(SectionPlugin):
         lines, warnings = [], []
         month = ctx.date.month
 
-        # ticks
+        # ticks: only where the route runs through forest or open ground
+        cover = shared.get("land_cover") or {}
+        cover_known = bool(cover.get("known"))
         mean = weather.get("daily_mean_temp")
-        if mean is not None and mean >= 0.0 and in_season(month, TICK_MONTHS, lat):      # no tick line on a freezing day
+        terrain_ok = (not cover_known) or cover.get("total", 0.0) >= TICK_MIN_COVER
+        if mean is not None and mean >= 0.0 and in_season(month, TICK_MONTHS, lat) and terrain_ok:     # no tick line on a freezing day
             band = tick_band(mean)
             lines.append("- " + tr("bio_tick", lang, band=tr("bio_band", lang)[_BANDS[band]], temp=f"{mean:.0f}"))
+            if cover_known:
+                lines.append("  " + tr("bio_tick_terrain", lang, forest=f"{cover['forest'] * 100:.0f}",
+                                       open=f"{cover['open'] * 100:.0f}"))
+            else:
+                lines.append("  *" + tr("bio_tick_terrain_unknown", lang) + "*")
             if band >= 1:
                 lines.append("  " + tr("bio_tick_advice", lang))
             if band == 2:
-                warnings.append(PlanWarning("caution", tr("bio_warn_tick", lang, temp=f"{mean:.0f}")))
+                warnings.append(PlanWarning("caution" if cover_known else "info",
+                                            tr("bio_warn_tick", lang, temp=f"{mean:.0f}")))
 
         # biting insects
         habitat_known = bool(osm) and not osm.get("error") and osm.get("samples") is not None

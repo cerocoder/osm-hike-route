@@ -20,6 +20,9 @@ CONDITION_STRINGS = {
         "w_after_prefix": "After the finish:",
         "w_start_user": "given by you", "w_start_recommended": "recommended by the plan",
         "w_start_line": "Start **{start}** ({source}) → estimated finish **{finish}**; the rows after the finish are marked.",
+        # ticks by terrain
+        "bio_tick_terrain": "Terrain on the route: forest ~{forest} %, open ground (meadows, fields, scrub, heath) ~{open} %.",
+        "bio_tick_terrain_unknown": "Terrain type not determined (the map query failed): this tick estimate does not take vegetation into account.",
     },
     "ru": {
         "st_limits": {"sunrise": "рассвет", "start_open": "открытие точки старта",
@@ -35,6 +38,9 @@ CONDITION_STRINGS = {
         "w_after_prefix": "После финиша:",
         "w_start_user": "задан вами", "w_start_recommended": "рекомендован планом",
         "w_start_line": "Старт **{start}** ({source}) → расчётный финиш **{finish}**; строки после финиша отмечены.",
+        # ticks by terrain
+        "bio_tick_terrain": "Местность на маршруте: лес ~{forest} %, открытые места (луга, поля, кустарник, пустошь) ~{open} %.",
+        "bio_tick_terrain_unknown": "Тип местности не определён (запрос к карте не удался): оценка клещей без учёта растительности.",
     },
 }
 

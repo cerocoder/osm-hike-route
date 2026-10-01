@@ -41,7 +41,7 @@ Runs before the plugins and sets `ctx.start` (minutes after midnight, local) and
 - **Recommended** = max(earliest, 07:00) when that is ≤ latest; else earliest when ≤ latest; else the window is empty.
 - **Empty window:** a `danger` warning names the conflicting limits ("the first bus arrives at 09:10, daylight allows a start only until 08:40"); the start used is the latest daylight start.
 - **No transport fact recorded:** the plan says so ("the first/last public transport was not recorded, the transport limits are not applied") instead of silently using sunrise.
-- Polar day/night: sunrise and sunset limits are replaced by the fixed windows `weather.py` already uses; the 07:00 rule stays.
+- Polar day: there are no sunrise or sunset limits; polar night: no recommendation (the light section already warns).
 - The line in the plan: "Start: HH:MM (recommended by the plan / given by you)".
 
 ### Fact `first_arrival_local`
@@ -51,7 +51,7 @@ Runs before the plugins and sets `ctx.start` (minutes after midnight, local) and
 `light`, `transit`, `poi_hours` and `common.finish_minute` read `ctx.finish`; the "latest start" line of `light` becomes the recommendation line. Without `--start` the return checks now run on the recommended start.
 
 ### Weather (`plugins/weather.py`)
-- The shown window: the 24 hours of the date, then up to 4 hours after the finish. When the finish + 4 h passes midnight, the next day is requested too (the cache key gets the date range; one Open-Meteo request with `start_date` and `end_date`). `daytime_rows` stays as the function for the day (used by the bio plugin), the table uses the new window.
+- The shown window: the 24 hours of the date, then up to 4 hours after the finish. When the finish + 4 h passes midnight, the next day is requested too (the cache key gets the date range; a second cached per-day request). `daytime_rows` stays as the function for the day (used by the bio plugin), the table uses the new window.
 - Rows after the finish are marked "after the finish" in a column or a trailing marker; warnings (thunder, gusts, cold, heat, rain, fog) are computed on every shown hour, and a warning caused only by an after-finish hour says so.
 - A line above the table: the start and its source. Climatology source (beyond +15 days): the same, from the archive for both days.
 - `shared["rows"]`, `shared["daytime_rows"]` keep their meaning for dependent plugins; `shared["window_rows"]` is added.
@@ -61,15 +61,15 @@ Runs before the plugins and sets `ctx.start` (minutes after midnight, local) and
 ### New data-only plugin `plugins/land_cover.py` (`omit=True`)
 One Overpass query around the track (`around:30`, polyline of the route, geometry returned): `natural=wood|scrub|grassland|heath`, `landuse=forest|meadow|grass|farmland`. The kinds are one constants table. Cached for a week like the other OSM queries, run through the shared Overpass mirror health, size-capped.
 
-- Up to 300 points along the track are tested locally against the returned polygons (bounding-box prefilter first, multipolygon holes honoured).
-- Result: `shared["land_cover"] = {"share": {"forest": f, "grass": g}, "total": t, "known": True}`; `known=False` when Overpass failed.
+- Sampling is by distance (about every 100 m, at most 300 points) along the track, tested locally against the returned polygons (bounding-box prefilter first, multipolygon holes honoured).
+- Result: `shared["land_cover"] = {"share": {"forest": f, "grass": g}, "total": t, "known": True}`; `known=False` when Overpass failed or the response was truncated (element cap reached; such a result is not cached). `water_near` on a truncated response keeps the data, does not cache it and sets a `truncated` flag.
 
 ### `bio_hazards`
 - `depends_on` gains `land_cover`.
 - Total share below 5 %: no tick line, no tick warning, no tick advice. If nothing else is in the section, it is left out as today.
 - 5 % or more: the existing temperature and season logic, plus the line "forest ~N %, meadows and fields ~M % of the route"; the `caution` warning only here.
 - `known=False`: the existing line stays with "terrain type not determined, estimate without vegetation" and the warning is `info`, not `caution`.
-- Regional facts (`facts.json`, `bio_hazards`) are shown only when ticks were assessed for this route.
+- Regional facts (`facts.json`, `bio_hazards`) are shown as before: they also carry notes about animals.
 - Mosquito, blackfly and horsefly logic is unchanged.
 
 ## Part 3. Water within 500 m
@@ -85,9 +85,9 @@ One Overpass query `nwr(around:500, <track polyline and points>)` for `natural=w
   - Sea: Marine API `sea_surface_temperature` at a coastal sample; if `null`, the neighbouring grid points (four offsets) are tried; still nothing: "no data". Beyond the forecast horizon: the mean of the same date over the previous years (marked "climatology, not a forecast"). Label `derived`.
   - Lake or river: an estimate from the daily mean air temperature over the previous 14–30 days (one cached archive request), exponentially smoothed; the time constant grows with the size of the body, a river reacts faster. Label `derived`, "an estimate, the error is a few degrees". Below 4 °C: "ice is possible".
 - **Bathing:** from OSM tags (`swimming`, `bathing`, `access`, `leisure`, `sport`): allowed / forbidden / not stated, check locally. Label `tag-backed`. Water below 15 °C adds a cold-shock caution.
-- **Pollution and hazards** (currents, algae, jellyfish, crocodiles, steep banks, local bans): a new fact type `water` in `record_fact.py` (`--plugin water`, with `--warning`), filled from the web after the plan is built; no fact: "no data on pollution recorded". Label `web-sourced`.
+- **Pollution and hazards** (currents, algae, jellyfish, crocodiles, steep banks, local bans) are one block under the table (the fact belongs to the plugin, not to a body): a new fact type `water` in `record_fact.py` (`--plugin water`, with `--warning`), filled from the web after the plan is built; no fact: "no data on pollution recorded". Label `web-sourced`.
 - **Tides (sea only):** the extrema (high and low water, time and height) of `sea_level_height_msl` over the shown forecast window; label `derived`, "a guide, not a navigation table". A range of 2 m or more adds an `info` warning.
-- **Layout:** a table (water, near what, temperature, bathing, pollution and hazards), the tide block under the sea, then the list of the rest.
+- **Layout:** a table (water, near what, temperature, bathing), the pollution and hazards block under it, the tide block under the sea, then the list of the rest. A truncated `water_near` result adds the line "the list may be incomplete".
 - **Failures:** Overpass down: "water not determined" (`no-data`); Marine down: temperature "–", the rest stays. Each source is isolated like the other plugins.
 
 ## Cross-cutting

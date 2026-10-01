@@ -96,4 +96,12 @@ CONDITION_STRINGS = {
 }
 
 # plugin names for the progress lines: every language (a test requires it for every default plugin)
-CONDITION_PLUGIN_NAMES = {lang: {} for lang in ("en", "ru", "es", "fr", "de", "pt", "it")}
+CONDITION_PLUGIN_NAMES = {
+    "en": {"pl_land_cover": "Terrain (forest, grass)", "pl_water_near": "Water nearby (OSM)", "pl_water": "Water nearby"},
+    "ru": {"pl_land_cover": "Местность (лес, трава)", "pl_water_near": "Водоёмы рядом (OSM)", "pl_water": "Водоёмы рядом"},
+    "es": {"pl_land_cover": "Terreno (bosque, hierba)", "pl_water_near": "Agua cercana (OSM)", "pl_water": "Agua cercana"},
+    "fr": {"pl_land_cover": "Terrain (forêt, herbe)", "pl_water_near": "Eau à proximité (OSM)", "pl_water": "Eau à proximité"},
+    "de": {"pl_land_cover": "Gelände (Wald, Gras)", "pl_water_near": "Gewässer in der Nähe (OSM)", "pl_water": "Gewässer in der Nähe"},
+    "pt": {"pl_land_cover": "Terreno (floresta, erva)", "pl_water_near": "Água por perto (OSM)", "pl_water": "Água por perto"},
+    "it": {"pl_land_cover": "Terreno (bosco, erba)", "pl_water_near": "Acqua vicina (OSM)", "pl_water": "Acqua vicina"},
+}

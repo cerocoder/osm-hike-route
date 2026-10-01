@@ -92,8 +92,10 @@ def test_default_plan_has_getting_there_and_points_of_interest(make_route_with_p
     assert subheadings == ["### Radiation", "### Mountain hazards", "### Fire danger", "### Ticks and biting insects",
                            "### Air: pollen and pollution"]
     assert "| Lago | start |" in text and "| Museo | sight | 10:00–18:00 |" in text and "| Lago | 41 | bus |" in text
-    assert ("<!-- plugins: weather 1, light 1, osm_features 1, radiation 1, snow_history 1, trail_passability 1, transit 1, poi_hours 1, mountain 1, fire 1, "
-            "bio_hazards 1, air 1, people_hazards 1, cell_coverage 1 -->") in text
+    # land_cover, water_near and water are now registered (hence in the plugin comment)
+    assert ("<!-- plugins: weather 1, light 1, osm_features 1, land_cover 1, water_near 1, radiation 1, snow_history 1, "
+            "trail_passability 1, transit 1, poi_hours 1, mountain 1, fire 1, bio_hazards 1, water 1, air 1, "
+            "people_hazards 1, cell_coverage 1 -->") in text
 
 
 def test_hint_asks_for_web_facts_until_they_are_recorded(make_route_with_points, weather_response, fixed_now, capsys):
@@ -478,3 +480,32 @@ def test_every_default_plugin_has_a_name_in_every_language():
     for plugin in build_day_plan.default_plugins():
         for lang in LANGS:
             assert f"pl_{plugin.plugin_id}" in STRINGS[lang], (plugin.plugin_id, lang)
+
+
+def build_context_for(make_route, fixed_now):
+    from day_plan.context import build_context
+    return build_context(make_route(), datetime.date(2026, 6, 21), http=lambda u: {}, now=fixed_now)
+
+
+def test_the_new_plugins_are_registered_and_ordered():
+    ids = [p.plugin_id for p in build_day_plan.default_plugins()]
+    for new in ("land_cover", "water_near", "water"):
+        assert new in ids
+    assert ids.index("land_cover") < ids.index("bio_hazards") and ids.index("water_near") < ids.index("water")
+
+
+def test_the_water_fact_is_suggested_when_water_is_near(make_route, fixed_now):
+    from day_plan.base import Section
+    ctx = build_context_for(make_route, fixed_now)
+    result = type("R", (), {"sections": [Section("hazards", "x", "derived", shared={"water_applies": True})]})()
+    assert "water" in build_day_plan.optional_hazard_facts(ctx, result)
+    quiet = type("R", (), {"sections": [Section("hazards", "x", "derived")]})()
+    assert "water" not in build_day_plan.optional_hazard_facts(ctx, quiet)
+
+
+def test_a_whole_plan_builds_with_every_new_plugin(make_route, weather_response, fixed_now, capsys):
+    route_dir = make_route()
+    code = build_day_plan.main([str(route_dir), "2026-06-21", "--quiet"], http=lambda url: (
+        {"elements": []} if "overpass" in url else weather_response()), http_text=_text, now=fixed_now)
+    assert code == 0 and (route_dir / "day-plan-2026-06-21.md").exists()
+    assert "Recommended start" in (route_dir / "day-plan-2026-06-21.md").read_text(encoding="utf-8")

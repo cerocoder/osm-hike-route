@@ -28,6 +28,7 @@ from day_plan.plugins.air import AirPlugin
 from day_plan.plugins.bio_hazards import BioHazardsPlugin, TICK_MONTHS, in_season
 from day_plan.plugins.cell_coverage import CellCoveragePlugin
 from day_plan.plugins.fire import FirePlugin
+from day_plan.plugins.land_cover import LandCoverPlugin
 from day_plan.plugins.light import LightPlugin
 from day_plan.plugins.mountain import (
     MOUNTAIN_MIN_ELEVATION_M, MOUNTAIN_MIN_RELIEF_M, MountainPlugin, elevation_stats,
@@ -38,6 +39,8 @@ from day_plan.plugins.radiation import RadiationPlugin
 from day_plan.plugins.snow_history import SnowHistoryPlugin
 from day_plan.plugins.trail_passability import TrailPassabilityPlugin
 from day_plan.plugins.transit import TransitPlugin
+from day_plan.plugins.water import WaterPlugin
+from day_plan.plugins.water_near import WaterNearPlugin
 from day_plan.plugins.weather import WeatherPlugin
 from day_plan.progress import Progress
 from day_plan.service import build_plan
@@ -46,9 +49,10 @@ from day_plan.service import build_plan
 def default_plugins() -> list:
     # the order inside the Hazards group is the registration order: radiation first, it matters most, then the
     # passability of trails and roads
-    return [WeatherPlugin(), LightPlugin(), OsmFeaturesPlugin(), RadiationPlugin(), SnowHistoryPlugin(),
-            TrailPassabilityPlugin(), TransitPlugin(), PoiHoursPlugin(), MountainPlugin(), FirePlugin(),
-            BioHazardsPlugin(), AirPlugin(), PeopleHazardsPlugin(), CellCoveragePlugin()]
+    return [WeatherPlugin(), LightPlugin(), OsmFeaturesPlugin(), LandCoverPlugin(), WaterNearPlugin(),
+            RadiationPlugin(), SnowHistoryPlugin(), TrailPassabilityPlugin(), TransitPlugin(), PoiHoursPlugin(),
+            MountainPlugin(), FirePlugin(), BioHazardsPlugin(), WaterPlugin(), AirPlugin(), PeopleHazardsPlugin(),
+            CellCoveragePlugin()]
 
 
 def missing_web_facts(ctx) -> list:
@@ -74,6 +78,8 @@ def optional_hazard_facts(ctx, result=None) -> list:
         wanted.append("bio_hazards")
     if result is not None and any(s.shared.get("trail_applies") for s in result.sections):
         wanted.append("trail_conditions")
+    if result is not None and any(s.shared.get("water_applies") for s in result.sections):
+        wanted.append("water")
     wanted.append("people_hazards")
     return [pid for pid in wanted if lookup(ctx.facts, ctx.date_iso, pid) is None]
 
@@ -133,7 +139,8 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text, p
         missing = []
     if missing:
         print(f"hint: no web-sourced facts recorded for {', '.join(missing)} on {date.isoformat()}: search the "
-              f"web (timetables, directions from the departure point, opening days), record what you find with "
+              f"web (timetables, directions from the departure point, opening days; for transit also --first-arrival "
+              f"(the first public transport to the start point) next to --last-departure), record what you find with "
               f"record_fact.py, then run this command again"
               + (". calendar: check in the official calendar whether the date is a public holiday, a "
                  "transferred day off or a working Saturday, and record it with --plugin calendar "
@@ -147,7 +154,8 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text, p
               f"fire: forest-access and open-fire restrictions; mountain: avalanche bulletin, closed huts or passes; "
               f"bio_hazards: insect season and peaks, animals (bears, snakes, boar) and hunting; trail_conditions: "
               f"reports of the current season (forums, clubs, park administrations) on snow clearing, grooming, ice "
-              f"and closed sections; people_hazards: official travel advisories, permit or border-zone rules and "
+              f"and closed sections; water: bathing-water quality, bans on swimming, currents, algae, jellyfish and other "
+              f"dangers of the water near the route; people_hazards: official travel advisories, permit or border-zone rules and "
               f"access restrictions; record them with record_fact.py --plugin <name>")
     return 0
 

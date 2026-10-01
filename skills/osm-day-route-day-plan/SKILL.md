@@ -17,7 +17,8 @@ The plan has these sections, always in this order:
 
 1. **Summary** — the highest-severity warnings of every section.
 2. **Daylight** — sunrise, sunset, day length, margin to the route's finish.
-3. **Weather by hour** — Open-Meteo, with wind speed, direction and gusts.
+3. **Weather by hour** — Open-Meteo, with wind speed, direction and gusts. The
+   table covers the 24 hours of the date plus 4 hours after the finish.
 4. **Getting there** — the kind of day (weekday / weekend / public holiday),
    the access points and their OSM hours on the date, the public-transport
    lines serving them (OSM), and — from `facts.json` — timetables and
@@ -35,7 +36,10 @@ The plan has these sections, always in this order:
    danger** (official Fire Weather Index from the Copernicus GWIS service,
    the Russian Nesterov class for routes in Russia, active fires near the
    route), **Ticks and biting insects** (ticks, mosquitoes, blackflies and
-   midges, horseflies — estimated from weather and water nearby) and **Air:
+   midges, horseflies — estimated from weather and water nearby; the tick line
+   appears only where the route runs through forest or open ground), **Water
+   nearby** (the sea first, then the two largest bodies in detail: temperature,
+   bathing from OSM tags, tides at the sea) and **Air:
    pollen and pollution** (Open-Meteo CAMS model) and **People and access**
    (only what Claude recorded with a source: permit or border zones, travel
    advisories, access restrictions). A part that does not apply (mountains on
@@ -89,10 +93,13 @@ live navigation, multi-day plans.
    plan is embedded in `map.html`, a file meant to be forwarded, so never a
    street address. The script drops any `--departure` containing digits and
    says so on stderr.
-3. Optional `--start HH:MM` if the person gave a start time; without it the
-   plan reports the latest start that still ends 60 minutes before sunset, and
-   no return-time checks against buses or opening hours are made (they need
-   the estimated finish).
+3. Optional `--start HH:MM` if the person gave a start time. Without it the
+   plan **recommends a start** — the earliest feasible one, not earlier than
+   07:00 — from sunrise, the opening of the start point, the first public
+   transport that reaches it (`--first-arrival`), sunset, the last public
+   transport back (`--last-departure`) and the closing of the end point, and
+   uses it for the forecast window and every return check. An empty window is a
+   danger warning.
 4. Run (from this skill's `scripts/` directory):
    ```bash
    python3 build_day_plan.py <route_dir> <YYYY-MM-DD> \
@@ -127,16 +134,16 @@ never by hand-editing JSON:
 
 ```bash
 python3 record_fact.py <route_dir> --date <YYYY-MM-DD|all> \
-    --plugin <transit|poi_hours|calendar|fire|mountain|bio_hazards|air|people_hazards|trail_conditions> \
+    --plugin <transit|poi_hours|calendar|fire|mountain|bio_hazards|air|people_hazards|trail_conditions|water> \
     --markdown "text" | --markdown-file note.md \
     --source https://... [--source https://...] \
-    [--last-departure HH:MM] [--first-departure HH:MM] \
+    [--last-departure HH:MM] [--first-departure HH:MM] [--first-arrival HH:MM] \
     [--warning caution:"text"] [--day-type holiday|weekend|workday]
 ```
 
-`--last-departure`, `--first-departure` and `--warning` belong to `transit`
+`--last-departure`, `--first-departure`, `--first-arrival` and `--warning` belong to `transit`
 (`--warning` also to `poi_hours`, `fire`, `mountain`, `bio_hazards`, `air`,
-`people_hazards` and `trail_conditions`); `--day-type` belongs to `calendar`. The helper refuses an option the
+`people_hazards`, `trail_conditions` and `water`); `--day-type` belongs to `calendar`. The helper refuses an option the
 plugin would ignore.
 
 - `--plugin transit`: timetables and **directions from the departure point**
@@ -148,7 +155,10 @@ plugin would ignore.
   margin is under 30 minutes). The same return check, and the warning that the
   return point closes before the return, need `--start` and a route duration
   (`duration_estimate_hours` in the route file); without them nothing is
-  compared. `--first-departure` is stored but not compared. Use `--warning
+  compared. `--first-departure` is stored but not compared. `--first-arrival` (local
+  `HH:MM`) is the time public transport first brings one to the route's start
+  point: record it together with the last departure back; the recommended start
+  is not earlier than it. Use `--warning
   severity:text` (`danger|caution|info`) for anything the person must see in
   the Summary (works, replacement buses, closed stations).
 - `--plugin poi_hours`: opening days and special features of the points of
@@ -188,6 +198,10 @@ plugin would ignore.
   personal details. The text appears under the passability section, labelled
   web-sourced, next to the computed verdict and **never changes it**; it is
   shown even when the computation found nothing to report.
+- `--plugin water`: pollution, bathing-water quality, bans and dangers of the
+  water within 500 m (currents, algae, jellyfish, crocodiles, steep banks);
+  `--warning` is allowed. The script prints a `hint (optional)` for it when
+  water lies near the route.
 - Every fact needs at least one `http(s)` source, or it is refused (and, if
   found in the file, ignored). Say only what the source says.
 - **Privacy:** facts end up in `day-plan-<date>.md`, embedded in a `map.html`

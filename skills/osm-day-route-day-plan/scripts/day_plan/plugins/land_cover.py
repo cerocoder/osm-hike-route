@@ -45,9 +45,24 @@ def route_polyline(coords: list) -> str:
     return ",".join(f"{lat:.5f},{lon:.5f}" for lat, lon in route_samples(coords, POLYLINE_MAX))
 
 
+def polyline_bbox(poly: str, extra_points=(), margin_m: float = 600.0) -> str:
+    """`south,west,north,east` of a polyline string ("lat,lon,lat,lon,...") and of extra (lat, lon) points, widened
+    by `margin_m`: the box of an Overpass `[bbox:...]` setting."""
+    numbers = [float(x) for x in poly.split(",")]
+    lats = numbers[0::2] + [lat for lat, _ in extra_points]
+    lons = numbers[1::2] + [lon for _, lon in extra_points]
+    lat_margin = margin_m / 111000.0
+    lon_margin = margin_m / (111000.0 * max(0.2, math.cos(math.radians((min(lats) + max(lats)) / 2))))
+    return f"{min(lats) - lat_margin:.5f},{min(lons) - lon_margin:.5f},{max(lats) + lat_margin:.5f},{max(lons) + lon_margin:.5f}"
+
+
 def cover_query(poly: str) -> str:
-    return (f'[out:json][timeout:9];(nwr(around:{AROUND_M},{poly})["natural"~"^(wood|scrub|grassland|heath)$"];'
-            f'nwr(around:{AROUND_M},{poly})["landuse"~"^(forest|meadow|grass|farmland)$"];);out tags geom {ELEMENT_CAP};')
+    """Exact tag values are selected inside the bbox of the track (served by the tag index), and only that small set
+    is filtered by distance to the track. A regex selector, or `around` on every tag clause, made the query so slow in
+    a dense town that it timed out on the public servers."""
+    selectors = "".join(f'nwr["{key}"="{value}"];' for (key, value) in COVER_KINDS)
+    return (f"[out:json][timeout:9][bbox:{polyline_bbox(poly, margin_m=AROUND_M + 50)}];({selectors})->.c;"
+            f"nwr.c(around:{AROUND_M},{poly});out tags geom {ELEMENT_CAP};")
 
 
 def densify(coords: list, step_m: float = SAMPLE_STEP_M, max_points: int = SAMPLE_MAX) -> list:

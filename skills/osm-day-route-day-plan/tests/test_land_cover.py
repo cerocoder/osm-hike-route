@@ -19,10 +19,15 @@ def _way(kind_tag, ring):
     return {"type": "way", "id": 1, "tags": kind_tag, "geometry": ring}
 
 
-def test_query_is_an_around_query_on_the_polyline():
+def test_cover_query_selects_exact_tags_in_a_bbox_then_filters_by_around():
     ql = cover_query("51.45,-0.2,51.55,-0.05")
-    assert "around:30,51.45,-0.2,51.55,-0.05" in ql and "wood|scrub|grassland|heath" in ql
-    assert "[timeout:9]" in ql and "forest|meadow|grass|farmland" in ql and f"out tags geom {ELEMENT_CAP}" in ql
+    assert "[~" not in ql and 'nwr["natural"~' not in ql                # indexed exact values, no regex selectors
+    assert "[bbox:" in ql
+    for selector in ('["natural"="wood"]', '["natural"="scrub"]', '["natural"="grassland"]', '["natural"="heath"]',
+                     '["landuse"="forest"]', '["landuse"="meadow"]', '["landuse"="grass"]', '["landuse"="farmland"]'):
+        assert "nwr" + selector in ql
+    assert "nwr.c(around:30,51.45,-0.2,51.55,-0.05)" in ql
+    assert "[timeout:9]" in ql and f"out tags geom {ELEMENT_CAP}" in ql
 
 
 def test_densify_samples_along_the_distance_not_per_vertex():

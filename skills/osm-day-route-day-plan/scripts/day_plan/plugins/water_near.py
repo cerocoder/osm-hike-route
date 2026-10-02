@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass
 from ..base import Section, SectionPlugin
 from ..osm_features import haversine_m, route_samples
 from ..overpass import EMPTY_TTL_S, ROUTES_TTL_S, OverpassError, run
-from .land_cover import route_polyline
+from .land_cover import polyline_bbox, route_polyline
 
 RADIUS_M = 500
 POINT_MAX = 12
@@ -18,7 +18,9 @@ ELEMENT_CAP = 800
 QUERY_VERSION = "1"
 KEEP_TAGS = ("swimming", "bathing", "access", "sport", "water", "salt")
 # One key-regex selector per centre keeps the GET URL short; parse_water classifies the matches locally.
-_SELECTOR = '[~"^(natural|waterway|leisure)$"~"^(water|coastline|river|canal|swimming_area|bathing_place)$"]'
+# exact (tag, value) pairs: indexed on the server; see water_query
+_WATER_TAGS = (("natural", "water"), ("natural", "coastline"), ("waterway", "river"), ("waterway", "canal"),
+               ("leisure", "swimming_area"), ("leisure", "bathing_place"))
 
 
 @dataclass
@@ -59,9 +61,14 @@ def point_anchors(ctx) -> list:
 
 
 def water_query(poly: str, points: list) -> str:
-    around = [f"around:{RADIUS_M},{poly}"] + [f"around:{RADIUS_M},{a.lat:.5f},{a.lon:.5f}" for a in points]
-    body = "".join(f"nwr({a}){_SELECTOR};" for a in around)
-    return f"[out:json][timeout:9];({body});out tags bb center {ELEMENT_CAP};"
+    """Exact tag values are selected inside the bbox of the route (served by the tag index), then that small set is
+    filtered by distance to the track and to each point. A key-regex selector cannot use the index and timed out in a
+    dense town on every public mirror; `around` repeated per tag clause also made the URL too long (HTTP 414)."""
+    selectors = "".join(f'nwr["{key}"="{value}"];' for key, value in _WATER_TAGS)
+    box = polyline_bbox(poly, [(a.lat, a.lon) for a in points], margin_m=RADIUS_M + 100)
+    around = f"nwr.w(around:{RADIUS_M},{poly});" + "".join(
+        f"nwr.w(around:{RADIUS_M},{a.lat:.5f},{a.lon:.5f});" for a in points)
+    return f"[out:json][timeout:9][bbox:{box}];({selectors})->.w;({around});out tags bb center {ELEMENT_CAP};"
 
 
 def _bbox(element: dict):

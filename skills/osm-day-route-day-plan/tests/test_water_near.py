@@ -1,3 +1,4 @@
+import re
 import datetime
 import urllib.parse
 
@@ -23,13 +24,27 @@ def _el(tags, bounds=None, lat=None, lon=None, type_="way"):
     return element
 
 
-def test_query_has_a_clause_for_the_track_and_for_each_point():
+def test_query_selects_by_exact_tag_in_a_bbox_then_filters_by_around():
+    """Root cause of the "read operation timed out" report: a key-regex selector cannot use the tag index and
+    timed out in a dense town. The query must select exact tag values inside a bbox (indexed) and only then apply
+    `around` to that small set."""
     points = [Anchor("poi", "Viewpoint", 40.43, -3.74), Anchor("start", "Cercedilla", 40.42, -3.75)]
     ql = water_query("40.42,-3.75,40.43,-3.74", points)
-    assert "around:500,40.42,-3.75,40.43,-3.74" in ql
-    assert "around:500,40.43000,-3.74000" in ql and "around:500,40.42000,-3.75000" in ql
-    assert "coastline" in ql and "swimming_area" in ql and "river|canal" in ql and "out tags bb center" in ql
-    assert "[timeout:9]" in ql
+    assert "[~" not in ql                                              # no key-regex selector
+    south, west, north, east = [float(x) for x in re.search(r"\[bbox:([^\]]+)\]", ql).group(1).split(",")]
+    assert 40.41 < south < 40.42 and 40.43 < north < 40.44 and -3.77 < west < -3.75 and -3.74 < east < -3.72
+    for selector in ('["natural"="water"]', '["natural"="coastline"]', '["waterway"="river"]',
+                     '["waterway"="canal"]', '["leisure"="swimming_area"]', '["leisure"="bathing_place"]'):
+        assert "nwr" + selector in ql
+    assert "nwr.w(around:500,40.42,-3.75,40.43,-3.74)" in ql           # the track
+    assert "nwr.w(around:500,40.43000,-3.74000)" in ql and "nwr.w(around:500,40.42000,-3.75000)" in ql
+    assert "out tags bb center" in ql and "[timeout:9]" in ql
+
+
+def test_the_bbox_covers_points_outside_the_track():
+    ql = water_query("40.42,-3.75,40.43,-3.74", [Anchor("poi", "Far", 40.60, -3.50)])
+    south, west, north, east = [float(x) for x in re.search(r"\[bbox:([^\]]+)\]", ql).group(1).split(",")]
+    assert south < 40.42 and north > 40.60 and west < -3.75 and east > -3.50
 
 
 def _long_track():
@@ -46,6 +61,7 @@ def test_water_query_url_stays_short_enough_for_every_mirror():
     ql = water_query(poly, anchors)
     assert len(_longest_url(ql)) < 8000
     assert ql.count(poly) == 1
+    assert len(_longest_url(ql)) < 5000                                # one polyline, no repeated filters
 
 
 def test_cover_query_url_stays_short_enough_for_every_mirror():
@@ -123,7 +139,7 @@ def test_plugin_finds_the_sea_and_the_lakes_and_caches(make_route_with_points, f
     assert section.shared["sea"]["near_kind"] in ("track", "start", "poi", "access")
     assert [b.name for b in section.shared["bodies"]] == ["Lago"]
     # Check that the point of interest is in the query (URL-encoded as part of the around clause)
-    assert "around:500,40.42800,-3.74200" in urllib.parse.unquote(calls[0])
+    assert "nwr.w(around:500,40.42800,-3.74200)" in urllib.parse.unquote(calls[0])
     WaterNearPlugin().run(ctx, {})
     assert len(calls) == 1
 

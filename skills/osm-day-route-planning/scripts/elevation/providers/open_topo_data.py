@@ -9,6 +9,7 @@ _USER_AGENT = "osm-day-route-planning/1.0 (elevation lookup)"
 
 class OpenTopoDataProvider(ElevationProvider):
     provider_id = "open_topo_data"
+    host = "api.opentopodata.org"
     max_batch = 100
     rate_limit_per_sec = 1.0
     dataset = "srtm90m"

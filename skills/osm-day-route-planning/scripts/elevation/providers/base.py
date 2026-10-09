@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 
 class ElevationProvider(ABC):
     provider_id: str
+    host: str
     max_batch: int
     rate_limit_per_sec: float
 

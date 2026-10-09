@@ -11,6 +11,7 @@ import math
 import re
 from collections import defaultdict
 
+import runlog
 from overpass_query import haversine, query_overpass
 from progress import NullProgress
 
@@ -191,21 +192,22 @@ def load_tracks(candidates: list, cache_dir=None, progress=None, batch: int = GE
     groups = [candidates[i:i + batch] for i in range(0, len(candidates), batch)]
     state = {"failures": 0}
     loaded, lost = [], 0
-    for number, group in enumerate(groups, 1):
-        by_id, lost_here = _fetch_group(group, options, state)
-        progress.tick(number, len(groups), "public_geometry_batch")
-        lost += lost_here
-        for candidate in group:
-            element = by_id.get(candidate["id"])
-            if element is None:
-                continue
-            ways = _member_ways(element)
-            if not ways:
-                members = element.get("members") or []
-                if not any(m.get("type") == "relation" or m.get("role", "") in SKIP_ROLES for m in members):
-                    lost += 1
-                continue
-            loaded.append({**candidate, **build_track(ways)})
+    with runlog.http_series("public_geometry"):
+        for number, group in enumerate(groups, 1):
+            by_id, lost_here = _fetch_group(group, options, state)
+            progress.tick(number, len(groups), "public_geometry_batch")
+            lost += lost_here
+            for candidate in group:
+                element = by_id.get(candidate["id"])
+                if element is None:
+                    continue
+                ways = _member_ways(element)
+                if not ways:
+                    members = element.get("members") or []
+                    if not any(m.get("type") == "relation" or m.get("role", "") in SKIP_ROLES for m in members):
+                        lost += 1
+                    continue
+                loaded.append({**candidate, **build_track(ways)})
     return loaded, lost
 
 

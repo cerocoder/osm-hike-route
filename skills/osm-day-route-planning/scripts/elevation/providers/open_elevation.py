@@ -11,6 +11,7 @@ class OpenElevationProvider(ElevationProvider):
     """Least reliable of the four (known public-instance outages) — kept
     last in ElevationService's failover order, see spec §3.8."""
     provider_id = "open_elevation"
+    host = "api.open-elevation.com"
     max_batch = 100
     rate_limit_per_sec = 1.0
     dataset = "srtm"

@@ -9,6 +9,7 @@ _USER_AGENT = "osm-day-route-planning/1.0 (elevation lookup)"
 
 class OpenMeteoProvider(ElevationProvider):
     provider_id = "open_meteo"
+    host = "api.open-meteo.com"
     max_batch = 100
     rate_limit_per_sec = 5.0
     dataset = "copernicus_glo90"

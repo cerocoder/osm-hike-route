@@ -9,6 +9,7 @@ Usage:
 Or import:
     from overpass_query import query_overpass, route_length_m
 """
+import contextlib
 import hashlib
 import json
 import math
@@ -19,6 +20,8 @@ import time
 import urllib.request
 import urllib.parse
 from pathlib import Path
+
+import runlog
 
 ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
@@ -95,36 +98,45 @@ def query_overpass(ql: str, timeout: int = 90, retries: int = 2, cache_dir=None,
     if cache_path is not None and not refresh:
         cached = _read_cache(cache_path, max_age_s)
         if cached is not None:
+            runlog.current().cache("overpass", "hit", age_s=int(cached[1]))
             if progress is not None:
                 progress.note("overpass_cache_hit", age=int(cached[1] // 3600))
             return cached[0]
+    if cache_path is not None:
+        runlog.current().cache("overpass", "miss")
     body = urllib.parse.urlencode({"data": ql}).encode()
     last_error = None
-    for endpoint_index, endpoint in enumerate(ENDPOINTS):
-        for attempt in range(retries):
-            if progress is not None and (endpoint_index, attempt) != (0, 0):
-                progress.note("overpass_attempt", endpoint=_host(endpoint), n=attempt + 1, m=retries)
-            try:
-                req = urllib.request.Request(endpoint, data=body, headers=HEADERS)
-                with urllib.request.urlopen(req, timeout=timeout) as resp:
-                    raw = resp.read()
-                    if resp.status != 200:
-                        last_error = f"{endpoint}: HTTP {resp.status}"
-                        continue
-                    text = raw.decode("utf-8", errors="replace")
-                    if "runtime error" in text.lower() or "timeout" in text.lower() and text.lstrip().startswith("<"):
-                        last_error = f"{endpoint}: server-side timeout/error body"
-                        time.sleep(2)
-                        continue
-                    result = json.loads(text)
+    # a caller's own series (public_geometry) already covers these requests: no second, nested "overpass" series
+    outer = getattr(runlog.current(), "_series", None)
+    with (contextlib.nullcontext() if outer else runlog.http_series("overpass")):
+        for endpoint_index, endpoint in enumerate(ENDPOINTS):
+            for attempt in range(retries):
+                if progress is not None and (endpoint_index, attempt) != (0, 0):
+                    progress.note("overpass_attempt", endpoint=_host(endpoint), n=attempt + 1, m=retries)
+                try:
+                    req = urllib.request.Request(endpoint, data=body, headers=HEADERS)
+                    with runlog.http_call(endpoint, attempt=attempt + 1) as call:
+                        with urllib.request.urlopen(req, timeout=timeout) as resp:
+                            raw = resp.read()
+                            call.set(status=resp.status, nbytes=len(raw))
+                            if resp.status != 200:
+                                last_error = f"{endpoint}: HTTP {resp.status}"
+                                continue
+                            text = raw.decode("utf-8", errors="replace")
+                            if "runtime error" in text.lower() or "timeout" in text.lower() and text.lstrip().startswith("<"):
+                                call.set(ok=False)
+                                last_error = f"{endpoint}: server-side timeout/error body"
+                                time.sleep(2)
+                                continue
+                            result = json.loads(text)
                     if cache_path is not None:
                         _write_cache(cache_path, result)
                     return result
-            except Exception as e:
-                last_error = f"{endpoint}: {e}"
-                if progress is not None:
-                    progress.warn("overpass_failed", endpoint=_host(endpoint), reason=" ".join(str(e).split())[:80])
-                time.sleep(2)
+                except Exception as e:
+                    last_error = f"{endpoint}: {e}"
+                    if progress is not None:
+                        progress.warn("overpass_failed", endpoint=_host(endpoint), reason=" ".join(str(e).split())[:80])
+                    time.sleep(2)
     raise RuntimeError(f"Overpass query failed on all endpoints/attempts: {last_error}")
 
 

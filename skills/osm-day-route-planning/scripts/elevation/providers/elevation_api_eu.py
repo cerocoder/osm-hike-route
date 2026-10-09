@@ -10,6 +10,7 @@ _USER_AGENT = "osm-day-route-planning/1.0 (elevation lookup)"
 
 class ElevationApiEuProvider(ElevationProvider):
     provider_id = "elevation_api_eu"
+    host = "www.elevation-api.eu"
     max_batch = 100  # not documented by the provider — treated conservatively, see spec §3.8
     rate_limit_per_sec = 10.0
     dataset = "copernicus"

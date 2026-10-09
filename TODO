@@ -1,0 +1,7 @@
+
+1. [done] Why we don't account these types of objects:
+   The walk preset didn't include unclassified, service, tertiary, pedestrian and steps (e.g. 1000 Steps),
+   so they never reached the graph. Added to presets/walk.json (secondary stays avoidance-only).
+
+2. [done] Should these types: steps, service, unclassified and pedestrian be available for walk?
+   Yes, plus tertiary. The near-highway penalty is kept.

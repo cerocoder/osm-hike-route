@@ -26,21 +26,23 @@ Long planning runs show the user nothing but Claude Code's "Running… N min". `
 |---|---|
 | `run_start` | `tool`, `argv`, `python`, `platform`, `version` |
 | `span_start` / `span_end` | `span`; end adds `dur`, `ok`, `error` (one line) |
-| `http` | `host`, `path` (no query string, no keys), `status`, `bytes`, `attempt`, `cache` (`hit`/`miss`/null), `t_sent`, `t_answer`, `dur` (= `t_answer - t_sent`: from sending the request to receiving the answer, for every single request, retries included as separate events) |
+| `http` | `host`, `path` (no query string, no keys), `status`, `bytes`, `attempt`, `ok`, `error` (one line, null on success), `series` (name of the innermost enclosing series, or null), `cache` (`hit`/`miss`/null), `t_sent`, `t_answer`, `dur` (= `t_answer - t_sent`: from sending the request to receiving the answer, for every single request, retries included as separate events) |
 | `http_series` | `series` (name, e.g. `elevation_batches`), `n` (requests), `ok`, `failed`, `t_first_sent`, `t_last_answer`, `dur` (= `t_last_answer - t_first_sent`: wall time from the first request of the series to the last answer, including pauses between requests such as the 1 req/s rate limit), `sum_dur` (sum of the single `dur`s), `bytes` |
 | `cache` | `kind`, `result` (`hit`/`miss`/`stale`), `age_s` |
 | `metric` | `name`, `value` (counts: edges, points, batches) |
-| `warn` / `error` | `msg`; error adds `traceback` |
+| `note` | `key` (message key, not the translated text), `params` — written by `Progress.note` |
+| `warn` / `error` | `msg`; error adds `traceback`. `warn` from `Progress` carries `msg` = the message key plus `params` |
 | `run_end` | `dur`, `ok` |
 
 - **Request timing rule:** every request is logged with the total time from sending to answer; every series of requests (elevation batches, geometry batches, the plugin's several calls, Overpass attempts across mirrors) also gets one `http_series` event with the total time from the start of the series to the last answer. `RunLog.http_series(name)` is a context manager; single `http` events inside it are tagged with `series`. A request that fails or times out still gets `t_sent`, `t_answer` (the moment of the failure) and `dur`. Time spent waiting between requests (rate limit, backoff) is visible as `dur - sum_dur`.
+- `RunLog.start(folder, tool, argv=None, …)` creates the log (it is the constructor; `close()` or `with RunLog.start(…) as log:` ends it); `RunLog.in_series()` is the public accessor telling whether a series is open.
 - `RunLog.span(name)` is a context manager; spans nest (a thread-local-free stack: the pipeline is sequential).
 - A write failure disables the log for the rest of the run and never raises (same rule as `Progress._emit`).
 - `NullRunLog` is the default everywhere.
 
 ## 2. Wiring
 
-- `Progress(..., runlog=None)`: `step` opens/closes a span, `tick` writes a `metric` (rate-limited like the console line), `note`/`warn` write `cache`/`warn` events keyed by the message key (not the translated text). Existing call sites and signatures do not change.
+- `Progress(..., runlog=None)`: `step` opens/closes a span, `tick` writes a `metric` (rate-limited like the console line), `note`/`warn` write `note`/`warn` events keyed by the message key (not the translated text). Existing call sites and signatures do not change.
 - HTTP: the day plan's `http.py` and the planner's Overpass and elevation transports go through one wrapper that times the call and emits `http` (retries are separate events with `attempt`). Plugins are untouched.
 - `run_plugins` already opens one step per plugin, so each plugin becomes a span for free.
 - `build_day_plan.main` creates the `RunLog` (CLI only; `--quiet` does not silence the log; `--no-log` does). Library callers and tests get `NullRunLog`.

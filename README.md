@@ -130,6 +130,16 @@ Each route gets its own folder, `routes/<place>-<date>/`:
 | `day-plan-<YYYY-MM-DD>.md` | A day plan for one date (daylight, hourly weather, transport, opening hours). One file per planned date. |
 | `facts.json` | Web-sourced facts Claude recorded for your day plans (timetables, directions, opening days), each with its sources. |
 | `map.html` | The rendered map (after the show step); contains every day plan. |
+| `plan-<time>.log.jsonl`, `day-plan-<time>.log.jsonl` | Run logs (newest 20 kept): every step and HTTP request with its timing. |
+
+### Run log and live status
+
+Every planning and day-plan run writes a run log into the route folder (`routes/<place>-<date>/plan-<time>.log.jsonl`,
+`day-plan-<time>.log.jsonl`; `--no-log` on the day plan turns it off). `python3 skills/osm-day-route-planning/scripts/log_report.py <log>`
+prints where the time went: a span tree, the slowest spans, HTTP requests per host and per series, cache hits and warnings.
+While a run is alive, `skills/osm-day-route-planning/scripts/statusline.py` can show its progress in the Claude Code
+status line (terminal CLI only). It is optional and never configured for you; to enable it, add to your `settings.json`:
+`"statusLine": {"type": "command", "command": "python3 <path>/skills/osm-day-route-planning/scripts/statusline.py --fallback '<your current statusline command>'"}`.
 
 ## Usage examples
 

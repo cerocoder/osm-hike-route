@@ -406,6 +406,7 @@ that directory is on `sys.path` (see `tests/conftest.py` for the exact
 one-liner used in this skill's own test suite):
 
 ```python
+import sys
 from pathlib import Path
 
 from overpass_query import query_overpass, haversine        # noqa: F401 (imported by route_graph)
@@ -425,10 +426,13 @@ from elevation.providers.open_elevation import OpenElevationProvider
 from duration import estimate_duration_hours, duration_warning
 from route_output import build_geojson
 from progress import Progress
+from runlog import RunLog
 
 # Console progress, in the USER'S language (en ru es fr de pt it; English for any other): one line per step, plain
 # lines without a terminal, sub-progress only for slow steps. Pass `progress` to the functions below that accept it.
-progress = Progress(total_steps=5, lang=user_lang)        # user_lang: the language of the conversation / notes.md
+route_dir = Path("routes") / f"{slug}-{date}"          # resolved/created BEFORE the first step (pipeline step 2)
+log = RunLog.start(route_dir, "plan", argv=sys.argv)   # <route_dir>/plan-<UTC time>.log.jsonl + the live status file
+progress = Progress(total_steps=5, lang=user_lang, runlog=log)   # user_lang: the language of the conversation / notes.md
 
 preset = load_preset(mode, style)                 # e.g. load_preset("bike", "leisure")
 weights = build_weights(preset, preference_overrides, max_distance_km, max_duration_hours)
@@ -525,6 +529,7 @@ tag_grades(graph, node_coords, elevations)          # mutates graph in place: gr
 preferences = {**weights["preferences"], "gradient_threshold_pct": weights["gradient_threshold_pct"]}
 with progress.step("routing"):
     path, cost = weighted_shortest_path(graph, start_node_id, end_node_id, preferences)
+log.close()  # also on failure: wrap the pipeline in `with RunLog.start(...) as log:` if the script can raise
 ```
 
 **Progress output.** Every long step reports to the user, in the user's language (`Progress(lang=...)`: the
@@ -532,9 +537,17 @@ language of the conversation; the wording lives in `progress.py`'s catalogue, ne
 accept `progress=` are `fetch_area_data`, `query_overpass`, `tag_edges`, `ElevationService.get_elevations`,
 `select_optional_points` and `route_through_waypoints` (they tick the step that is running; wrap them in their own
 `progress.step("optional")` / `progress.step("routing")` and raise `total_steps` accordingly, or the counter reads
-`[6/5]`). Run the planning script so that its
-output reaches the user while it works: a script whose step may take more than 30 s (Overpass, the first elevation
-fetch of an area) is started in the background with its output written to a log that is then followed. When
+`[6/5]`). **Run log and live progress.** A planning script is always started in the background (`Bash` with
+`run_in_background`), because the Bash tool does not stream a running command's output to the user. Two things make the
+run visible: (1) the **run log** `routes/<slug>-<date>/plan-<time>.log.jsonl` (every step, every HTTP request with its
+send→answer time, every series of requests with first-sent→last-answer time, cache hits, warnings); read it with
+`python3 scripts/log_report.py <log>` for a tree of where the time went. (2) The **statusline**: while the script
+runs, `scripts/statusline.py` shows `🥾 [3/9] <step> 41/91 · 1:20 · total 4:05` instead of the normal status line and
+the normal line returns when the run ends. It works only in the terminal CLI. Setup is the user's decision, one entry
+in their `settings.json` (offer it, never write it unasked):
+`"statusLine": {"type": "command", "command": "python3 <path to this skill>/scripts/statusline.py --fallback '<their current statusline command>'"}`.
+When asked "why was it slow?", run `log_report.py` on the latest log of the route instead of guessing.
+When
 Overpass answered from `routes/.cache` (its line says how old the answer is), a user who suspects stale data gets
 `refresh=True`.
 
@@ -620,6 +633,7 @@ routes/
     route.geojson      # geometry + waypoints — COMPUTED OUTPUTS (route_output.build_geojson)
     weights.json        # merged preset + overrides + budget — INPUTS (weights_io.save_weights)
     requests.md          # verbatim request journal, one block per iteration (requests_log.append_request)
+    plan-<time>.log.jsonl     # run log (log_report.py reads it); the newest 20 per folder are kept
     notes.md              # location, preferences used, why segments were
                            # chosen, confidence caveats for each interest layer,
                            # access-point recommendation, curated-routes count, date

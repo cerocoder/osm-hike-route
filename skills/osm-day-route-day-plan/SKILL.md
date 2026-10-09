@@ -104,11 +104,16 @@ live navigation, multi-day plans.
    ```bash
    python3 build_day_plan.py <route_dir> <YYYY-MM-DD> \
        --lang <ISO 639-1 of the person's language> \
-       [--departure "<city or station>"] [--start HH:MM] [--quiet]
+       [--departure "<city or station>"] [--start HH:MM] [--quiet] [--no-log]
    ```
    While it runs, each part (weather, daylight, hazards …) prints a start line
    `[k/n] <name> …` and an end line with how long it took or why it failed, to
-   stderr **in the `--lang` language**; `--quiet` switches that off. Re-running for the same date overwrites that date's file; other dates are
+   stderr **in the `--lang` language**; `--quiet` switches that off.
+   The run also writes `<route_dir>/day-plan-<UTC time>.log.jsonl` (every plugin as a span, every HTTP request with its
+   send→answer time, per-plugin series times); `--no-log` switches the log and the live status file off, `--quiet` only
+   the stderr lines. Run it in the background and, for "why is it slow", read the log with
+   `python3 ../osm-day-route-planning/scripts/log_report.py <log>`. While it runs, the user's statusline (see the
+   planning skill) shows the current plugin. Re-running for the same date overwrites that date's file; other dates are
    kept. Network results are cached in `<route_dir>/day_plan_cache.json`
    (forecasts 3 hours, Overpass lines 7 days, holiday lists 30 days, the
    route's country for good).

@@ -112,7 +112,7 @@ live navigation, multi-day plans.
    The run also writes `<route_dir>/day-plan-<UTC time>.log.jsonl` (every plugin as a span, every HTTP request with its
    send→answer time, per-plugin series times); `--no-log` switches the log and the live status file off, `--quiet` only
    the stderr lines. Run it in the background and, for "why is it slow", read the log with
-   `python3 ../osm-day-route-planning/scripts/log_report.py <log>`. While it runs, the user's statusline (see the
+   `python3 ../../osm-day-route-planning/scripts/log_report.py <log>`. While it runs, the user's statusline (see the
    planning skill) shows the current plugin. Re-running for the same date overwrites that date's file; other dates are
    kept. Network results are cached in `<route_dir>/day_plan_cache.json`
    (forecasts 3 hours, Overpass lines 7 days, holiday lists 30 days, the

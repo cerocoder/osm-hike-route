@@ -547,8 +547,7 @@ the normal line returns when the run ends. It works only in the terminal CLI. Se
 in their `settings.json` (offer it, never write it unasked):
 `"statusLine": {"type": "command", "command": "python3 <path to this skill>/scripts/statusline.py --fallback '<their current statusline command>'"}`.
 When asked "why was it slow?", run `log_report.py` on the latest log of the route instead of guessing.
-When
-Overpass answered from `routes/.cache` (its line says how old the answer is), a user who suspects stale data gets
+When Overpass answered from `routes/.cache` (its line says how old the answer is), a user who suspects stale data gets
 `refresh=True`.
 
 **Do not paste an elevation-wiring version that calls `get_elevations` once

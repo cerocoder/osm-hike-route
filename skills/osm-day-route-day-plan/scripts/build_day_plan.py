@@ -3,10 +3,10 @@
 
 Standard-library only. Usage:
     python3 build_day_plan.py <route_dir> <YYYY-MM-DD>
-        [--lang <ISO 639-1>] [--departure "<city or station>"] [--start HH:MM] [--quiet]
+        [--lang <ISO 639-1>] [--departure "<city or station>"] [--start HH:MM] [--quiet] [--no-log]
 
 Progress (one line per plugin, in the --lang language, on stderr) is printed when run from the command line;
---quiet switches it off. Library callers and tests get none unless they pass `progress`.
+--quiet switches it off. A run log is written next to the route unless --no-log is given. Library callers and tests get none unless they pass `progress`.
 
 --departure is written into the file, and the file is meant to be forwarded
 (it is embedded in map.html), so pass a city, station or stop — never a street

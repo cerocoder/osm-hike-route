@@ -1,4 +1,5 @@
 import io
+import json
 import re
 from pathlib import Path
 
@@ -237,3 +238,86 @@ def test_the_public_route_steps_exist_and_a_russian_run_has_no_english_words():
     text = stream.getvalue()
     assert "найдено 12, дальних (многодневных) пропущено 3" in text and "подходят 7, показано 7" in text
     assert not re.search(r"\b(Public|routes|geometry|found|match|shown|key points|elevations)\b", text)
+
+
+# ---- forwarding to a run log ----------------------------------------------------------------------------------------------
+
+class _Rec:
+    def __init__(self):
+        self.calls = []
+
+    def __getattr__(self, name):
+        return lambda *a, **k: self.calls.append((name, a))
+
+
+def _p(rec, **kw):
+    return pr.Progress(total_steps=3, lang="ru", stream=io.StringIO(), runlog=rec, **kw)
+
+
+def test_a_step_is_forwarded_with_its_localized_title_and_counter():
+    rec = _Rec()
+    with _p(rec).step("graph") as step:
+        step.detail("graph_done", nodes=1, edges=2)
+    assert rec.calls[0] == ("step_start", ("graph", "Граф дорог", 1, 3, "ru"))
+    assert rec.calls[-1] == ("step_end", (True, None, "1 вершин, 2 рёбер"))
+
+
+def test_the_span_name_can_differ_from_the_message_key():
+    rec = _Rec()
+    with _p(rec).step("plugin", text="Погода", span="plugin.weather"):
+        pass
+    assert rec.calls[0] == ("step_start", ("plugin.weather", "Погода", 1, 3, "ru"))
+
+
+def test_a_failed_or_raising_step_is_forwarded_as_not_ok():
+    rec = _Rec()
+    with _p(rec).step("graph") as step:
+        step.fail("HTTP 503")
+    assert rec.calls[-1] == ("step_end", (False, "HTTP 503", None))
+    rec2 = _Rec()
+    with pytest.raises(ValueError):
+        with _p(rec2).step("graph"):
+            raise ValueError("bad")
+    assert rec2.calls[-1] == ("step_end", (False, "ValueError: bad", None))
+
+
+def test_ticks_notes_and_warnings_are_forwarded_with_their_keys():
+    rec = _Rec()
+    progress = _p(rec)
+    progress.tick(5, 10, "tag_progress")
+    progress.note("overpass_cache_hit", age=3)
+    progress.warn("overpass_failed", endpoint="h", reason="504")
+    assert ("progress_tick", (5, 10, "tag_progress")) in rec.calls
+    assert ("message", ("note", "overpass_cache_hit", {"age": 3})) in rec.calls
+    assert ("message", ("warn", "overpass_failed", {"endpoint": "h", "reason": "504"})) in rec.calls
+
+
+def test_a_run_log_that_raises_never_breaks_progress():
+    class Boom:
+        def __getattr__(self, name):
+            def fail(*a, **k):
+                raise RuntimeError("log is broken")
+            return fail
+
+    out = io.StringIO()
+    progress = pr.Progress(total_steps=1, lang="en", stream=out, runlog=Boom())
+    with progress.step("graph"):
+        progress.tick(1, 2)
+        progress.note("overpass_cache_hit", age=1)
+    assert "[1/1]" in out.getvalue()
+
+
+def test_status_total_exists_in_every_language():
+    assert set(pr.MESSAGES["status_total"]) == set(pr.LANGS)
+
+
+def test_a_real_run_log_receives_the_steps(tmp_path):
+    import runlog
+    log = runlog.RunLog.start(tmp_path, "plan", heartbeat=False, install_as_current=False, status_dir=tmp_path / "s")
+    progress = pr.Progress(total_steps=1, lang="de", stream=io.StringIO(), runlog=log)
+    with progress.step("graph"):
+        pass
+    log.close()
+    lines = [json.loads(l) for l in log.path.read_text(encoding="utf-8").splitlines()]
+    start = next(e for e in lines if e["ev"] == "span_start")
+    assert start["span"] == "graph" and start["title"] == "Wegegraph"

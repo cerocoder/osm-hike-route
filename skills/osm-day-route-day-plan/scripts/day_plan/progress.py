@@ -29,6 +29,7 @@ def _m(en, ru, es, fr, de, pt, it):
 
 MESSAGES = {
     "unit_s": _m("s", "с", "s", "s", "s", "s", "s"),
+    "status_total": _m("total", "всего", "total", "total", "gesamt", "total", "totale"),
     # planner steps
     "overpass": _m("Overpass query", "Запрос к Overpass", "Consulta a Overpass", "Requête Overpass",
                    "Overpass-Abfrage", "Consulta ao Overpass", "Interrogazione Overpass"),
@@ -167,7 +168,7 @@ class NullProgress:
 
 class Progress:
     def __init__(self, total_steps=None, lang="en", stream=None, clock=time.monotonic, tty=None, color=None,
-                 tick_interval=TICK_INTERVAL_S):
+                 tick_interval=TICK_INTERVAL_S, runlog=None):
         self.total_steps = total_steps
         self.lang = lang if lang in LANGS else "en"
         self.stream = stream if stream is not None else sys.stderr
@@ -194,6 +195,7 @@ class Progress:
         self._current = None
         self._last_tick = None
         self._live = False                                      # a tick line is on screen (terminal only)
+        self._log = runlog                                      # optional RunLog; every call into it is guarded
 
     # ---- output helpers -------------------------------------------------------------------------------------------
     def _paint(self, text: str, code: str) -> str:
@@ -209,6 +211,15 @@ class Progress:
             self.stream.flush()
         except Exception:  # noqa: BLE001 — progress is decoration, never a failure of the work it reports on
             self._broken = True
+
+    def _to_log(self, name, *args) -> None:
+        """Forward to the run log. A log that raises is dropped; progress never fails because of it."""
+        if self._log is None:
+            return
+        try:
+            getattr(self._log, name)(*args)
+        except Exception:  # noqa: BLE001 — the log is decoration like the console lines
+            self._log = None
 
     def _write(self, line: str) -> None:
         if self._live:
@@ -226,14 +237,16 @@ class Progress:
         return _translate(key, self.lang, **shown).replace(_NBSP, self._nbsp)
 
     # ---- steps ----------------------------------------------------------------------------------------------------
-    def step(self, key: str, text: str | None = None, **params):
+    def step(self, key: str, text: str | None = None, span: str | None = None, **params):
         """Context manager for one pipeline step. `text` replaces the catalogue title (a caller-localized name,
-        e.g. a section heading); otherwise the title is MESSAGES[key]."""
-        return _Step(self, key, text, params)
+        e.g. a section heading); otherwise the title is MESSAGES[key]. `span` names the step in the run log
+        (default: the message key)."""
+        return _Step(self, key, text, params, span)
 
     def tick(self, done, total, key: str = "tag_progress", **params) -> None:
         """Sub-progress of the current step: MESSAGES[key] gets done/total. Without a terminal at most one line
         every `tick_interval` seconds (and never for a step that finishes quickly)."""
+        self._to_log("progress_tick", done, total, key)
         now = self._clock()
         percent = int(100 * done / total) if total else 100
         message = f"{self._dots} {self._text(key, dict(params, done=done, total=total))} ({percent} %)"
@@ -252,16 +265,19 @@ class Progress:
             self._current.detail_text = self._text(key, params)
 
     def note(self, key: str, **params) -> None:
+        self._to_log("message", "note", key, params)
         self._write(f"      {self._dot} {self._text(key, params)}")
 
     def warn(self, key: str, **params) -> None:
+        self._to_log("message", "warn", key, params)
         self._write("  " + self._paint("!", "33") + f" {self._text(key, params)}")
 
 
 class _Step:
-    def __init__(self, progress, key, text, params):
+    def __init__(self, progress, key, text, params, span=None):
         self.p = progress
         self.key, self.text, self.params = key, text, params
+        self.span = span or key
         self.detail_text = None
         self.failure = None
         self.started = 0.0
@@ -274,6 +290,7 @@ class _Step:
         title = self.text if self.text is not None else p._text(self.key, self.params)
         counter = f"[{p._count}/{p.total_steps}]" if p.total_steps else f"[{p._count}]"
         p._write(f"{counter} {title} {p._dots}")
+        p._to_log("step_start", self.span, title, p._count, p.total_steps, p.lang)
         self.started = p._clock()
         return self
 
@@ -292,10 +309,13 @@ class _Step:
         if exc_type is not None:
             reason = " ".join(f"{exc_type.__name__}: {exc}".split())
             p._write("      " + p._paint(p._bad, "31") + f" {seconds} {p._dot} {reason}")
+            p._to_log("step_end", False, reason, None)
         elif self.failure is not None:
             p._write("      " + p._paint(p._bad, "31") + f" {seconds} {p._dot} {self.failure}")
+            p._to_log("step_end", False, self.failure, None)
         else:
             extra = f" {p._dot} {self.detail_text}" if self.detail_text else ""
             p._write("      " + p._paint(p._ok, "32") + f" {seconds}{extra}")
+            p._to_log("step_end", True, None, self.detail_text)
         p._current = None
         return False

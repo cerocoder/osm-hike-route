@@ -26,9 +26,11 @@ Long planning runs show the user nothing but Claude Code's "Running… N min". `
 |---|---|
 | `run_start` | `tool`, `argv`, `python`, `platform`, `version` |
 | `span_start` / `span_end` | `span`; end adds `dur`, `ok`, `error` (one line) |
-| `http` | `host`, `path` (no query string, no keys), `status`, `bytes`, `attempt`, `ok`, `error` (one line, null on success), `series` (name of the innermost enclosing series, or null), `cache` (`hit`/`miss`/null), `t_sent`, `t_answer`, `dur` (= `t_answer - t_sent`: from sending the request to receiving the answer, for every single request, retries included as separate events) |
+| `http` | `host`, `path` (no query string, no keys), `status`, `bytes`, `attempt` (the retry round when the caller knows it, e.g. the Overpass mirror set; otherwise 1), `ok`, `error` (one line, null on success), `series` (name of the innermost enclosing series, or null), `cache` (`hit`/`miss`/null), `t_sent`, `t_answer`, `dur` (= `t_answer - t_sent`: from sending the request to receiving the answer, for every single request, retries included as separate events) |
 | `http_series` | `series` (name, e.g. `elevation_batches`), `n` (requests), `ok`, `failed`, `t_first_sent`, `t_last_answer`, `dur` (= `t_last_answer - t_first_sent`: wall time from the first request of the series to the last answer, including pauses between requests such as the 1 req/s rate limit), `sum_dur` (sum of the single `dur`s), `bytes` |
-| `cache` | `kind`, `result` (`hit`/`miss`/`stale`), `age_s` |
+| `cache` | `kind`, `result` (`hit`/`miss`/`stale`), `age_s` (day-plan: every `JsonCache.get_entry` lookup, `kind` = first part of the key) |
+| `plugin_result` | day-plan, inside the plugin's span: `plugin`, `outcome` (`ok` / `no-data` = ran but has nothing to show / `failed` = raised), `source` (`network` / `cache` / `mixed` / `local`, from what the span did), `reason` (one line, when known), counts `http_ok`, `http_failed`, `cache_hit`, `cache_miss`, `cache_stale` (only non-zero ones) |
+| `overpass` | day-plan, one per query: `ok`, `tries` (mirror requests), `mirror` and `elements` on success, `error` on failure, `ql_bytes`, `timeout_s` and `bbox_km2` when the query has `[timeout:]` / `[bbox:]` |
 | `metric` | `name`, `done`, `total` (progress ticks; `RunLog.metric()` writes `name`, `value` for plain counts: edges, points, batches) |
 | `note` | `key` (message key, not the translated text), `params` — written by `Progress.note` |
 | `warn` / `error` | `msg`; error adds `traceback`. `warn` from `Progress` carries `msg` = the message key plus `params` |
@@ -56,12 +58,12 @@ Long planning runs show the user nothing but Claude Code's "Running… N min". `
   - **a skill is running** (a status file whose pid is alive and whose heartbeat is younger than 30 s): prints only the progress line, e.g. `🥾 [3/9] Высоты 41/91 · 1:20 · всего 4:05`; the normal line is **not** shown;
   - **nothing is running:** runs the user's normal statusline command, passing the same stdin through, and prints its output unchanged. The normal command comes from `--fallback "<command>"` (for this user: `npx -y ccusage@latest statusline`). Without `--fallback`, it prints nothing. A failing or slow (> 2 s) fallback prints nothing and never breaks the line.
   - The moment the run ends (status file removed or stale), the next refresh returns the normal line; no cleanup is needed in `settings.json`.
-- Installation is a manual `statusLine` entry in the user's `settings.json`, e.g. `"command": "python3 <plugin>/skills/osm-day-route-planning/scripts/statusline.py --fallback 'npx -y ccusage@latest statusline'"`; the skill documents it, and the agent adds it only on the user's request. (The ccusage entry removed from `settings.json` on 2026-10-09 is restored this way.)
+- Installation is a manual `statusLine` entry in the user's `settings.json`, e.g. `"command": "python3 <plugin>/skills/osm-day-route-planning/scripts/statusline.py --fallback 'npx -y ccusage@latest statusline'"`; since 2026-10-09 the agent installs it itself, once, with `statusline.py --install` (see `2026-10-09-adhoc-run-log-and-statusline-install-design.md`). (The ccusage entry removed from `settings.json` on 2026-10-09 is restored this way.)
 - Limits: terminal CLI only; the statusline refreshes on Claude Code's own cadence, so a few seconds of lag is expected.
 
 ## 4. `log_report.py <log.jsonl>` (planning skill scripts)
 
-Prints: total time and outcome; span tree with `dur` and share of the parent; top 10 longest spans; HTTP summary per host (requests, retries, total/max single time, bytes) and per series (wall time first-sent → last-answer, sum of single times, waiting share); cache hit rate; all `warn`/`error` events. Plain text, English.
+Prints: total time and outcome; span tree with `dur` and share of the run (plugins with `no-data`/`failed` outcome marked, and the time outside any top-level span); a plugins table (outcome, data source, HTTP and cache use); one line per Overpass query; top 10 longest spans; HTTP summary per host (requests, retries, total/max single time, bytes) and per series (wall time first-sent → last-answer, sum of single times, waiting share); cache hits, misses and stale entries per kind; all `warn`/`error` events. Plain text, English.
 
 ## 5. SKILL.md changes
 

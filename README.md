@@ -130,16 +130,21 @@ Each route gets its own folder, `routes/<place>-<date>/`:
 | `day-plan-<YYYY-MM-DD>.md` | A day plan for one date (daylight, hourly weather, transport, opening hours). One file per planned date. |
 | `facts.json` | Web-sourced facts Claude recorded for your day plans (timetables, directions, opening days), each with its sources. |
 | `map.html` | The rendered map (after the show step); contains every day plan. |
-| `plan-<time>.log.jsonl`, `day-plan-<time>.log.jsonl` | Run logs (newest 20 kept): every step and HTTP request with its timing. |
+| `plan-<time>.log.jsonl`, `day-plan-<time>.log.jsonl`, `adhoc-<time>.log.jsonl` | Run logs (newest 20 kept): every step and HTTP request with its timing. |
 
 ### Run log and live status
 
 Every planning and day-plan run writes a run log into the route folder (`routes/<place>-<date>/plan-<time>.log.jsonl`,
 `day-plan-<time>.log.jsonl`; `--no-log` on the day plan turns it off). `python3 skills/osm-day-route-planning/scripts/log_report.py <log>`
 prints where the time went: a span tree, the slowest spans, HTTP requests per host and per series, cache hits and warnings.
-While a run is alive, `skills/osm-day-route-planning/scripts/statusline.py` can show its progress in the Claude Code
-status line (terminal CLI only). It is optional and never configured for you; to enable it, add to your `settings.json`:
-`"statusLine": {"type": "command", "command": "python3 <path>/skills/osm-day-route-planning/scripts/statusline.py --fallback '<your current statusline command>'"}`.
+Scripts that never started a log themselves (throw-away fetch scripts) still get an `adhoc` one at their first Overpass or
+elevation call: in `$OSM_HIKE_ROUTE_DIR` if set, else in `routes/.logs/` (`OSM_HIKE_NO_LOG=1` turns it off).
+
+While a run is alive, `skills/osm-day-route-planning/scripts/statusline.py` shows its progress in the Claude Code status
+line (terminal CLI only; a run without steps shows its latest request, e.g. `🥾 adhoc · overpass-api.de #7 4✗ · 0:45`).
+`python3 skills/osm-day-route-planning/scripts/statusline.py --check` tells whether it is installed in `settings.json`, `--install`
+installs it (your current statusline stays as `--fallback`; a `settings.json.bak-<time>` copy is kept). The skill runs
+`--install` itself, once, before its first network script.
 
 ## Usage examples
 

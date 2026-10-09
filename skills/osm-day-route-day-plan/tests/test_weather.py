@@ -5,7 +5,7 @@ import pytest
 from day_plan.context import build_context
 from day_plan.http import HttpError
 from day_plan.plugins.weather import (
-    WeatherPlugin, average_rows, choose_source, daytime_rows, parse_hourly, render_table, utc_offset_for,
+    WeatherPlugin, average_rows, choose_source, daytime_rows, mark_daylight, parse_hourly, render_table, utc_offset_for,
     warnings_for,
 )
 
@@ -161,6 +161,16 @@ def test_precipitation_probability_is_shown_in_parentheses(weather_response):
     assert "1.5 (80)" in render_table(rows[10:11], "en")
 
 
+def test_precipitation_pictogram_levels():
+    from day_plan.plugins.weather import _precip_icon
+    row = lambda precip, code=61: {"precip": precip, "code": code}
+    assert _precip_icon(row(0.0)) == ""
+    assert [_precip_icon(row(v)) for v in (0.3, 3.0, 9.0)] == ["💧", "💧💧", "💧💧💧"]
+    assert _precip_icon({"precip": 0.3, "code": 3, "temp": -4.0}) == "❄️"
+    assert _precip_icon({"precip": 0.3, "code": 3, "temp": 6.0}) == "💧"
+    assert [_precip_icon(row(v, 73)) for v in (0.3, 1.0, 2.0)] == ["❄️", "❄️❄️", "❄️❄️❄️"]
+
+
 def test_thunderstorm_is_danger(weather_response):
     rows = parse_hourly(weather_response(weather_code={14: 95}))
     warnings = warnings_for(rows, "en", "forecast")
@@ -282,8 +292,8 @@ def test_plugin_table_covers_hours_walked_after_sunset(make_route, fixed_now, we
     ctx = build_context(make_route(duration_hours=6.0), datetime.date(2026, 6, 21), start_time=dt.time(17, 0),
                         http=lambda u: weather_response(), now=fixed_now)
     section = WeatherPlugin().run(ctx, {})
-    assert "| 22:00 |" in section.markdown   # finish 23:00 -> 23 shown too
-    assert "| 23:00 |" in section.markdown
+    assert "22:00 |" in section.markdown   # finish 23:00 -> 23 shown too
+    assert "23:00 |" in section.markdown
 
 
 def test_num_never_prints_negative_zero():
@@ -339,8 +349,8 @@ def test_plugin_shows_the_whole_day_and_four_hours_after_midnight(make_route, fi
                         http=http, now=fixed_now)
     section = WeatherPlugin().run(ctx, {})
     assert len(urls) == 2
-    assert "| 00:00 |" in section.markdown and "| 23:00 |" in section.markdown
-    assert "| 03:00 (+1) |" in section.markdown and "| 04:00 (+1) |" not in section.markdown
+    assert "00:00 |" in section.markdown and "23:00 |" in section.markdown
+    assert "03:00 (+1) |" in section.markdown and "04:00 (+1) |" not in section.markdown
     assert "After finish" in section.markdown and "given by you" in section.markdown
     assert len(section.shared["window_rows"]) == 28
     assert section.shared["rows"][0]["hour"] == 0 and len(section.shared["rows"]) == 24
@@ -393,3 +403,9 @@ def test_russian_start_line(make_route, fixed_now, weather_response):
                         start_time=dt.time(9, 0), http=lambda u: weather_response(), now=fixed_now)
     ctx.start_source = "recommended"
     assert "рекомендован планом" in WeatherPlugin().run(ctx, {}).markdown
+
+
+def test_table_marks_night_and_day_hours_with_a_pictogram(weather_response):
+    rows = mark_daylight(parse_hourly(weather_response()), datetime.date(2026, 6, 21), 50.0, 14.0, 7200)
+    table = render_table(rows, "en")
+    assert "🌙 03:00 |" in table and "☀️ 12:00 |" in table and "🌙 23:00 |" in table

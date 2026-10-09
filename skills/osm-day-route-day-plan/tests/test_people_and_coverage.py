@@ -4,7 +4,7 @@ import json
 from day_plan.context import build_context
 from day_plan.http import HttpError
 from day_plan.osm_features import OsmFeature
-from day_plan.plugins.cell_coverage import CellCoveragePlugin, nperf_url
+from day_plan.plugins.cell_coverage import CellCoveragePlugin, nperf_url, opencellid_url
 from day_plan.plugins.people_hazards import PeopleHazardsPlugin
 
 DATE = datetime.date(2026, 7, 4)
@@ -74,7 +74,7 @@ def test_the_caveat_the_advice_and_the_map_links_are_always_there(make_route, fi
     md = section.markdown
     assert "a missing mast does not mean there is no signal" in md and "Coverage is not measured here." in md
     assert "Download offline maps and the GPX track" in md and "112" in md
-    assert "[nPerf](https://www.nperf.com/en/map)" in md and "[OpenCellID](https://opencellid.org/)" in md
+    assert "[nPerf](https://www.nperf.com/en/map?ll=" in md and "[OpenCellID](https://opencellid.org/#zoom=14&lat=" in md
 
 
 def test_no_mast_recorded_is_only_an_info_warning(make_route, fixed_now):
@@ -98,18 +98,28 @@ def test_a_missing_osm_plugin_is_handled(make_route, fixed_now):
 
 def test_the_nperf_link_is_country_specific_when_the_country_is_known(make_route, fixed_now):
     section, ctx = coverage(make_route, fixed_now, features=[mast(0.0)], country="ru")
-    assert "[nPerf](https://www.nperf.com/en/map/RU/-/-/signal)" in section.markdown
-    assert nperf_url(ctx) == "https://www.nperf.com/en/map/RU/-/-/signal"
+    assert "[nPerf](https://www.nperf.com/en/map/RU/-/-/signal?ll=" in section.markdown
+    assert nperf_url(ctx).startswith("https://www.nperf.com/en/map/RU/-/-/signal?ll=")
 
 
 def test_a_failing_country_lookup_falls_back_to_the_global_map(make_route, fixed_now):
     def broken(url):
         raise HttpError("503")
     ctx = build_context(make_route(), DATE, http=broken, now=fixed_now)
-    assert nperf_url(ctx) == "https://www.nperf.com/en/map"
+    assert nperf_url(ctx).startswith("https://www.nperf.com/en/map?ll=")
 
 
 def test_russian_text(make_route, fixed_now):
     section, _ = coverage(make_route, fixed_now, features=[mast(0.5)], lang="ru")
     assert "В OpenStreetMap нет вышек сотовой связи в радиусе 5 км от маршрута." in section.markdown
     assert "112 — номер экстренных служб" in section.markdown and "Покрытие здесь не измеряется." in section.markdown
+
+
+def test_the_opencellid_link_is_centred_on_the_start(make_route, fixed_now):
+    ctx = build_context(make_route(), DATE, http=lambda url: {}, now=fixed_now)
+    url = opencellid_url(ctx)
+    lon, lat = ctx.coords[0][0], ctx.coords[0][1]
+    if ctx.access_points:
+        start = ([p for p in ctx.access_points if p.role == "start"] or ctx.access_points)[0]
+        lat, lon = start.lat, start.lon
+    assert url == f"https://opencellid.org/#zoom=14&lat={lat:.5f}&lon={lon:.5f}"

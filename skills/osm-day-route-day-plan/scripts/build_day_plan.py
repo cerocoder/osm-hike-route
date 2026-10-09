@@ -44,6 +44,7 @@ from day_plan.plugins.water import WaterPlugin
 from day_plan.plugins.water_near import WaterNearPlugin
 from day_plan.plugins.weather import WeatherPlugin
 from day_plan.progress import Progress
+from day_plan import runlog
 from day_plan.runlog import RunLog
 from day_plan.service import build_plan
 
@@ -157,12 +158,14 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text, p
     try:
         result = build_plan(ctx, plugin_list, progress)
         out = route_dir / f"day-plan-{date.isoformat()}.md"
-        out.write_text(result.markdown, encoding="utf-8")
+        with runlog.span("write"):
+            out.write_text(result.markdown, encoding="utf-8")
         print(f"wrote {out.resolve()}")
         for plugin_id, reason in result.failures:
             print(f"warning: plugin {plugin_id} failed: {reason}", file=sys.stderr)
         try:
-            missing = missing_web_facts(ctx)
+            with runlog.span("hints"):
+                missing = missing_web_facts(ctx)
         except Exception:  # noqa: BLE001 — a hint must never turn a written plan into a failure
             missing = []
         if missing:
@@ -174,7 +177,8 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text, p
                      "transferred day off or a working Saturday, and record it with --plugin calendar "
                      "--day-type ..." if "calendar" in missing else ""))
         try:
-            optional = optional_hazard_facts(ctx, result)
+            with runlog.span("hints_optional"):
+                optional = optional_hazard_facts(ctx, result)
         except Exception:  # noqa: BLE001 — a hint must never turn a written plan into a failure
             optional = []
         if optional:

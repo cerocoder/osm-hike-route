@@ -62,6 +62,26 @@ def _plugin_name(plugin, lang: str) -> str:
     return tr(key, lang) if key in STRINGS["en"] else plugin.plugin_id
 
 
+def _degraded_reason(section) -> str | None:
+    error = section.shared.get("error") if isinstance(section.shared, dict) else None
+    return _one_line(error) if isinstance(error, str) and error else None
+
+
+def _log_outcome(plugin, before: dict, outcome: str, reason=None) -> None:
+    """One `plugin_result` event inside the plugin's span: what came of it (ok, no-data = ran but has nothing to show,
+    failed = raised) and where the data came from, by what the span did on the network and in the cache."""
+    try:
+        after = runlog.snapshot()
+        used = {k: after.get(k, 0) - before.get(k, 0) for k in after}
+        network = used.get("http_ok", 0) + used.get("http_failed", 0) > 0
+        cache = used.get("cache_hit", 0) > 0
+        source = "mixed" if network and cache else "network" if network else "cache" if cache else "local"
+        runlog.event("plugin_result", plugin=plugin.plugin_id, outcome=outcome, source=source, reason=reason,
+                     **{k: v for k, v in used.items() if v})
+    except Exception:  # noqa: BLE001 — the log is decoration
+        pass
+
+
 def run_plugins(ctx, plugins: list, progress=None):
     """Returns (sections_in_registration_order, shared, failures). `progress` (optional, see progress.py) gets one
     step per plugin: its name in the user's language, then how long it took or why it failed."""
@@ -69,7 +89,8 @@ def run_plugins(ctx, plugins: list, progress=None):
     progress = progress or NullProgress()
     ctx.progress = progress                     # plugins that wait on a network (Overpass) say why it takes long
     try:
-        resolve_start(ctx)
+        with runlog.span("resolve_start"):       # the weather, geocoding and holiday lookups behind the start time
+            resolve_start(ctx)
     except Exception:  # noqa: BLE001 — a recommendation must never stop the plan
         pass
     shared, failures, by_id = {}, [], {}
@@ -78,6 +99,7 @@ def run_plugins(ctx, plugins: list, progress=None):
             deps = {d: shared[d] for d in plugin.depends_on if d in shared}
             with progress.step("plugin", text=_plugin_name(plugin, ctx.lang), span=plugin.plugin_id) as step, \
                     runlog.http_series(f"plugins.{plugin.plugin_id}"):
+                before = runlog.snapshot()
                 try:
                     section = plugin.run(ctx, deps)
                 except Exception as e:  # noqa: BLE001 — isolate any plugin failure
@@ -85,8 +107,11 @@ def run_plugins(ctx, plugins: list, progress=None):
                     failures.append((plugin.plugin_id, reason))
                     step.fail(reason)
                     section = Section(plugin.section_id, tr("plugin_failed", ctx.lang, reason=reason), "no-data")
+                    _log_outcome(plugin, before, "failed", reason)
                 else:
                     shared[plugin.plugin_id] = section.shared
+                    _log_outcome(plugin, before, "no-data" if section.confidence == "no-data" else "ok",
+                                 _degraded_reason(section) if section.confidence == "no-data" else None)
             if section.title is None and plugin.title_key:
                 section.title = tr(plugin.title_key, ctx.lang)
             by_id[plugin.plugin_id] = section
@@ -143,10 +168,12 @@ def assemble_markdown(ctx, sections: list, summary: Section, fetched_at: datetim
 def build_plan(ctx, plugins: list, progress=None) -> PlanResult:
     sections, shared, failures = run_plugins(ctx, plugins, progress)
     try:
-        summary = build_summary_section(sections, ctx.lang)
+        with runlog.span("summary"):
+            summary = build_summary_section(sections, ctx.lang)
     except Exception as e:  # noqa: BLE001 — the summary is outside run_plugins' isolation
         failures.append(("summary", _one_line(f"{type(e).__name__}: {e}")))
         summary = Section("summary", "- " + tr("summary_unavailable", ctx.lang), "derived")
-    markdown = assemble_markdown(ctx, sections, summary, _fetched_at(ctx, shared),
-                                 (shared.get("weather") or {}).get("utc_offset_seconds"), plugins)
+    with runlog.span("assemble"):
+        markdown = assemble_markdown(ctx, sections, summary, _fetched_at(ctx, shared),
+                                     (shared.get("weather") or {}).get("utc_offset_seconds"), plugins)
     return PlanResult(markdown=markdown, sections=sections, failures=failures)

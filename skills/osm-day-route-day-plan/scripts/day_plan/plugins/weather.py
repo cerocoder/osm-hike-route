@@ -234,6 +234,22 @@ def trip_rows(window: list, day_rows: list, start_min, finish_min) -> tuple:
     return trip or day_rows, post
 
 
+def mark_daylight(rows: list[dict], date: datetime.date, lat: float, lon: float,
+                  utc_offset_seconds: float | None) -> list[dict]:
+    """Copies of the rows with `night` (the middle of the hour is before sunrise or after sunset)."""
+    offset_min = (utc_offset_seconds if utc_offset_seconds is not None else round(lon / 15.0 * 2) / 2 * 3600) / 60.0
+    out = []
+    for row in rows:
+        sun = sun_times(date + datetime.timedelta(days=row.get("day", 0)), lat, lon)
+        if sun.kind == "normal":
+            middle = row["hour"] * 60 + 30
+            night = not (sun.sunrise_utc_min + offset_min <= middle <= sun.sunset_utc_min + offset_min)
+        else:
+            night = sun.kind == "polar_night"
+        out.append({**row, "night": night})
+    return out
+
+
 def _sky_key(code) -> str:
     if code is None:
         return "sky_unknown"
@@ -272,11 +288,31 @@ def _wind_cell(row: dict, lang: str) -> str:
     return f"{row['wind']:.1f} {label} ({row['wdir']:.0f}°)" if label else f"{row['wind']:.1f}"
 
 
+_SNOW_CODES = (71, 73, 75, 77, 85, 86)
+SNOW_TEMP_C = 0.5          # at or below this the precipitation is drawn as snow whatever the (climate-averaged) code says
+
+
+def _precip_icon(row: dict) -> str:
+    """Pictogram of the precipitation: 💧 rain or ❄️ snow, repeated 1-3 times for light / moderate / heavy
+    (snow also when the air is at or below SNOW_TEMP_C; rain: under 2.5 and 7.6 mm/h; snow, as water equivalent: under 0.5 and 1.5 mm/h). Empty when dry."""
+    precip = row["precip"]
+    if not precip or precip < 0.05:
+        return ""
+    temp = row.get("temp")
+    snow = row.get("code") in _SNOW_CODES or (temp is not None and temp <= SNOW_TEMP_C)
+    light, heavy = (0.5, 1.5) if snow else (2.5, 7.6)
+    level = 1 if precip < light else 2 if precip < heavy else 3
+    return ("❄️" if snow else "💧") * level
+
+
 def _precip_cell(row: dict) -> str:
     if row["precip"] is None:
         return "–"
     text = f"{row['precip']:.1f}"
-    return f"{text} ({row['prob']:.0f})" if row.get("prob") is not None else text
+    if row.get("prob") is not None:
+        text += f" ({row['prob']:.0f})"
+    icon = _precip_icon(row)
+    return f"{icon} {text}" if icon else text
 
 
 def render_table(rows: list[dict], lang: str) -> str:
@@ -288,6 +324,8 @@ def render_table(rows: list[dict], lang: str) -> str:
         vis_km = r["vis_m"] / 1000.0 if r.get("vis_m") is not None else None
         snow_cm = r["snow_m"] * 100.0 if r.get("snow_m") is not None else None
         hour = f"{r['hour']:02d}:00" + (" (+1)" if r.get("day") == 1 else "")
+        if "night" in r:
+            hour = ("🌙 " if r["night"] else "☀️ ") + hour
         cells = [hour, _num(r["temp"], 0), _num(r["feels"], 0), _precip_cell(r),
                  _num(r["cloud"], 0), _num(vis_km, 1), _wind_cell(r, lang), _num(r["gust"], 1),
                  _num(snow_cm, 0), tr(_sky_key(r["code"]), lang)]
@@ -364,7 +402,7 @@ class WeatherPlugin(SectionPlugin):
                 next_rows = _fetch(ctx, source, lat, lon, ctx.date + datetime.timedelta(days=1))[0]
             except (HttpError, KeyError, IndexError, ValueError, TypeError):
                 next_rows = None           # the 24 hours of the date are still shown
-        shown = window_rows(rows, next_rows, finish)
+        shown = mark_daylight(window_rows(rows, next_rows, finish), ctx.date, lat, lon, offset)
         trip, post = trip_rows(shown, day, start_min, finish)
         note_key = {"forecast": "w_source_forecast", "archive": "w_source_archive",
                     "climate": "w_source_climate"}[source]

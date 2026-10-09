@@ -128,3 +128,45 @@ def test_the_overpass_backoff_after_an_error_body_is_not_part_of_the_call(log, m
     first = next(e for e in events(log) if e["ev"] == "http")
     assert first["ok"] is False and first["dur"] == 0
     assert log.clock.t == 2
+
+
+def test_query_overpass_logs_what_the_query_asked_and_what_came_back(log, monkeypatch):
+    answers = [_Response({}, status=504), _Response({"elements": [1, 2, 3]})]
+    monkeypatch.setattr(overpass_query.urllib.request, "urlopen", lambda req, timeout=None: answers.pop(0))
+    monkeypatch.setattr(overpass_query.time, "sleep", lambda s: None)
+    ql = "[out:json][timeout:25];way(around:6000,57.0,60.0);out;"
+    overpass_query.query_overpass(ql)
+    query = next(e for e in events(log) if e["ev"] == "overpass")
+    assert query["ok"] is True and query["elements"] == 3 and query["tries"] == 2
+    assert query["timeout_s"] == 25 and query["radius_m"] == 6000 and query["ql_bytes"] == len(ql)
+
+
+def test_a_failed_query_is_logged_with_its_size(log, monkeypatch):
+    monkeypatch.setattr(overpass_query.urllib.request, "urlopen", lambda req, timeout=None: _Response({}, status=500))
+    monkeypatch.setattr(overpass_query.time, "sleep", lambda s: None)
+    with pytest.raises(RuntimeError):
+        overpass_query.query_overpass("[out:json];node(1);out;", retries=1)
+    query = next(e for e in events(log) if e["ev"] == "overpass")
+    assert query["ok"] is False and query["tries"] == len(overpass_query.ENDPOINTS) and "500" in query["error"]
+
+
+def test_a_script_without_a_log_gets_an_adhoc_one_from_the_overpass_layer(tmp_path, monkeypatch):
+    monkeypatch.delenv("OSM_HIKE_NO_LOG", raising=False)
+    monkeypatch.setattr(runlog, "_autostart_tried", False)
+    runlog.install(None)
+    monkeypatch.setattr(overpass_query.urllib.request, "urlopen", lambda req, timeout=None: _Response({"elements": []}))
+    overpass_query.query_overpass("[out:json];node(1);out;", cache_dir=tmp_path / "routes" / ".cache")
+    log = runlog.current()
+    assert isinstance(log, RunLog) and log.path.parent == tmp_path / "routes" / ".logs"
+    log.close()
+    assert any(json.loads(l)["ev"] == "overpass" for l in log.path.read_text().splitlines())
+
+
+def test_a_script_without_a_log_gets_an_adhoc_one_from_the_elevation_layer(tmp_path, monkeypatch):
+    monkeypatch.delenv("OSM_HIKE_NO_LOG", raising=False)
+    monkeypatch.setattr(runlog, "_autostart_tried", False)
+    runlog.install(None)
+    ElevationService([], cache_path=tmp_path / "routes" / ".cache" / "elevation.json").get_elevations([(1.0, 2.0)])
+    log = runlog.current()
+    assert isinstance(log, RunLog) and log.path.parent == tmp_path / "routes" / ".logs"
+    log.close()

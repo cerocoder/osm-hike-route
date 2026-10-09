@@ -4,6 +4,8 @@ import os
 import sys
 import time
 
+import pytest
+
 import statusline
 
 NOW = 1_700_000_100.0
@@ -121,3 +123,60 @@ def test_non_utf8_stdout_never_raises(tmp_path):
 
 def test_pid_alive_rejects_non_positive_pids():
     assert statusline.pid_alive(0) is False and statusline.pid_alive(-1) is False
+
+
+# ---- activity, --check / --install -----------------------------------------------------------------------------------------
+def test_a_run_without_a_step_shows_the_latest_request():
+    status = {"tool": "adhoc", "activity": "overpass-api.de #7 4✗", "activity_started": 960.0, "run_started": 700.0,
+              "lang": "en"}
+    assert statusline.render(status, 1000.0) == "🥾 adhoc · overpass-api.de #7 4✗ · 0:40 · total 5:00"
+
+
+def test_a_step_wins_over_the_activity():
+    status = {"tool": "plan", "step_title": "Graph", "i": 2, "n": 5, "activity": "h #1", "run_started": 0, "lang": "en"}
+    assert statusline.render(status, 60.0).startswith("🥾 [2/5] Graph")
+
+
+def test_install_keeps_the_old_statusline_as_fallback_and_a_backup(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"model": "m", "statusLine": {"type": "command", "command": "bash my.sh", "padding": 0}}))
+    assert not statusline.check(path)
+    assert "installed" in statusline.install(path, "/skills/osm-day-route-planning/scripts/statusline.py")
+    data = json.loads(path.read_text())
+    assert data["model"] == "m" and data["statusLine"]["padding"] == 0
+    assert data["statusLine"]["command"] == ("python3 /skills/osm-day-route-planning/scripts/statusline.py "
+                                             "--fallback 'bash my.sh'")
+    assert statusline.check(path)
+    assert len(list(tmp_path.glob("settings.json.bak-*"))) == 1
+
+
+def test_install_is_idempotent(tmp_path):
+    path = tmp_path / "settings.json"
+    statusline.install(path, "/s/osm-day-route-planning/scripts/statusline.py")
+    before = path.read_text()
+    assert statusline.install(path, "/s/osm-day-route-planning/scripts/statusline.py").startswith("already installed")
+    assert path.read_text() == before
+
+
+def test_install_without_a_settings_file_or_an_old_statusline(tmp_path):
+    path = tmp_path / "new" / "settings.json"
+    statusline.install(path, "/s/osm-day-route-planning/scripts/statusline.py")
+    assert json.loads(path.read_text())["statusLine"]["command"] == "python3 /s/osm-day-route-planning/scripts/statusline.py"
+
+
+def test_install_leaves_a_broken_settings_file_alone(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text("{broken")
+    assert statusline.install(path, "/s/statusline.py").startswith("not installed")
+    assert path.read_text() == "{broken" and not list(tmp_path.glob("*.bak-*"))
+    assert not statusline.check(path)
+
+
+def test_check_and_install_flags_set_the_exit_code(tmp_path, capsys):
+    path = tmp_path / "settings.json"
+    with pytest.raises(SystemExit) as e:
+        statusline.main(["--check", "--settings", str(path)])
+    assert e.value.code == 1 and "not installed" in capsys.readouterr().out
+    assert statusline.main(["--install", "--settings", str(path)]) == 0
+    assert statusline.main(["--check", "--settings", str(path)]) == 0
+    assert "installed" in capsys.readouterr().out

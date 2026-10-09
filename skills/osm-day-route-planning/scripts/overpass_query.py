@@ -14,6 +14,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import sys
 import tempfile
 import time
@@ -86,6 +87,28 @@ def _host(endpoint: str) -> str:
     return urllib.parse.urlparse(endpoint).netloc or endpoint
 
 
+_TIMEOUT = re.compile(r"\[timeout:(\d+)\]")
+_AROUND = re.compile(r"around:(\d+)")
+_BBOX = re.compile(r"\[bbox:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)\]")
+
+
+def _query_info(ql: str) -> dict:
+    """What a query asks for, for the run log: its size, [timeout:], the largest `around:` radius and the [bbox:] area."""
+    info = {"ql_bytes": len(ql.encode("utf-8"))}
+    timeout = _TIMEOUT.search(ql)
+    if timeout:
+        info["timeout_s"] = int(timeout.group(1))
+    radii = [int(r) for r in _AROUND.findall(ql)]
+    if radii:
+        info["radius_m"] = max(radii)
+    box = _BBOX.search(ql)
+    if box:
+        south, west, north, east = (float(x) for x in box.groups())
+        info["bbox_km2"] = round(abs(north - south) * 111.0 * abs(east - west) * 111.0
+                                 * math.cos(math.radians((north + south) / 2)), 2)
+    return info
+
+
 def query_overpass(ql: str, timeout: int = 90, retries: int = 2, cache_dir=None,
                    max_age_s: float = CACHE_MAX_AGE_S, refresh: bool = False, progress=None) -> dict:
     """Run an Overpass QL query, trying each endpoint, retrying on
@@ -94,6 +117,7 @@ def query_overpass(ql: str, timeout: int = 90, retries: int = 2, cache_dir=None,
     With `cache_dir` the answer is kept in <cache_dir>/overpass/ and a fresh one (younger than `max_age_s`) is
     returned without a request; `refresh=True` skips the read. `progress` (optional: see progress.py) is told about
     a cache hit, every retry or endpoint switch and every failed attempt."""
+    runlog.ensure_started(cache_dir)                     # a script that never started a log still gets one
     cache_path = _cache_file(cache_dir, ql) if cache_dir is not None else None
     if cache_path is not None and not refresh:
         cached = _read_cache(cache_path, max_age_s)
@@ -106,10 +130,13 @@ def query_overpass(ql: str, timeout: int = 90, retries: int = 2, cache_dir=None,
         runlog.current().cache("overpass", "miss")
     body = urllib.parse.urlencode({"data": ql}).encode()
     last_error = None
+    info = _query_info(ql)
+    tries = 0
     # a caller's own series (public_geometry) already covers these requests: no second, nested "overpass" series
     with (contextlib.nullcontext() if runlog.in_series() else runlog.http_series("overpass")):
         for endpoint_index, endpoint in enumerate(ENDPOINTS):
             for attempt in range(retries):
+                tries += 1
                 if progress is not None and (endpoint_index, attempt) != (0, 0):
                     progress.note("overpass_attempt", endpoint=_host(endpoint), n=attempt + 1, m=retries)
                 try:
@@ -131,12 +158,16 @@ def query_overpass(ql: str, timeout: int = 90, retries: int = 2, cache_dir=None,
                             result = json.loads(text)
                     if cache_path is not None:
                         _write_cache(cache_path, result)
+                    elements = result.get("elements") if isinstance(result, dict) else None
+                    runlog.event("overpass", ok=True, mirror=_host(endpoint), tries=tries,
+                                 elements=len(elements) if isinstance(elements, list) else None, **info)
                     return result
                 except Exception as e:
                     last_error = f"{endpoint}: {e}"
                     if progress is not None:
                         progress.warn("overpass_failed", endpoint=_host(endpoint), reason=" ".join(str(e).split())[:80])
                     time.sleep(2)
+    runlog.event("overpass", ok=False, tries=tries, error=str(last_error)[:200], **info)
     raise RuntimeError(f"Overpass query failed on all endpoints/attempts: {last_error}")
 
 

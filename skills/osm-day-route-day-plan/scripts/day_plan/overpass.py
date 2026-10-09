@@ -6,6 +6,7 @@ import each other); measured while building this: overpass-api.de answered
 sometimes returns HTML — so a failed mirror is skipped and the whole set is
 retried once after a pause. Any failure ends as OverpassError, which the
 plugin turns into a no-data section."""
+import math
 import re
 import time
 import urllib.parse
@@ -70,14 +71,18 @@ def run(http, ql: str, mirrors=MIRRORS, retries: int = 1, sleep=None, backoff: f
     tried again."""
     sleep = sleep or _default_sleep
     last = "no mirror tried"
+    info = _query_info(ql)
+    tries = 0
     with runlog.http_series("overpass"):
         for attempt in range(retries + 1):
             order = health.ordered(mirrors) if health is not None else list(mirrors)
             if attempt and progress is not None and order:
                 progress.note("overpass_attempt", endpoint=_host(order[0]), n=attempt + 1, m=retries + 1)
             for mirror in order:
+                tries += 1
                 try:
-                    data = http(f"{mirror}?data={urllib.parse.quote(ql)}")
+                    with runlog.attempt(attempt + 1):
+                        data = http(f"{mirror}?data={urllib.parse.quote(ql)}")
                 except HttpError as e:
                     last = f"{mirror}: {e}"
                     _failed(health, progress, mirror, e)
@@ -92,10 +97,31 @@ def run(http, ql: str, mirrors=MIRRORS, retries: int = 1, sleep=None, backoff: f
                     continue
                 if health is not None:
                     health.worked(mirror)
+                runlog.event("overpass", ok=True, mirror=_host(mirror), tries=tries, elements=len(data["elements"]),
+                             **info)
                 return data
             if attempt < retries:
                 sleep(backoff * (attempt + 1))
+    runlog.event("overpass", ok=False, tries=tries, error=last[:200], **info)
     raise OverpassError(last)
+
+
+_TIMEOUT = re.compile(r"\[timeout:(\d+)\]")
+_BBOX = re.compile(r"\[bbox:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)\]")
+
+
+def _query_info(ql: str) -> dict:
+    """What a query asks for, for the run log: its size, its [timeout:] and the area of its [bbox:]."""
+    info = {"ql_bytes": len(ql.encode("utf-8"))}
+    timeout = _TIMEOUT.search(ql)
+    if timeout:
+        info["timeout_s"] = int(timeout.group(1))
+    box = _BBOX.search(ql)
+    if box:
+        south, west, north, east = (float(x) for x in box.groups())
+        info["bbox_km2"] = round(abs(north - south) * 111.0 * abs(east - west) * 111.0
+                                 * math.cos(math.radians((north + south) / 2)), 2)
+    return info
 
 
 def _failed(health, progress, mirror: str, reason) -> None:
@@ -151,11 +177,9 @@ def routes_near(ctx, lat: float, lon: float) -> list:
     """RouteInfo list for the lines through public-transport nodes near a point
     (cached 7 days in the route folder). Raises OverpassError."""
     key = f"overpass|routes|{lat:.4f}|{lon:.4f}"
-    cached = ctx.cache.get_entry(key)
+    cached = ctx.cache.get_entry(key, lambda value: ROUTES_TTL_S if value else EMPTY_TTL_S)
     if cached is not None:
-        value = cached[0]
-        if ctx.cache.get_entry(key, ROUTES_TTL_S if value else EMPTY_TTL_S) is not None:
-            return [RouteInfo(**r) for r in value]
+        return [RouteInfo(**r) for r in cached[0]]
     routes = parse_routes(run(ctx.http, routes_query(lat, lon), health=ctx.overpass_health, progress=ctx.progress))
     ctx.cache.put(key, [asdict(r) for r in routes])
     return routes

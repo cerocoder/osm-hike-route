@@ -545,9 +545,17 @@ run visible: (1) the **run log** `routes/<slug>-<date>/plan-<time>.log.jsonl` (e
 send→answer time, every series of requests with first-sent→last-answer time, cache hits, warnings); read it with
 `python3 scripts/log_report.py <log>` for a tree of where the time went. (2) The **statusline**: while the script
 runs, `scripts/statusline.py` shows `🥾 [3/9] <step> 41/91 · 1:20 · total 4:05` instead of the normal status line and
-the normal line returns when the run ends. It works only in the terminal CLI. Setup is the user's decision, one entry
-in their `settings.json` (offer it, never write it unasked):
-`"statusLine": {"type": "command", "command": "python3 <path to this skill>/scripts/statusline.py --fallback '<their current statusline command>'"}`.
+the normal line returns when the run ends. It works only in the terminal CLI. **Install it automatically, once:**
+before the first network script of a session run `python3 scripts/statusline.py --check`; on "not installed" run
+`python3 scripts/statusline.py --install` (it keeps the user's current statusline as `--fallback`, keeps a
+`settings.json.bak-<time>` copy, never touches a settings file that is not valid JSON) and tell the user in one line
+what it did.
+**Every script that touches the network is logged, a throw-away one in the scratchpad included** (tile fetches, public
+route suggestions, elevation probes): start it with `RunLog.start(route_dir, "<name>", argv=sys.argv)`, `route_dir`
+being the route folder (it exists, with `requests.md`, before the first fetch), so its log lies next to the route and
+the statusline shows it. A script without a log of its own is not silent: the first Overpass or elevation call starts an
+`adhoc` log in `$OSM_HIKE_ROUTE_DIR` if set, else in `routes/.logs/` (its `run_start` names the script and the cwd);
+set `OSM_HIKE_ROUTE_DIR=<route folder>` for such scripts so the log is filed with the route. `OSM_HIKE_NO_LOG=1` turns it off.
 When asked "why was it slow?", run `log_report.py` on the latest log of the route instead of guessing.
 When Overpass answered from `routes/.cache` (its line says how old the answer is), a user who suspects stale data gets
 `refresh=True`.

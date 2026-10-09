@@ -24,6 +24,7 @@ class ElevationService:
         """Elevation per location (None where no provider knew it). `progress` (optional, see progress.py) gets a
         tick per provider request: elevation_batch done/total (total counts the first provider's batches and grows
         if a failover needs more)."""
+        runlog.ensure_started(self._cache_path.parent)
         results: list[float | None] = [None] * len(locations)
         pending_indices = []
         for i, (lat, lon) in enumerate(locations):

@@ -504,3 +504,97 @@ def test_start_removes_stale_status_files_but_keeps_a_live_fresh_one(tmp_path):
                        wall=lambda: now)
     log.close()
     assert not stale_day.exists() and not dead.exists() and fresh.exists()
+
+
+# ---- adhoc log, activity ---------------------------------------------------------------------------------------------------
+def _fresh_autostart(monkeypatch, tmp_path, **env):
+    monkeypatch.delenv("OSM_HIKE_NO_LOG", raising=False)
+    monkeypatch.delenv("OSM_HIKE_ROUTE_DIR", raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, str(value))
+    monkeypatch.setattr(runlog, "_autostart_tried", False)
+    runlog.install(None)
+
+
+def test_ensure_started_logs_next_to_the_cache_dir_and_says_what_the_script_was(monkeypatch, tmp_path):
+    _fresh_autostart(monkeypatch, tmp_path)
+    runlog.ensure_started(tmp_path / "routes" / ".cache")
+    log = runlog.current()
+    assert isinstance(log, RunLog) and log.path.parent == tmp_path / "routes" / ".logs"
+    with runlog.http_call("https://h.example/p?key=SECRET") as call:
+        call.set(status=200)
+    log.close()
+    events = [json.loads(x) for x in log.path.read_text().splitlines()]
+    assert events[0]["tool"] == "adhoc" and events[0]["adhoc"] is True and events[0]["cwd"] and events[0]["script"]
+    assert events[-1]["ev"] == "run_end" and "SECRET" not in log.path.read_text()
+
+
+def test_ensure_started_prefers_the_route_dir_from_the_environment(monkeypatch, tmp_path):
+    _fresh_autostart(monkeypatch, tmp_path, OSM_HIKE_ROUTE_DIR=tmp_path / "my-route")
+    runlog.ensure_started(tmp_path / "routes" / ".cache")
+    assert runlog.current().path.parent == tmp_path / "my-route"
+    runlog.current().close()
+
+
+def test_ensure_started_does_nothing_without_a_folder_when_switched_off_or_when_a_log_exists(monkeypatch, tmp_path):
+    _fresh_autostart(monkeypatch, tmp_path)
+    runlog.ensure_started(None)
+    assert isinstance(runlog.current(), NullRunLog)
+    _fresh_autostart(monkeypatch, tmp_path, OSM_HIKE_NO_LOG="1")
+    runlog.ensure_started(tmp_path / "routes" / ".cache")
+    assert isinstance(runlog.current(), NullRunLog) and not (tmp_path / "routes").exists()
+    _fresh_autostart(monkeypatch, tmp_path)
+    own = RunLog.start(tmp_path / "own", "plan", heartbeat=False, status_dir=tmp_path / "s")
+    runlog.ensure_started(tmp_path / "routes" / ".cache")
+    assert runlog.current() is own and not (tmp_path / "routes").exists()
+    own.close()
+
+
+def test_ensure_started_tries_once_per_process(monkeypatch, tmp_path):
+    _fresh_autostart(monkeypatch, tmp_path)
+    runlog.ensure_started(tmp_path / "routes" / ".cache")
+    runlog.current().close()
+    runlog.ensure_started(tmp_path / "routes" / ".cache")
+    assert isinstance(runlog.current(), NullRunLog)
+
+
+def test_an_adhoc_log_is_closed_ok_at_exit(monkeypatch, tmp_path):
+    _fresh_autostart(monkeypatch, tmp_path)
+    runlog.ensure_started(tmp_path / "routes" / ".cache")
+    log = runlog.current()
+    log._atexit()
+    end = json.loads(log.path.read_text().splitlines()[-1])
+    assert end["ev"] == "run_end" and end["ok"] is True and "adhoc" in end["note"]
+
+
+def test_the_status_shows_the_latest_request_host_count_and_failures(tmp_path):
+    log = RunLog.start(tmp_path, "adhoc", heartbeat=False, status_dir=tmp_path / "s")
+    with pytest.raises(RuntimeError):
+        with log.http_call("https://a.example/x"):
+            raise RuntimeError("boom")
+    with log.http_call("https://b.example/y"):
+        status = json.loads(next((tmp_path / "s").glob("*.json")).read_text())      # in flight: request 2
+        assert status["activity"] == "b.example #2 1✗" and status["activity_started"]
+    log.close()
+
+
+def test_start_puts_extra_context_into_run_start(tmp_path):
+    log = RunLog.start(tmp_path, "t", heartbeat=False, status_dir=tmp_path / "s", note="x https://h/p?k=SECRET")
+    log.close()
+    assert "SECRET" not in log.path.read_text() and '"note":"x https://h/p"' in log.path.read_text()
+
+
+def test_an_uncaught_exception_makes_the_adhoc_run_not_ok(monkeypatch, tmp_path):
+    _fresh_autostart(monkeypatch, tmp_path)
+    monkeypatch.setattr("sys.excepthook", lambda *a: None)       # restored by monkeypatch; ensure_started wraps it
+    runlog.ensure_started(tmp_path / "routes" / ".cache")
+    log = runlog.current()
+    import sys
+    try:
+        raise RuntimeError("tile failed")
+    except RuntimeError as exc:
+        sys.excepthook(type(exc), exc, exc.__traceback__)
+    log._atexit()
+    events = [json.loads(x) for x in log.path.read_text().splitlines()]
+    assert any(e["ev"] == "error" and "tile failed" in e["msg"] for e in events)
+    assert events[-1]["ok"] is False and "uncaught" in events[-1]["note"]

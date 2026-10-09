@@ -5,3 +5,15 @@
 
 2. [done] Should these types: steps, service, unclassified and pedestrian be available for walk?
    Yes, plus tertiary. The near-highway penalty is kept.
+
+3. [done] Incorporate starting access point lat and lon in the link of opencellid.org to center on our route starting point.
+
+4. [done] In the plan detail data the "wheather by hours" topic is presented. Use there a pictogram (Sun / Lune) to
+   show dark / light time of day.
+
+5. [done] Incorporate starting access point lat and lon in the link of nperf.com to center on our route starting point, don't
+   provide a carrier and cell operator, it should be requested by the site.
+
+6. [done] In the plan detail data the "wheather by hours" topic is presented. Use pictograms with a rain (tree levels) or show (tree levels), 
+   in the column named "Осадки" (in Russian).
+   Done: 💧 (rain) or ❄️ (snow, by weather code) repeated 1-3 times for light / moderate / heavy, before the mm value.

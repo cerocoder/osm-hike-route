@@ -101,3 +101,54 @@ def test_plugins_span_nests_its_children():
     tree = log_report.report(events).split("Span tree")[1].split("Slowest")[0]
     assert tree.index("plugins") < tree.index("plugins.weather") < tree.index("plugins.fire")
     assert tree.count("plugins ") + tree.count("plugins\n") >= 1 and "plugin " not in tree
+
+
+PLUGIN_EVENTS = [
+    {"t": 0.0, "ev": "run_start", "tool": "day-plan"},
+    {"t": 0.0, "ev": "span_start", "span": "plugins"},
+    {"t": 0.0, "ev": "span_start", "span": "plugins.land_cover"},
+    {"t": 0.5, "ev": "overpass", "span": "plugins.land_cover", "ok": False, "tries": 6, "ql_bytes": 900,
+     "timeout_s": 9, "bbox_km2": 12.5, "error": "boom"},
+    {"t": 0.5, "ev": "http", "span": "plugins.land_cover", "host": "h", "path": "/p", "ok": False, "dur": 0.5,
+     "attempt": 2, "series": "overpass"},
+    {"t": 0.5, "ev": "http_series", "span": "plugins.land_cover", "series": "overpass", "n": 1, "ok": 0, "failed": 1,
+     "dur": 0.5, "sum_dur": 0.5, "bytes": 0},
+    {"t": 0.5, "ev": "http_series", "span": "plugins.land_cover", "series": "plugins.land_cover", "n": 1, "ok": 0,
+     "failed": 1, "dur": 0.5, "sum_dur": 0.5, "bytes": 0},
+    {"t": 0.5, "ev": "plugin_result", "span": "plugins.land_cover", "plugin": "land_cover", "outcome": "no-data",
+     "source": "network", "http_failed": 6, "reason": "all mirrors failed"},
+    {"t": 0.5, "ev": "span_end", "span": "plugins.land_cover", "dur": 0.5, "ok": True},
+    {"t": 0.5, "ev": "span_end", "span": "plugins", "dur": 0.5, "ok": True},
+    {"t": 4.0, "ev": "run_end", "dur": 4.0, "ok": True},
+]
+
+
+def test_report_lists_plugin_outcomes_overpass_queries_and_time_outside_spans():
+    text = log_report.report(PLUGIN_EVENTS)
+    assert "plugins.land_cover  0.5 s  12%  NO-DATA" in text
+    plugins = text.split("Plugins (in the order they ran)")[1].split("Overpass queries")[0]
+    assert "land_cover" in plugins and "no-data, data from network, http failed 6" in plugins
+    assert "all mirrors failed" in plugins
+    queries = text.split("Overpass queries")[1].split("HTTP per host")[0]
+    assert "900 B, timeout 9 s, bbox 12.5 km2" in queries and "6 mirror tries" in queries and "FAILED: boom" in queries
+    assert "(outside any top-level span)  3.5 s  88%" in text
+    assert "1 retries" in text                                   # attempt 2 is a retry
+
+
+def test_report_lists_each_http_series_once_under_its_owner_and_hides_unknown_sizes():
+    text = log_report.report(PLUGIN_EVENTS)
+    series = text.split("HTTP series")[1]
+    assert series.count("1 requests") == 1 and "plugins.land_cover  1 requests" in series
+    assert "bytes" not in series and "bytes" not in text.split("HTTP per host")[1].split("HTTP series")[0]
+
+
+def test_report_says_when_a_run_was_adhoc_and_shows_the_query_radius():
+    events = [
+        {"t": 0.0, "ev": "run_start", "tool": "adhoc", "adhoc": True, "script": "fetch2.py", "cwd": "/w/hikes"},
+        {"t": 3.0, "ev": "overpass", "ok": True, "tries": 1, "ql_bytes": 400, "timeout_s": 25, "radius_m": 6000,
+         "elements": 120, "mirror": "overpass-api.de"},
+        {"t": 4.0, "ev": "run_end", "dur": 4.0, "ok": True},
+    ]
+    text = log_report.report(events)
+    assert "adhoc run" in text and "fetch2.py" in text and "/w/hikes" in text
+    assert "radius 6000 m" in text and "120 elements from overpass-api.de" in text

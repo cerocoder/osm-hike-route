@@ -20,6 +20,7 @@ import json
 import os
 import platform
 import re
+import sys
 import threading
 import time
 import traceback
@@ -135,6 +136,7 @@ class _Call:
         self._ok_explicit = False
         self._finished = False
         self.t_sent = log.now()
+        log._activity(self.host, 1 + log._counts["http_ok"] + log._counts["http_failed"], force=True)
 
     def set(self, status=None, nbytes=None, ok=None, cache=None):
         if isinstance(status, int) and not isinstance(status, bool):
@@ -190,6 +192,13 @@ class NullRunLog:
     def http_call(self, *args, **kwargs):
         yield _NullCall()
 
+    @contextlib.contextmanager
+    def attempt(self, *args, **kwargs):
+        yield
+
+    def snapshot(self):
+        return {}
+
     def __enter__(self):
         return self
 
@@ -203,6 +212,8 @@ class RunLog:
         self._clock, self._wall = clock, wall
         self._t0 = clock()
         self._spans, self._tokens, self._series = [], [], []
+        self._attempts = []
+        self._counts = {"http_ok": 0, "http_failed": 0, "cache_hit": 0, "cache_miss": 0, "cache_stale": 0}
         self._closed = False
         self._last_metric = float("-inf")
         self._status_lock = threading.RLock()
@@ -221,7 +232,8 @@ class RunLog:
     # ---- construction -----------------------------------------------------------------------------------------------------
     @classmethod
     def start(cls, folder, tool, argv=None, install_as_current=True, status_dir=None, heartbeat=True,
-              heartbeat_interval=HEARTBEAT_INTERVAL_S, clock=time.monotonic, wall=time.time, keep=KEEP_LOGS):
+              heartbeat_interval=HEARTBEAT_INTERVAL_S, clock=time.monotonic, wall=time.time, keep=KEEP_LOGS,
+              **context):
         fh = None
         try:
             folder = Path(folder)
@@ -238,7 +250,8 @@ class RunLog:
                       default_status_dir() if status_dir is None else status_dir, heartbeat, heartbeat_interval)
             log.event("run_start", tool=tool, argv=list(argv) if argv is not None else None,
                       python=platform.python_version(), platform=platform.platform(), version=LOG_VERSION,
-                      started_at=datetime.fromtimestamp(wall(), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+                      started_at=datetime.fromtimestamp(wall(), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                      **_scrub_params(context))
             _prune(folder, keep, log.path)
             if log._status_path is not None:
                 _prune_status(log._status_path.parent, wall)
@@ -274,7 +287,21 @@ class RunLog:
         self.event("metric", name=name, value=value)
 
     def cache(self, kind, result, age_s=None):
+        key = f"cache_{result}"
+        if key in self._counts:
+            self._counts[key] += 1
         self.event("cache", kind=kind, result=result, age_s=age_s)
+
+    def _activity(self, host, requests, force=False):
+        """What the status line shows when no Progress step does: the host of the latest request, how many were made,
+        how many failed, and (through activity_started) how long ago that was."""
+        failed = self._counts["http_failed"]
+        text = f"{host} #{requests}" + (f" {failed}✗" if failed else "")
+        self._set_status(force=force, activity=text, activity_started=self._safe_wall())
+
+    def snapshot(self) -> dict:
+        """Running totals (HTTP answers, cache lookups); the difference of two snapshots is what a span did."""
+        return dict(self._counts)
 
     def warn(self, msg, **fields):
         self.event("warn", msg=msg, **fields)
@@ -319,7 +346,19 @@ class RunLog:
 
     # ---- http -------------------------------------------------------------------------------------------------------------
     @contextlib.contextmanager
-    def http_call(self, url, attempt=1):
+    def attempt(self, n):
+        """Calls made inside carry attempt=n (the retry round of a caller that knows it, e.g. the Overpass mirrors)."""
+        self._attempts.append(n)
+        try:
+            yield
+        finally:
+            if self._attempts:
+                self._attempts.pop()
+
+    @contextlib.contextmanager
+    def http_call(self, url, attempt=None):
+        if attempt is None:
+            attempt = self._attempts[-1] if self._attempts else 1
         call = _Call(self, url, attempt)
         try:
             yield call
@@ -334,6 +373,8 @@ class RunLog:
 
     def _finish_call(self, call):
         t_answer = self.now()
+        self._counts["http_ok" if call.ok else "http_failed"] += 1
+        self._activity(call.host, self._counts["http_ok"] + self._counts["http_failed"])
         series = self._series[-1].name if self._series else None
         for s in self._series:
             s.add(call.t_sent, t_answer, call.ok, call.nbytes)
@@ -454,7 +495,11 @@ class RunLog:
             install(None)
 
     def _atexit(self):
-        self.close(ok=False, note="not closed explicitly")
+        if getattr(self, "adhoc", False):                       # nobody was going to close it: that is its normal end
+            failed = getattr(self, "adhoc_failed", False)
+            self.close(ok=not failed, note="adhoc: closed at exit" + (" after an uncaught exception" if failed else ""))
+        else:
+            self.close(ok=False, note="not closed explicitly")
 
     def __enter__(self):
         return self
@@ -489,8 +534,50 @@ def install(log):
     _current = log if log is not None else NullRunLog()
 
 
-def http_call(url, attempt=1):
+_autostart_tried = False
+
+
+def ensure_started(cache_dir=None):
+    """The safety net for scripts that never called RunLog.start: the first network call of the process starts an
+    `adhoc` log. Folder: $OSM_HIKE_ROUTE_DIR (a route folder), else <cache_dir>/../.logs (routes/.logs); with neither
+    nothing is started. Once per process; $OSM_HIKE_NO_LOG switches it off. Never raises."""
+    global _autostart_tried
+    try:
+        if _autostart_tried or not isinstance(_current, NullRunLog) or os.environ.get("OSM_HIKE_NO_LOG"):
+            return
+        route_dir = os.environ.get("OSM_HIKE_ROUTE_DIR")
+        if route_dir:
+            folder = Path(route_dir)
+        elif cache_dir is not None:
+            folder = Path(cache_dir).parent / ".logs"
+        else:
+            return
+        _autostart_tried = True
+        log = RunLog.start(folder, "adhoc", argv=sys.argv, adhoc=True, cwd=os.getcwd(),
+                           script=sys.argv[0] if sys.argv else None,
+                           cache_dir=str(cache_dir) if cache_dir is not None else None)
+        if isinstance(log, RunLog):
+            log.adhoc = True
+            previous = sys.excepthook
+
+            def hook(exc_type, exc, tb):                        # an uncaught exception ends the script: the log says so
+                try:
+                    log.adhoc_failed = True
+                    log.error(_one_line(exc), exc)
+                except Exception:  # noqa: BLE001
+                    pass
+                previous(exc_type, exc, tb)
+            sys.excepthook = hook
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def http_call(url, attempt=None):
     return _current.http_call(url, attempt)
+
+
+def attempt(n):
+    return _current.attempt(n)
 
 
 def http_series(name):
@@ -503,3 +590,16 @@ def in_series():
 
 def span(name, **fields):
     return _current.span(name, **fields)
+
+
+def snapshot() -> dict:
+    return _current.snapshot() or {}
+
+
+def event(ev, **fields):
+    """A free-form event on the current log; text values have their URLs reduced to scheme://host/path."""
+    _current.event(ev, **{k: (_scrub_urls(v) if isinstance(v, str) else v) for k, v in fields.items()})
+
+
+def cache(kind, result, age_s=None):
+    _current.cache(kind, result, age_s)

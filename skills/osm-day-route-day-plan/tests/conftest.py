@@ -21,6 +21,13 @@ def block_real_network():
 
 
 @pytest.fixture(autouse=True)
+def no_adhoc_log(tmp_path, monkeypatch):
+    """No test starts an adhoc log or writes a status file into the real ~/.cache."""
+    monkeypatch.setenv("OSM_HIKE_NO_LOG", "1")
+    monkeypatch.setenv("OSM_HIKE_STATUS_DIR", str(tmp_path / "_status"))
+
+
+@pytest.fixture(autouse=True)
 def no_real_sleep(monkeypatch):
     """Overpass retries pause between rounds; tests must never wait for real."""
     monkeypatch.setattr("day_plan.overpass._default_sleep", lambda seconds: None)

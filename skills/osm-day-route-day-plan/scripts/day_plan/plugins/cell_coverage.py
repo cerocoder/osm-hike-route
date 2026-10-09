@@ -15,11 +15,31 @@ from ..osm_features import MARGIN_KM, near
 
 NPERF_GLOBAL = "https://www.nperf.com/en/map"
 NPERF_COUNTRY = "https://www.nperf.com/en/map/{code}/-/-/signal"
+NPERF_VIEW = "?ll={lat:.5f}&lg={lon:.5f}&zoom=14"
+OPENCELLID_MAP = "https://opencellid.org/#zoom=14&lat={lat:.5f}&lon={lon:.5f}"
+
+
+def start_point(ctx) -> tuple[float, float]:
+    """(lat, lon) of the start: the access point with role 'start', else the
+    first access point, else the first point of the track."""
+    starts = [p for p in ctx.access_points if p.role == "start"] or list(ctx.access_points)
+    if starts:
+        return starts[0].lat, starts[0].lon
+    return ctx.coords[0][1], ctx.coords[0][0]
+
+
+def opencellid_url(ctx) -> str:
+    lat, lon = start_point(ctx)
+    return OPENCELLID_MAP.format(lat=lat, lon=lon)
 
 
 def nperf_url(ctx) -> str:
+    """nPerf map centred on the start. No carrier or technology is given: the
+    site asks for it."""
     code = country_code(ctx)
-    return NPERF_COUNTRY.format(code=code.upper()) if code and code.isalpha() and len(code) == 2 else NPERF_GLOBAL
+    base = NPERF_COUNTRY.format(code=code.upper()) if code and code.isalpha() and len(code) == 2 else NPERF_GLOBAL
+    lat, lon = start_point(ctx)
+    return base + NPERF_VIEW.format(lat=lat, lon=lon)
 
 
 class CellCoveragePlugin(SectionPlugin):
@@ -30,7 +50,8 @@ class CellCoveragePlugin(SectionPlugin):
     def run(self, ctx, shared: dict) -> Section:
         lang = ctx.lang
         osm = shared.get("osm_features") or {}
-        tail = [tr("cell_caveat", lang), tr("cell_advice", lang), tr("cell_maps", lang, nperf=nperf_url(ctx))]
+        tail = [tr("cell_caveat", lang), tr("cell_advice", lang), tr("cell_maps", lang, nperf=nperf_url(ctx),
+                                                                          opencellid=opencellid_url(ctx))]
         if osm.get("error") or osm.get("samples") is None:
             reason = osm.get("error") or "no data"
             return Section("cell_coverage", "\n".join([tr("cell_osm_unavailable", lang, reason=reason)] + tail),

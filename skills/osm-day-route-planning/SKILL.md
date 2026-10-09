@@ -724,7 +724,7 @@ discard a field already in hand," not an extra query.
 
 | Constraint | Overpass filter / preset field |
 |---|---|
-| Walkable paths (`walk`) | `highway=path\|footway\|track\|residential\|living_street` |
+| Walkable paths (`walk`) | `highway=path\|footway\|track\|pedestrian\|steps\|residential\|living_street\|unclassified\|service\|tertiary` — preset `routable_highway` |
 | Routable ways (`bike`) | preset's `routable_highway` — adds `cycleway`, and `secondary` for `bike-sport` — passed to `fetch_area_data`'s `routable_highway` argument, or those ways are never fetched at all |
 | Bike hard-exclude | `bicycle=no\|dismount`, `highway=steps` — preset `hard_exclude_tags` |
 | Highway needs cycle infra (bike) | `trunk\|primary` with no positive `cycleway`/`cycleway:left\|right\|both` value (`no`/`none`/`separate` = no infra) — preset `exclude_highway_without_infra` |

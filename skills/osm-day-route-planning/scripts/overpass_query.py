@@ -107,8 +107,7 @@ def query_overpass(ql: str, timeout: int = 90, retries: int = 2, cache_dir=None,
     body = urllib.parse.urlencode({"data": ql}).encode()
     last_error = None
     # a caller's own series (public_geometry) already covers these requests: no second, nested "overpass" series
-    outer = getattr(runlog.current(), "_series", None)
-    with (contextlib.nullcontext() if outer else runlog.http_series("overpass")):
+    with (contextlib.nullcontext() if runlog.in_series() else runlog.http_series("overpass")):
         for endpoint_index, endpoint in enumerate(ENDPOINTS):
             for attempt in range(retries):
                 if progress is not None and (endpoint_index, attempt) != (0, 0):
@@ -125,6 +124,7 @@ def query_overpass(ql: str, timeout: int = 90, retries: int = 2, cache_dir=None,
                             text = raw.decode("utf-8", errors="replace")
                             if "runtime error" in text.lower() or "timeout" in text.lower() and text.lstrip().startswith("<"):
                                 call.set(ok=False)
+                                call.finish()                       # the answer is in: the back-off below is not part of it
                                 last_error = f"{endpoint}: server-side timeout/error body"
                                 time.sleep(2)
                                 continue

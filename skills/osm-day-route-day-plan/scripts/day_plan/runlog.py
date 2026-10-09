@@ -242,7 +242,8 @@ class RunLog:
         self.event("warn", msg=msg, **fields)
 
     def error(self, msg, exc=None):
-        tb = traceback.format_exception(type(exc), exc, exc.__traceback__) if exc is not None else None
+        tb = ([_scrub_urls(line) for line in traceback.format_exception(type(exc), exc, exc.__traceback__)]
+              if exc is not None else None)
         self.event("error", msg=msg, traceback=tb)
 
     def message(self, level, key, params):
@@ -296,6 +297,9 @@ class RunLog:
                    attempt=call.attempt, cache=call.cache, t_sent=round(call.t_sent, 3),
                    t_answer=round(t_answer, 3), dur=round(t_answer - call.t_sent, 3), ok=call.ok,
                    error=call.error, series=series)
+
+    def in_series(self) -> bool:
+        return bool(self._series)
 
     @contextlib.contextmanager
     def http_series(self, name):
@@ -447,6 +451,10 @@ def http_call(url, attempt=1):
 
 def http_series(name):
     return _current.http_series(name)
+
+
+def in_series():
+    return _current.in_series()
 
 
 def span(name, **fields):

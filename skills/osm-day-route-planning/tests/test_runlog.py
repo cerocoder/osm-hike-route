@@ -437,3 +437,27 @@ def test_a_later_status_overrides_an_earlier_error_status_unless_ok_was_explicit
         call.set(status=200)
     first, second = [e for e in events(log) if e["ev"] == "http"]
     assert first["ok"] is True and second["ok"] is False
+
+
+def test_in_series_is_true_only_inside_a_series(make_log):
+    log = make_log()
+    assert not log.in_series()
+    with log.http_series("s"):
+        assert log.in_series()
+    assert not log.in_series()
+    assert not NullRunLog().in_series()
+
+
+def test_error_tracebacks_and_failed_runs_do_not_leak_url_keys(make_log, tmp_path, clock):
+    log = make_log()
+    try:
+        raise RuntimeError("failed https://h.example/p?key=SECRET now")
+    except RuntimeError as exc:
+        log.error("boom", exc)
+    log.close()
+    assert "SECRET" not in Path(log.path).read_text(encoding="utf-8")
+    with pytest.raises(RuntimeError):
+        with RunLog.start(tmp_path / "r2", "plan", clock=clock, heartbeat=False, status_dir=tmp_path / "s2") as run:
+            path = run.path
+            raise RuntimeError("https://h.example/p?key=SECRET")
+    assert "SECRET" not in Path(path).read_text(encoding="utf-8")

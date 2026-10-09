@@ -52,7 +52,7 @@ def test_query_overpass_logs_attempts_in_a_series_without_the_query(log, monkeyp
     evs = events(log)
     calls = [e for e in evs if e["ev"] == "http"]
     assert [c["status"] for c in calls] == [504, 200] and [c["ok"] for c in calls] == [False, True]
-    assert all(c["series"] == "overpass" and c["host"] == "overpass-api.de" for c in calls[:1])
+    assert all(c["series"] == "overpass" and c["host"] == "overpass-api.de" for c in calls)
     series = next(e for e in evs if e["ev"] == "http_series")
     assert series["series"] == "overpass" and series["n"] == 2 and series["failed"] == 1
     assert "SECRET_KEY" not in Path(log.path).read_text(encoding="utf-8")
@@ -113,3 +113,18 @@ def test_load_tracks_geometry_queries_are_one_series(log, monkeypatch):
     public_routes.load_tracks([{"id": 1}, {"id": 2}, {"id": 3}], batch=1)
     series = [e for e in events(log) if e["ev"] == "http_series"]
     assert [s["series"] for s in series] == ["public_geometry"] and series[0]["n"] == 3
+
+
+def test_the_overpass_backoff_after_an_error_body_is_not_part_of_the_call(log, monkeypatch):
+    def fake_sleep(s):
+        log.clock.t += s
+    class _Body(_Response):
+        def read(self):
+            return b"<html>runtime error: timeout</html>"
+    answers = [_Body({}), _Response({"elements": []})]
+    monkeypatch.setattr(overpass_query.urllib.request, "urlopen", lambda req, timeout=None: answers.pop(0))
+    monkeypatch.setattr(overpass_query.time, "sleep", fake_sleep)
+    overpass_query.query_overpass("QL")
+    first = next(e for e in events(log) if e["ev"] == "http")
+    assert first["ok"] is False and first["dur"] == 0
+    assert log.clock.t == 2

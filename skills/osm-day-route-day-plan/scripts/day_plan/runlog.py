@@ -19,6 +19,7 @@ import itertools
 import json
 import os
 import platform
+import re
 import threading
 import time
 import traceback
@@ -50,8 +51,25 @@ def split_url(url):
         return "", ""
 
 
+_URL_IN_TEXT = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s'\"<>)\]]+")
+
+
+def _scrub_urls(text) -> str:
+    """Every URL in a text reduced to scheme://host/path: no query string, fragment or credentials."""
+    def one(match):
+        url = match.group(0)
+        host, path = split_url(url)
+        if not host:
+            return url.split("://", 1)[0] + "://"
+        return f"{url.split('://', 1)[0]}://{host}{path}"
+    return _URL_IN_TEXT.sub(one, text)
+
+
 def _one_line(exc) -> str:
-    return " ".join(f"{type(exc).__name__}: {exc}".split())[:300]
+    try:
+        return _scrub_urls(" ".join(f"{type(exc).__name__}: {exc}".split()))[:300]
+    except Exception:  # noqa: BLE001
+        return type(exc).__name__
 
 
 class _Series:
@@ -78,18 +96,20 @@ class _Call:
         self.attempt = attempt
         self.status = self.nbytes = self.cache = self.error = None
         self.ok = True
+        self._ok_explicit = False
         self._finished = False
         self.t_sent = log.now()
 
     def set(self, status=None, nbytes=None, ok=None, cache=None):
         if isinstance(status, int) and not isinstance(status, bool):
             self.status = status
-            if status >= 400 and ok is None:
-                self.ok = False
+            if ok is None and not self._ok_explicit:
+                self.ok = status < 400
         if isinstance(nbytes, int) and not isinstance(nbytes, bool):
             self.nbytes = nbytes
         if ok is not None:
             self.ok = bool(ok)
+            self._ok_explicit = True
         if cache is not None:
             self.cache = cache
 
@@ -166,6 +186,7 @@ class RunLog:
     @classmethod
     def start(cls, folder, tool, argv=None, install_as_current=True, status_dir=None, heartbeat=True,
               heartbeat_interval=HEARTBEAT_INTERVAL_S, clock=time.monotonic, wall=time.time, keep=KEEP_LOGS):
+        fh = None
         try:
             folder = Path(folder)
             folder.mkdir(parents=True, exist_ok=True)
@@ -177,17 +198,22 @@ class RunLog:
                     break
                 except FileExistsError:
                     continue
-        except OSError:
+            log = cls(fh, folder / name, tool, clock, wall,
+                      default_status_dir() if status_dir is None else status_dir, heartbeat, heartbeat_interval)
+            log.event("run_start", tool=tool, argv=list(argv) if argv is not None else None,
+                      python=platform.python_version(), platform=platform.platform(), version=LOG_VERSION,
+                      started_at=datetime.fromtimestamp(wall(), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+            _prune(folder, keep, log.path)
+            if install_as_current:
+                install(log)
+            return log
+        except Exception:  # noqa: BLE001 — "never raises": no log is better than a failed run
+            try:
+                if fh is not None:
+                    fh.close()
+            except Exception:  # noqa: BLE001
+                pass
             return NullRunLog()
-        log = cls(fh, folder / name, tool, clock, wall,
-                  default_status_dir() if status_dir is None else status_dir, heartbeat, heartbeat_interval)
-        log.event("run_start", tool=tool, argv=list(argv) if argv is not None else None,
-                  python=platform.python_version(), platform=platform.platform(), version=LOG_VERSION,
-                  started_at=datetime.fromtimestamp(wall(), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
-        _prune(folder, keep, log.path)
-        if install_as_current:
-            install(log)
-        return log
 
     def now(self) -> float:
         return self._clock() - self._t0
@@ -289,7 +315,13 @@ class RunLog:
         self._tokens.append(self.span_start(span_name, title=title))
         self._last_metric = float("-inf")
         self._set_status(force=True, lang=lang, step_title=title, i=index, n=total, done=None, total=None,
-                         step_started=self._wall())
+                         step_started=self._safe_wall())
+
+    def _safe_wall(self):
+        try:
+            return self._wall()
+        except Exception:  # noqa: BLE001
+            return None
 
     def step_end(self, ok, error, detail):
         if self._tokens:
@@ -312,19 +344,21 @@ class RunLog:
         with self._status_lock:
             if self._status_path is None:
                 return
-            now = self._wall()
-            if not force and now - self._status_written < STATUS_INTERVAL_S:
-                return
-            self._status["heartbeat"] = self._status_written = now
-            temporary = self._status_path.with_suffix(f".{threading.get_ident()}.tmp")
+            temporary = None
             try:
+                now = self._wall()
+                if not force and now - self._status_written < STATUS_INTERVAL_S:
+                    return
+                self._status["heartbeat"] = self._status_written = now
+                temporary = self._status_path.with_suffix(f".{threading.get_ident()}.tmp")
                 self._status_path.parent.mkdir(parents=True, exist_ok=True)
                 temporary.write_text(json.dumps(self._status, ensure_ascii=False), encoding="utf-8")
                 os.replace(temporary, self._status_path)
-            except OSError:
-                self._status_path = None                        # silenced for good
+            except Exception:  # noqa: BLE001 — the status is decoration: silenced for good
+                self._status_path = None
                 try:
-                    temporary.unlink()
+                    if temporary is not None:
+                        temporary.unlink()
                 except OSError:
                     pass
 
@@ -347,20 +381,29 @@ class RunLog:
             return
         self._closed = True
         self._stop.set()
-        self.event("run_end", dur=round(self.now(), 3), ok=ok, **fields)
-        self._remove_status()
-        if self._fh is not None:
-            try:
-                self._fh.close()
-            except Exception:  # noqa: BLE001
-                pass
-            self._fh = None
-        if current() is self:
-            install(None)
         try:
-            atexit.unregister(self._atexit)
+            self.event("run_end", dur=round(self.now(), 3), ok=ok, **fields)
         except Exception:  # noqa: BLE001
             pass
+        finally:                                                # cleanup always runs; close never raises
+            for cleanup in (self._remove_status, self._close_file, self._uninstall):
+                try:
+                    cleanup()
+                except Exception:  # noqa: BLE001
+                    pass
+            try:
+                atexit.unregister(self._atexit)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _close_file(self):
+        fh, self._fh = self._fh, None
+        if fh is not None:
+            fh.close()
+
+    def _uninstall(self):
+        if current() is self:
+            install(None)
 
     def _atexit(self):
         self.close(ok=False, note="not closed explicitly")

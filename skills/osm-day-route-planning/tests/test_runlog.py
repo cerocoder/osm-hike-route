@@ -359,3 +359,81 @@ def test_an_unwritable_status_folder_never_breaks_the_run(tmp_path, clock):
     log.step_end(True, None, None)
     log.close()
     assert events(log)[-1]["ev"] == "run_end"
+
+
+# ---- review fixes -----------------------------------------------------------------------------------------------------------
+
+def test_urls_in_error_texts_lose_query_fragment_and_credentials(make_log):
+    log = make_log()
+    with pytest.raises(OSError):
+        with log.span("s"):
+            with log.http_call("https://h.example/p"):
+                raise OSError("failed GET https://u:p@h.example/p?key=SECRET#f (timeout)")
+    text = Path(log.path).read_text(encoding="utf-8")
+    assert "SECRET" not in text and "u:p" not in text
+    evs = events(log)
+    assert [e for e in evs if e["ev"] == "http"][0]["error"] == "OSError: failed GET https://h.example/p (timeout)"
+    assert [e for e in evs if e["ev"] == "span_end"][0]["error"].startswith("OSError: failed GET https://h.example/p")
+
+
+def test_status_failures_of_any_kind_silence_the_status_without_raising(make_log, tmp_path):
+    log = make_log()
+    log.step_start("a", "A", 1, 1, "en")
+    log._status["bad"] = object()                               # json.dumps raises TypeError
+    log.progress_tick(1, 2, "k")
+    log._set_status(force=True)
+    assert log._status_path is None
+    log.event("metric", name="x", value=1)                      # still logging
+
+    def broken_wall():
+        raise ValueError("clock")
+    log2 = make_log()
+    log2._wall = broken_wall
+    log2.step_start("a", "A", 1, 1, "en")
+    assert log2._status_path is None
+
+
+def test_close_cleans_up_even_if_the_run_end_event_raises(make_log, tmp_path):
+    log = make_log()
+    log.step_start("a", "A", 1, 1, "en")
+    runlog.install(log)
+    assert list((tmp_path / "status").glob("*.json"))
+    fh = log._fh
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("event failed")
+    log.event = boom
+    log.close()
+    assert not list((tmp_path / "status").glob("*.json"))
+    assert fh.closed and log._fh is None
+    assert isinstance(runlog.current(), NullRunLog)
+
+
+def test_start_never_raises_and_does_not_leak_the_handle(tmp_path, monkeypatch):
+    opened = []
+    real_open = open
+
+    def tracking_open(*args, **kwargs):
+        fh = real_open(*args, **kwargs)
+        opened.append(fh)
+        return fh
+
+    def broken():
+        raise RuntimeError("no home")
+    monkeypatch.setattr("builtins.open", tracking_open)
+    monkeypatch.setattr(runlog, "default_status_dir", broken)
+    log = RunLog.start(tmp_path / "r", "plan", heartbeat=False, install_as_current=False)
+    assert isinstance(log, NullRunLog)
+    assert opened and all(fh.closed for fh in opened)
+
+
+def test_a_later_status_overrides_an_earlier_error_status_unless_ok_was_explicit(make_log):
+    log = make_log()
+    with log.http_call("https://h.example/p") as call:
+        call.set(status=503)
+        call.set(status=200)
+    with log.http_call("https://h.example/p") as call:
+        call.set(ok=False)
+        call.set(status=200)
+    first, second = [e for e in events(log) if e["ev"] == "http"]
+    assert first["ok"] is True and second["ok"] is False

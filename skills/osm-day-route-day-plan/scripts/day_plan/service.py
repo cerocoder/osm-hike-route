@@ -73,22 +73,23 @@ def run_plugins(ctx, plugins: list, progress=None):
     except Exception:  # noqa: BLE001 — a recommendation must never stop the plan
         pass
     shared, failures, by_id = {}, [], {}
-    for plugin in _ordered(plugins):
-        deps = {d: shared[d] for d in plugin.depends_on if d in shared}
-        with progress.step("plugin", text=_plugin_name(plugin, ctx.lang), span=f"plugin.{plugin.plugin_id}") as step, \
-                runlog.http_series(f"plugin.{plugin.plugin_id}"):
-            try:
-                section = plugin.run(ctx, deps)
-            except Exception as e:  # noqa: BLE001 — isolate any plugin failure
-                reason = _one_line(f"{type(e).__name__}: {e}")
-                failures.append((plugin.plugin_id, reason))
-                step.fail(reason)
-                section = Section(plugin.section_id, tr("plugin_failed", ctx.lang, reason=reason), "no-data")
-            else:
-                shared[plugin.plugin_id] = section.shared
-        if section.title is None and plugin.title_key:
-            section.title = tr(plugin.title_key, ctx.lang)
-        by_id[plugin.plugin_id] = section
+    with runlog.span("plugins"):                 # dots nest spans: plugins.<id> is a child of plugins
+        for plugin in _ordered(plugins):
+            deps = {d: shared[d] for d in plugin.depends_on if d in shared}
+            with progress.step("plugin", text=_plugin_name(plugin, ctx.lang), span=plugin.plugin_id) as step, \
+                    runlog.http_series(f"plugins.{plugin.plugin_id}"):
+                try:
+                    section = plugin.run(ctx, deps)
+                except Exception as e:  # noqa: BLE001 — isolate any plugin failure
+                    reason = _one_line(f"{type(e).__name__}: {e}")
+                    failures.append((plugin.plugin_id, reason))
+                    step.fail(reason)
+                    section = Section(plugin.section_id, tr("plugin_failed", ctx.lang, reason=reason), "no-data")
+                else:
+                    shared[plugin.plugin_id] = section.shared
+            if section.title is None and plugin.title_key:
+                section.title = tr(plugin.title_key, ctx.lang)
+            by_id[plugin.plugin_id] = section
     return [by_id[p.plugin_id] for p in plugins], shared, failures
 
 

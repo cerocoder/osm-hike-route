@@ -87,3 +87,17 @@ def test_partial_or_junk_events_never_crash_the_report():
     text = log_report.report(events)
     assert "unfinished" in text.lower() and "Span tree" in text
     assert log_report.report([]).startswith("Run:")
+
+
+def test_plugins_span_nests_its_children():
+    events = [
+        {"t": 0.0, "ev": "span_start", "span": "plugins"},
+        {"t": 0.0, "ev": "span_start", "span": "plugins.weather"},
+        {"t": 2.0, "ev": "span_end", "span": "plugins.weather", "dur": 2.0, "ok": True},
+        {"t": 2.0, "ev": "span_start", "span": "plugins.fire"},
+        {"t": 3.0, "ev": "span_end", "span": "plugins.fire", "dur": 1.0, "ok": True},
+        {"t": 3.0, "ev": "span_end", "span": "plugins", "dur": 3.0, "ok": True},
+    ]
+    tree = log_report.report(events).split("Span tree")[1].split("Slowest")[0]
+    assert tree.index("plugins") < tree.index("plugins.weather") < tree.index("plugins.fire")
+    assert tree.count("plugins ") + tree.count("plugins\n") >= 1 and "plugin " not in tree

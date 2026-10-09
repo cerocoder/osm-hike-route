@@ -431,105 +431,107 @@ from runlog import RunLog
 # Console progress, in the USER'S language (en ru es fr de pt it; English for any other): one line per step, plain
 # lines without a terminal, sub-progress only for slow steps. Pass `progress` to the functions below that accept it.
 route_dir = Path("routes") / f"{slug}-{date}"          # resolved/created BEFORE the first step (pipeline step 2)
-log = RunLog.start(route_dir, "plan", argv=sys.argv)   # <route_dir>/plan-<UTC time>.log.jsonl + the live status file
-progress = Progress(total_steps=5, lang=user_lang, runlog=log)   # user_lang: the language of the conversation / notes.md
+# The WHOLE pipeline, the save steps included, is inside the with-block: the run is closed after the last step,
+# and a failure is logged with its traceback (error event, run_end ok=false) before it propagates.
+with RunLog.start(route_dir, "plan", argv=sys.argv) as log:   # <route_dir>/plan-<UTC time>.log.jsonl + the live status file
+    progress = Progress(total_steps=5, lang=user_lang, runlog=log)   # user_lang: the language of the conversation / notes.md
 
-preset = load_preset(mode, style)                 # e.g. load_preset("bike", "leisure")
-weights = build_weights(preset, preference_overrides, max_distance_km, max_duration_hours)
+    preset = load_preset(mode, style)                 # e.g. load_preset("bike", "leisure")
+    weights = build_weights(preset, preference_overrides, max_distance_km, max_duration_hours)
 
-with progress.step("overpass"):
-    data = fetch_area_data(
-        lat, lon, radius_m=1500,
-        routable_highway=weights["routable_highway"],
-        hard_exclude_highway=weights["hard_exclude_tags"].get("highway", []),
+    with progress.step("overpass"):
+        data = fetch_area_data(
+            lat, lon, radius_m=1500,
+            routable_highway=weights["routable_highway"],
+            hard_exclude_highway=weights["hard_exclude_tags"].get("highway", []),
+            exclude_highway_without_infra=weights["exclude_highway_without_infra"],
+            mode=weights["mode"],  # scopes the designated-path override to this mode
+            cache_dir=Path("routes/.cache"),  # the answer is kept for 24 h: a revision does not wait for Overpass again;
+            progress=progress,                # refresh=True forces a new query (say so if the user doubts the data)
+        )
+        progress.detail("overpass_done", walkable=len(data["walkable"]), restricted=len(data["restricted"]))
+    restricted = build_restricted_polygons(data["restricted"], data["barrier_ways"])
+    walkable = filter_excluded_ways(
+        data["walkable"], restricted,
+        hard_exclude_tags=weights["hard_exclude_tags"],
         exclude_highway_without_infra=weights["exclude_highway_without_infra"],
-        mode=weights["mode"],  # scopes the designated-path override to this mode
-        cache_dir=Path("routes/.cache"),  # the answer is kept for 24 h: a revision does not wait for Overpass again;
-        progress=progress,                # refresh=True forces a new query (say so if the user doubts the data)
     )
-    progress.detail("overpass_done", walkable=len(data["walkable"]), restricted=len(data["restricted"]))
-restricted = build_restricted_polygons(data["restricted"], data["barrier_ways"])
-walkable = filter_excluded_ways(
-    data["walkable"], restricted,
-    hard_exclude_tags=weights["hard_exclude_tags"],
-    exclude_highway_without_infra=weights["exclude_highway_without_infra"],
-)
-with progress.step("graph"):
-    graph, node_coords = build_graph(
-        walkable, data["barrier_nodes"],
-        blocking_barrier_tags=weights["blocking_barrier_tags"],
-        respect_oneway=(mode == "bike"),
+    with progress.step("graph"):
+        graph, node_coords = build_graph(
+            walkable, data["barrier_nodes"],
+            blocking_barrier_tags=weights["blocking_barrier_tags"],
+            respect_oneway=(mode == "bike"),
+        )
+        progress.detail("graph_done", nodes=len(graph), edges=sum(len(e) for e in graph.values()))
+    with progress.step("tag_edges"):
+        tag_edges(graph, node_coords, data["highways"], data["water"], data["forest"], data["fields"],
+                  highway_buffer_m=weights["buffers_m"]["highway"], water_buffer_m=weights["buffers_m"]["water"],
+                  progress=progress)
+
+    # --- elevation wiring: batch ONCE across every way, never once per way ---
+
+    service = ElevationService(
+        [OpenTopoDataProvider(), OpenMeteoProvider(), ElevationApiEuProvider(), OpenElevationProvider()],
+        cache_path=Path("routes/.cache/elevation.json"),   # shared across routes, NOT per-route (spec §3.8)
     )
-    progress.detail("graph_done", nodes=len(graph), edges=sum(len(e) for e in graph.values()))
-with progress.step("tag_edges"):
-    tag_edges(graph, node_coords, data["highways"], data["water"], data["forest"], data["fields"],
-              highway_buffer_m=weights["buffers_m"]["highway"], water_buffer_m=weights["buffers_m"]["water"],
-              progress=progress)
 
-# --- elevation wiring: batch ONCE across every way, never once per way ---
+    def compute_node_elevations(ways: list[dict], service: ElevationService) -> dict[int, float]:
+        """One dict entry per OSM node id touched by any way, interpolated from
+        ~150m samples along that way (spec §3.8) — never a per-node lookup, and
+        never one HTTP round trip per way (a real route can have 1000+ ways;
+        ElevationService already chunks internally by each provider's
+        max_batch, so hand it every sample across every way in one call)."""
+        way_samples = []
+        all_points: list[tuple[float, float]] = []
+        for way in ways:
+            coords = [(pt["lat"], pt["lon"]) for pt in way["geometry"]]
+            samples = sample_positions(coords, interval_m=150.0)
+            way_samples.append((way, coords, samples))
+            all_points.extend((lat, lon) for lat, lon, _ in samples)
 
-service = ElevationService(
-    [OpenTopoDataProvider(), OpenMeteoProvider(), ElevationApiEuProvider(), OpenElevationProvider()],
-    cache_path=Path("routes/.cache/elevation.json"),   # shared across routes, NOT per-route (spec §3.8)
-)
+        all_elevations = service.get_elevations(all_points, progress=progress)
 
-def compute_node_elevations(ways: list[dict], service: ElevationService) -> dict[int, float]:
-    """One dict entry per OSM node id touched by any way, interpolated from
-    ~150m samples along that way (spec §3.8) — never a per-node lookup, and
-    never one HTTP round trip per way (a real route can have 1000+ ways;
-    ElevationService already chunks internally by each provider's
-    max_batch, so hand it every sample across every way in one call)."""
-    way_samples = []
-    all_points: list[tuple[float, float]] = []
-    for way in ways:
-        coords = [(pt["lat"], pt["lon"]) for pt in way["geometry"]]
-        samples = sample_positions(coords, interval_m=150.0)
-        way_samples.append((way, coords, samples))
-        all_points.extend((lat, lon) for lat, lon, _ in samples)
+        node_elevations: dict[int, float] = {}
+        unresolved = 0
+        cursor = 0
+        for way, coords, samples in way_samples:
+            n = len(samples)
+            elevations = all_elevations[cursor:cursor + n]
+            cursor += n
+            sample_dists = [dist for _, _, dist in samples]
+            # Interpolate only over samples a provider actually resolved — do
+            # NOT coerce a None to 0.0 before interpolating, that fabricates a
+            # fake sea-level dip next to real elevations and produces a bogus
+            # gradient. A None sample is simply left out of the interpolation
+            # input (Review Focus #2: no crash, no fabricated value).
+            known = [(d, e) for d, e in zip(sample_dists, elevations) if e is not None]
+            unresolved += sum(1 for e in elevations if e is None)
+            if not known:
+                continue  # no elevation info at all for this way; its node ids
+                           # simply stay out of node_elevations, and tag_grades
+                           # below already treats a missing id as grade_pct=0.0
+            known_dists, known_elevs = zip(*known)
+            node_dists = cumulative_distances(coords)
+            interpolated = interpolate_at_distances(list(known_dists), list(known_elevs), node_dists)
+            for node_id, elevation in zip(way["nodes"], interpolated):
+                node_elevations[node_id] = elevation
 
-    all_elevations = service.get_elevations(all_points, progress=progress)
+        if unresolved:
+            import sys
+            print(f"warning: {unresolved} elevation sample(s) unresolved by all "
+                  f"{len(service._providers)} providers — affected edges get no "
+                  f"gradient penalty", file=sys.stderr)
+        return node_elevations
 
-    node_elevations: dict[int, float] = {}
-    unresolved = 0
-    cursor = 0
-    for way, coords, samples in way_samples:
-        n = len(samples)
-        elevations = all_elevations[cursor:cursor + n]
-        cursor += n
-        sample_dists = [dist for _, _, dist in samples]
-        # Interpolate only over samples a provider actually resolved — do
-        # NOT coerce a None to 0.0 before interpolating, that fabricates a
-        # fake sea-level dip next to real elevations and produces a bogus
-        # gradient. A None sample is simply left out of the interpolation
-        # input (Review Focus #2: no crash, no fabricated value).
-        known = [(d, e) for d, e in zip(sample_dists, elevations) if e is not None]
-        unresolved += sum(1 for e in elevations if e is None)
-        if not known:
-            continue  # no elevation info at all for this way; its node ids
-                       # simply stay out of node_elevations, and tag_grades
-                       # below already treats a missing id as grade_pct=0.0
-        known_dists, known_elevs = zip(*known)
-        node_dists = cumulative_distances(coords)
-        interpolated = interpolate_at_distances(list(known_dists), list(known_elevs), node_dists)
-        for node_id, elevation in zip(way["nodes"], interpolated):
-            node_elevations[node_id] = elevation
+    with progress.step("elevation"):
+        elevations = compute_node_elevations(walkable, service)        # ticks once per provider request
+        progress.detail("elevation_done", **service.last_request)
+    tag_grades(graph, node_coords, elevations)          # mutates graph in place: grade_pct per directed edge
 
-    if unresolved:
-        import sys
-        print(f"warning: {unresolved} elevation sample(s) unresolved by all "
-              f"{len(service._providers)} providers — affected edges get no "
-              f"gradient penalty", file=sys.stderr)
-    return node_elevations
-
-with progress.step("elevation"):
-    elevations = compute_node_elevations(walkable, service)        # ticks once per provider request
-    progress.detail("elevation_done", **service.last_request)
-tag_grades(graph, node_coords, elevations)          # mutates graph in place: grade_pct per directed edge
-
-preferences = {**weights["preferences"], "gradient_threshold_pct": weights["gradient_threshold_pct"]}
-with progress.step("routing"):
-    path, cost = weighted_shortest_path(graph, start_node_id, end_node_id, preferences)
-log.close()  # also on failure: wrap the pipeline in `with RunLog.start(...) as log:` if the script can raise
+    preferences = {**weights["preferences"], "gradient_threshold_pct": weights["gradient_threshold_pct"]}
+    with progress.step("routing"):
+        path, cost = weighted_shortest_path(graph, start_node_id, end_node_id, preferences)
+    # ... save steps: route_output.build_geojson, notes.md, the map (still inside the with-block)
 ```
 
 **Progress output.** Every long step reports to the user, in the user's language (`Progress(lang=...)`: the

@@ -1369,7 +1369,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `day_plan.runlog` (copy from Task 1), `Progress(runlog=…)`/`step(span=…)` (Task 2).
-- Produces: `--no-log` flag; `<route_dir>/day-plan-<UTC>.log.jsonl`; series `plugin.<id>` per plugin and `overpass`.
+- Produces: `--no-log` flag; `<route_dir>/day-plan-<UTC>.log.jsonl`; span `plugins.<id>` and series `plugins.<id>` per plugin and `overpass`.
 
 - [ ] **Step 1: Isolate the day-plan tests**
 
@@ -1558,8 +1558,8 @@ Existing day-plan tests whose fake `_open` returns an object without `read()` re
 `day_plan/service.py` — `from . import runlog`; in `run_plugins` pass the span and wrap the plugin in a series:
 
 ```python
-        with progress.step("plugin", text=_plugin_name(plugin, ctx.lang), span=f"plugin.{plugin.plugin_id}") as step, \
-                runlog.http_series(f"plugin.{plugin.plugin_id}"):
+        with progress.step("plugin", text=_plugin_name(plugin, ctx.lang), span=plugin.plugin_id) as step, \
+                runlog.http_series(f"plugins.{plugin.plugin_id}"):   # inside `with runlog.span("plugins"):`
             try:
                 section = plugin.run(ctx, deps)
             ...
@@ -2186,4 +2186,4 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Placeholder scan:** none; the two places that say "adapt the test/double" in Tasks 4 and 6 describe what to do when an existing fixture differs and name the rule (production code stays as specified).
 
-**Type consistency:** `RunLog.start` (not `open`) everywhere; hook names `step_start/step_end/progress_tick/message` identical in Tasks 1, 2; `http_call(url, attempt=1)` / `call.set(status, nbytes, ok, cache)` used the same way in Tasks 3 and 4; series names `overpass`, `elevation`, `public_geometry`, `plugin.<id>` match tests and the report; `status_total` defined in Task 2, used in Task 5; status file fields identical in Task 1 (writer) and Task 5 (reader).
+**Type consistency:** `RunLog.start` (not `open`) everywhere; hook names `step_start/step_end/progress_tick/message` identical in Tasks 1, 2; `http_call(url, attempt=1)` / `call.set(status, nbytes, ok, cache)` used the same way in Tasks 3 and 4; series names `overpass`, `elevation`, `public_geometry`, `plugins.<id>` match tests and the report; `status_total` defined in Task 2, used in Task 5; status file fields identical in Task 1 (writer) and Task 5 (reader).

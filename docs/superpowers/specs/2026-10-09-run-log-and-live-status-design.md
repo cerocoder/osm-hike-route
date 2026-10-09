@@ -29,7 +29,7 @@ Long planning runs show the user nothing but Claude Code's "Running… N min". `
 | `http` | `host`, `path` (no query string, no keys), `status`, `bytes`, `attempt`, `ok`, `error` (one line, null on success), `series` (name of the innermost enclosing series, or null), `cache` (`hit`/`miss`/null), `t_sent`, `t_answer`, `dur` (= `t_answer - t_sent`: from sending the request to receiving the answer, for every single request, retries included as separate events) |
 | `http_series` | `series` (name, e.g. `elevation_batches`), `n` (requests), `ok`, `failed`, `t_first_sent`, `t_last_answer`, `dur` (= `t_last_answer - t_first_sent`: wall time from the first request of the series to the last answer, including pauses between requests such as the 1 req/s rate limit), `sum_dur` (sum of the single `dur`s), `bytes` |
 | `cache` | `kind`, `result` (`hit`/`miss`/`stale`), `age_s` |
-| `metric` | `name`, `value` (counts: edges, points, batches) |
+| `metric` | `name`, `done`, `total` (progress ticks; `RunLog.metric()` writes `name`, `value` for plain counts: edges, points, batches) |
 | `note` | `key` (message key, not the translated text), `params` — written by `Progress.note` |
 | `warn` / `error` | `msg`; error adds `traceback`. `warn` from `Progress` carries `msg` = the message key plus `params` |
 | `run_end` | `dur`, `ok` |
@@ -44,7 +44,8 @@ Long planning runs show the user nothing but Claude Code's "Running… N min". `
 
 - `Progress(..., runlog=None)`: `step` opens/closes a span, `tick` writes a `metric` (rate-limited like the console line), `note`/`warn` write `note`/`warn` events keyed by the message key (not the translated text). Existing call sites and signatures do not change.
 - HTTP: the day plan's `http.py` and the planner's Overpass and elevation transports go through one wrapper that times the call and emits `http` (retries are separate events with `attempt`). Plugins are untouched.
-- `run_plugins` already opens one step per plugin, so each plugin becomes a span for free.
+- `run_plugins` opens a `plugins` span and one step per plugin inside it, so each plugin is the span `plugins.<id>` (dots are the nesting separator) and its HTTP series is `plugins.<id>`.
+- Elevation `http` events carry the provider's host, path `/` and no status or bytes (the providers swallow their errors).
 - `build_day_plan.main` creates the `RunLog` (CLI only; `--quiet` does not silence the log; `--no-log` does). Library callers and tests get `NullRunLog`.
 - The planner SKILL.md example creates `RunLog` next to `Progress` and passes both.
 
@@ -82,6 +83,8 @@ Prints: total time and outcome; span tree with `dur` and share of the parent; to
 
 - Statusline lag or absence (desktop app) → the log file and `log_report.py` work regardless.
 - Log growth → retention of 20 files; `tick` metrics are rate-limited.
+- Known limitation: the status folder is per user, so with several live runs the statusline shows the one with the freshest heartbeat (a run in one window can show in another window).
+- Stale status files of killed runs are removed by the next `RunLog.start` (older than a day, or a dead pid and a heartbeat older than 30 s).
 - Secrets in URLs → only host and path are logged; a test checks it.
 
 ## Out of scope

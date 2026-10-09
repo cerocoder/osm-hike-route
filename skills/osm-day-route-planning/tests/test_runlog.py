@@ -461,3 +461,46 @@ def test_error_tracebacks_and_failed_runs_do_not_leak_url_keys(make_log, tmp_pat
             path = run.path
             raise RuntimeError("https://h.example/p?key=SECRET")
     assert "SECRET" not in Path(path).read_text(encoding="utf-8")
+
+
+def test_http_error_code_becomes_the_status(make_log):
+    import urllib.error
+    log = make_log()
+    with pytest.raises(urllib.error.HTTPError):
+        with log.http_call("https://h.example/p?key=SECRET"):
+            raise urllib.error.HTTPError("https://h.example/p?key=SECRET", 503, "x", {}, None)
+    log.close()
+    e = next(x for x in events(log) if x["ev"] == "http")
+    assert e["status"] == 503 and e["ok"] is False
+
+
+def test_urls_are_scrubbed_in_span_errors_error_messages_and_message_params(make_log):
+    log = make_log()
+    url = "https://h.example/p?key=SECRET"
+    with pytest.raises(RuntimeError):
+        with log.span("s"):
+            raise RuntimeError(url)
+    token = log.span_start("t")
+    log.span_end(token, ok=False, error=f"failed {url}")
+    log.error(f"bad {url}")
+    log.message("warn", "k", {"endpoint": url, "n": 3})
+    log.message("note", "k2", {"endpoint": url})
+    log.close()
+    text = Path(log.path).read_text(encoding="utf-8")
+    assert "SECRET" not in text and "https://h.example/p" in text
+
+
+def test_start_removes_stale_status_files_but_keeps_a_live_fresh_one(tmp_path):
+    status = tmp_path / "status"
+    status.mkdir()
+    now = 1_700_000_000.0
+    stale_day = status / "999999.json"
+    stale_day.write_text(json.dumps({"heartbeat": now - 2 * 86400}))
+    dead = status / "2147483646.json"
+    dead.write_text(json.dumps({"heartbeat": now - 120}))
+    fresh = status / f"{os.getppid()}.json"            # a live pid, fresh heartbeat
+    fresh.write_text(json.dumps({"heartbeat": now - 5}))
+    log = RunLog.start(tmp_path / "route", "plan", status_dir=status, heartbeat=False, install_as_current=False,
+                       wall=lambda: now)
+    log.close()
+    assert not stale_day.exists() and not dead.exists() and fresh.exists()

@@ -72,6 +72,42 @@ def _one_line(exc) -> str:
         return type(exc).__name__
 
 
+def _scrub_params(params) -> dict:
+    return {k: (_scrub_urls(v) if isinstance(v, str) else v) for k, v in dict(params).items()}
+
+
+def _prune_status(status_dir, wall, max_age_s=86400.0, dead_age_s=30.0):
+    """Best effort: status files of killed runs (older than a day, or a dead pid and a heartbeat older than 30 s)."""
+    try:
+        now = wall()
+        for path in Path(status_dir).glob("*.json"):
+            try:
+                try:
+                    heartbeat = float(json.loads(path.read_text(encoding="utf-8")).get("heartbeat"))
+                except Exception:  # noqa: BLE001
+                    heartbeat = path.stat().st_mtime
+                age = now - heartbeat
+                if age > max_age_s or (age > dead_age_s and not _pid_alive(path.stem)):
+                    path.unlink()
+            except Exception:  # noqa: BLE001
+                continue
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _pid_alive(stem) -> bool:
+    try:
+        pid = int(stem)
+        if pid <= 0:
+            return False
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True
+    except (ValueError, OSError):
+        return False
+
+
 class _Series:
     def __init__(self, name):
         self.name = name
@@ -204,6 +240,8 @@ class RunLog:
                       python=platform.python_version(), platform=platform.platform(), version=LOG_VERSION,
                       started_at=datetime.fromtimestamp(wall(), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
             _prune(folder, keep, log.path)
+            if log._status_path is not None:
+                _prune_status(log._status_path.parent, wall)
             if install_as_current:
                 install(log)
             return log
@@ -242,6 +280,7 @@ class RunLog:
         self.event("warn", msg=msg, **fields)
 
     def error(self, msg, exc=None):
+        msg = _scrub_urls(str(msg))
         tb = ([_scrub_urls(line) for line in traceback.format_exception(type(exc), exc, exc.__traceback__)]
               if exc is not None else None)
         self.event("error", msg=msg, traceback=tb)
@@ -249,9 +288,9 @@ class RunLog:
     def message(self, level, key, params):
         """A Progress note/warning, keyed by its message key (never the translated text)."""
         if level == "warn":
-            self.event("warn", msg=key, params=dict(params))
+            self.event("warn", msg=key, params=_scrub_params(params))
         else:
-            self.event("note", key=key, params=dict(params))
+            self.event("note", key=key, params=_scrub_params(params))
 
     # ---- spans ------------------------------------------------------------------------------------------------------------
     def span_start(self, name, **fields):
@@ -263,6 +302,8 @@ class RunLog:
     def span_end(self, token, ok=True, error=None, **fields):
         depth, path, t0 = token
         del self._spans[depth - 1:]
+        if isinstance(error, str):
+            error = _scrub_urls(error)
         self.event("span_end", span=path, dur=round(self.now() - t0, 3), ok=ok, error=error, **fields)
 
     @contextlib.contextmanager
@@ -283,6 +324,9 @@ class RunLog:
         try:
             yield call
         except BaseException as exc:
+            code = getattr(exc, "code", None)               # urllib's HTTPError: the status of the 4xx/5xx answer
+            if isinstance(code, int) and not isinstance(code, bool):
+                call.status = code
             call.finish(error=_one_line(exc))
             raise
         else:

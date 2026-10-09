@@ -95,6 +95,23 @@ def coarse_departure(text: str | None) -> tuple[str | None, bool]:
     return text.strip(), False
 
 
+def _loggable_argv(argv, departure, dropped) -> list:
+    """A copy of argv for the run log: the --departure value replaced by the coarse one ("<dropped>" if it was dropped)."""
+    shown = "<dropped>" if dropped or departure is None else departure
+    out, args, i = [], list(argv), 0
+    while i < len(args):
+        arg = str(args[i])
+        if arg == "--departure" and i + 1 < len(args):
+            out += [arg, shown]
+            i += 2
+            continue
+        if arg.startswith("--departure="):
+            arg = f"--departure={shown}"
+        out.append(arg)
+        i += 1
+    return out
+
+
 AUTO_PROGRESS = object()        # main(progress=AUTO_PROGRESS): a Progress in the --lang language unless --quiet
 
 
@@ -131,7 +148,7 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text, p
     log = None
     if progress is AUTO_PROGRESS:
         if not args.no_log:
-            log = RunLog.start(route_dir, "day-plan", argv=sys.argv if argv is None else list(argv))
+            log = RunLog.start(route_dir, "day-plan", argv=_loggable_argv(sys.argv if argv is None else argv, departure, dropped))
         stream = io.StringIO() if args.quiet else None          # --quiet: no console lines, the log still gets every step
         if args.quiet and log is None:
             progress = None
@@ -139,40 +156,40 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text, p
             progress = Progress(total_steps=len(plugin_list), lang=args.lang, stream=stream, runlog=log)
     try:
         result = build_plan(ctx, plugin_list, progress)
+        out = route_dir / f"day-plan-{date.isoformat()}.md"
+        out.write_text(result.markdown, encoding="utf-8")
+        print(f"wrote {out.resolve()}")
+        for plugin_id, reason in result.failures:
+            print(f"warning: plugin {plugin_id} failed: {reason}", file=sys.stderr)
+        try:
+            missing = missing_web_facts(ctx)
+        except Exception:  # noqa: BLE001 — a hint must never turn a written plan into a failure
+            missing = []
+        if missing:
+            print(f"hint: no web-sourced facts recorded for {', '.join(missing)} on {date.isoformat()}: search the "
+                  f"web (timetables, directions from the departure point, opening days; for transit also --first-arrival "
+                  f"(the first public transport to the start point) next to --last-departure), record what you find with "
+                  f"record_fact.py, then run this command again"
+                  + (". calendar: check in the official calendar whether the date is a public holiday, a "
+                     "transferred day off or a working Saturday, and record it with --plugin calendar "
+                     "--day-type ..." if "calendar" in missing else ""))
+        try:
+            optional = optional_hazard_facts(ctx, result)
+        except Exception:  # noqa: BLE001 — a hint must never turn a written plan into a failure
+            optional = []
+        if optional:
+            print(f"hint (optional): regional facts would improve the hazard sections: {', '.join(optional)} — "
+                  f"fire: forest-access and open-fire restrictions; mountain: avalanche bulletin, closed huts or passes; "
+                  f"bio_hazards: insect season and peaks, animals (bears, snakes, boar) and hunting; trail_conditions: "
+                  f"reports of the current season (forums, clubs, park administrations) on snow clearing, grooming, ice "
+                  f"and closed sections; water: bathing-water quality, bans on swimming, currents, algae, jellyfish and other "
+                  f"dangers of the water near the route; people_hazards: official travel advisories, permit or border-zone rules and "
+                  f"access restrictions; record them with record_fact.py --plugin <name>")
     except BaseException as exc:
         if log is not None:
             log.error(f"{type(exc).__name__}: {exc}", exc)
             log.close(ok=False)
         raise
-    out = route_dir / f"day-plan-{date.isoformat()}.md"
-    out.write_text(result.markdown, encoding="utf-8")
-    print(f"wrote {out.resolve()}")
-    for plugin_id, reason in result.failures:
-        print(f"warning: plugin {plugin_id} failed: {reason}", file=sys.stderr)
-    try:
-        missing = missing_web_facts(ctx)
-    except Exception:  # noqa: BLE001 — a hint must never turn a written plan into a failure
-        missing = []
-    if missing:
-        print(f"hint: no web-sourced facts recorded for {', '.join(missing)} on {date.isoformat()}: search the "
-              f"web (timetables, directions from the departure point, opening days; for transit also --first-arrival "
-              f"(the first public transport to the start point) next to --last-departure), record what you find with "
-              f"record_fact.py, then run this command again"
-              + (". calendar: check in the official calendar whether the date is a public holiday, a "
-                 "transferred day off or a working Saturday, and record it with --plugin calendar "
-                 "--day-type ..." if "calendar" in missing else ""))
-    try:
-        optional = optional_hazard_facts(ctx, result)
-    except Exception:  # noqa: BLE001 — a hint must never turn a written plan into a failure
-        optional = []
-    if optional:
-        print(f"hint (optional): regional facts would improve the hazard sections: {', '.join(optional)} — "
-              f"fire: forest-access and open-fire restrictions; mountain: avalanche bulletin, closed huts or passes; "
-              f"bio_hazards: insect season and peaks, animals (bears, snakes, boar) and hunting; trail_conditions: "
-              f"reports of the current season (forums, clubs, park administrations) on snow clearing, grooming, ice "
-              f"and closed sections; water: bathing-water quality, bans on swimming, currents, algae, jellyfish and other "
-              f"dangers of the water near the route; people_hazards: official travel advisories, permit or border-zone rules and "
-              f"access restrictions; record them with record_fact.py --plugin <name>")
     if log is not None:
         log.close(ok=True)
     return 0

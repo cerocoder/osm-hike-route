@@ -15,6 +15,7 @@ NOT written.
 """
 import argparse
 import datetime
+import io
 import re
 import sys
 from pathlib import Path
@@ -43,6 +44,7 @@ from day_plan.plugins.water import WaterPlugin
 from day_plan.plugins.water_near import WaterNearPlugin
 from day_plan.plugins.weather import WeatherPlugin
 from day_plan.progress import Progress
+from day_plan.runlog import RunLog
 from day_plan.service import build_plan
 
 
@@ -103,7 +105,8 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text, p
     parser.add_argument("--lang", default="en")
     parser.add_argument("--departure", default=None)
     parser.add_argument("--start", default=None, help="planned start time HH:MM")
-    parser.add_argument("--quiet", action="store_true", help="no progress lines")
+    parser.add_argument("--quiet", action="store_true", help="no progress lines on stderr (the run log is kept)")
+    parser.add_argument("--no-log", action="store_true", help="do not write the run log and the live status file")
     args = parser.parse_args(argv)
 
     route_dir = Path(args.route_dir)
@@ -125,9 +128,22 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text, p
     ctx = build_context(route_dir, date, lang=args.lang, departure=departure, start_time=start,
                         http=http, http_text=http_text, now=now)
     plugin_list = plugins if plugins is not None else default_plugins()
+    log = None
     if progress is AUTO_PROGRESS:
-        progress = None if args.quiet else Progress(total_steps=len(plugin_list), lang=args.lang)
-    result = build_plan(ctx, plugin_list, progress)
+        if not args.no_log:
+            log = RunLog.start(route_dir, "day-plan", argv=sys.argv if argv is None else list(argv))
+        stream = io.StringIO() if args.quiet else None          # --quiet: no console lines, the log still gets every step
+        if args.quiet and log is None:
+            progress = None
+        else:
+            progress = Progress(total_steps=len(plugin_list), lang=args.lang, stream=stream, runlog=log)
+    try:
+        result = build_plan(ctx, plugin_list, progress)
+    except BaseException as exc:
+        if log is not None:
+            log.error(f"{type(exc).__name__}: {exc}", exc)
+            log.close(ok=False)
+        raise
     out = route_dir / f"day-plan-{date.isoformat()}.md"
     out.write_text(result.markdown, encoding="utf-8")
     print(f"wrote {out.resolve()}")
@@ -157,6 +173,8 @@ def main(argv=None, http=get_json, now=None, plugins=None, http_text=get_text, p
               f"and closed sections; water: bathing-water quality, bans on swimming, currents, algae, jellyfish and other "
               f"dangers of the water near the route; people_hazards: official travel advisories, permit or border-zone rules and "
               f"access restrictions; record them with record_fact.py --plugin <name>")
+    if log is not None:
+        log.close(ok=True)
     return 0
 
 

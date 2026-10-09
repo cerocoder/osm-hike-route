@@ -11,6 +11,7 @@ import time
 import urllib.parse
 from dataclasses import asdict, dataclass
 
+from . import runlog
 from .http import HttpError
 from .i18n import tr
 
@@ -69,30 +70,31 @@ def run(http, ql: str, mirrors=MIRRORS, retries: int = 1, sleep=None, backoff: f
     tried again."""
     sleep = sleep or _default_sleep
     last = "no mirror tried"
-    for attempt in range(retries + 1):
-        order = health.ordered(mirrors) if health is not None else list(mirrors)
-        if attempt and progress is not None and order:
-            progress.note("overpass_attempt", endpoint=_host(order[0]), n=attempt + 1, m=retries + 1)
-        for mirror in order:
-            try:
-                data = http(f"{mirror}?data={urllib.parse.quote(ql)}")
-            except HttpError as e:
-                last = f"{mirror}: {e}"
-                _failed(health, progress, mirror, e)
-                continue
-            if not isinstance(data, dict) or not isinstance(data.get("elements"), list):
-                last = f"{mirror}: unexpected response"
-                _failed(health, progress, mirror, "unexpected response")
-                continue
-            if "runtime error" in str(data.get("remark", "")).lower():
-                last = f"{mirror}: {data.get('remark')}"
-                _failed(health, progress, mirror, data.get("remark"))
-                continue
-            if health is not None:
-                health.worked(mirror)
-            return data
-        if attempt < retries:
-            sleep(backoff * (attempt + 1))
+    with runlog.http_series("overpass"):
+        for attempt in range(retries + 1):
+            order = health.ordered(mirrors) if health is not None else list(mirrors)
+            if attempt and progress is not None and order:
+                progress.note("overpass_attempt", endpoint=_host(order[0]), n=attempt + 1, m=retries + 1)
+            for mirror in order:
+                try:
+                    data = http(f"{mirror}?data={urllib.parse.quote(ql)}")
+                except HttpError as e:
+                    last = f"{mirror}: {e}"
+                    _failed(health, progress, mirror, e)
+                    continue
+                if not isinstance(data, dict) or not isinstance(data.get("elements"), list):
+                    last = f"{mirror}: unexpected response"
+                    _failed(health, progress, mirror, "unexpected response")
+                    continue
+                if "runtime error" in str(data.get("remark", "")).lower():
+                    last = f"{mirror}: {data.get('remark')}"
+                    _failed(health, progress, mirror, data.get("remark"))
+                    continue
+                if health is not None:
+                    health.worked(mirror)
+                return data
+            if attempt < retries:
+                sleep(backoff * (attempt + 1))
     raise OverpassError(last)
 
 

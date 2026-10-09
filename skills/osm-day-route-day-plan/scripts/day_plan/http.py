@@ -4,6 +4,8 @@ import json
 import urllib.error
 import urllib.request
 
+from . import runlog
+
 # Nominatim's usage policy asks for an identifying User-Agent.
 USER_AGENT = "osm-day-route-day-plan/1.0 (+https://github.com/cerocoder/osm-hike-route)"
 
@@ -21,8 +23,11 @@ def get_text(url: str, timeout: float = 10.0) -> str:
     GWIS WMS GetFeatureInfo). Same failure contract as get_json."""
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with _open(req, timeout) as resp:
-            return resp.read().decode("utf-8", "replace")
+        with runlog.http_call(url) as call:
+            with _open(req, timeout) as resp:
+                raw = resp.read()
+                call.set(status=getattr(resp, "status", None), nbytes=len(raw))
+            return raw.decode("utf-8", "replace")
     except (urllib.error.URLError, OSError, ValueError) as e:
         raise HttpError(str(e)) from e
 
@@ -30,7 +35,10 @@ def get_text(url: str, timeout: float = 10.0) -> str:
 def get_json(url: str, timeout: float = 10.0) -> dict:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with _open(req, timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        with runlog.http_call(url) as call:
+            with _open(req, timeout) as resp:
+                raw = resp.read()
+                call.set(status=getattr(resp, "status", None), nbytes=len(raw))
+            return json.loads(raw.decode("utf-8"))
     except (urllib.error.URLError, OSError, ValueError) as e:
         raise HttpError(str(e)) from e

@@ -88,3 +88,12 @@ def weather_response():
 @pytest.fixture
 def fixed_now():
     return datetime.datetime(2026, 6, 20, 12, 0, tzinfo=datetime.timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def isolated_runlog(tmp_path, monkeypatch):
+    """No test writes to the real ~/.cache status folder or leaks an installed run log."""
+    monkeypatch.setenv("OSM_HIKE_STATUS_DIR", str(tmp_path / "_status"))
+    yield
+    from day_plan import runlog
+    runlog.install(None)

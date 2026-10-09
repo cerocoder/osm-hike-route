@@ -4,6 +4,7 @@ tile_providers.TileProviderService), then assembles the Markdown file."""
 import datetime
 from dataclasses import dataclass
 
+from . import runlog
 from .base import SECTION_ORDER, Section
 from .i18n import STRINGS, activity_label, tr
 from .progress import NullProgress
@@ -74,7 +75,8 @@ def run_plugins(ctx, plugins: list, progress=None):
     shared, failures, by_id = {}, [], {}
     for plugin in _ordered(plugins):
         deps = {d: shared[d] for d in plugin.depends_on if d in shared}
-        with progress.step("plugin", text=_plugin_name(plugin, ctx.lang)) as step:
+        with progress.step("plugin", text=_plugin_name(plugin, ctx.lang), span=f"plugin.{plugin.plugin_id}") as step, \
+                runlog.http_series(f"plugin.{plugin.plugin_id}"):
             try:
                 section = plugin.run(ctx, deps)
             except Exception as e:  # noqa: BLE001 — isolate any plugin failure

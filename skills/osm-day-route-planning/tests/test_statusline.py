@@ -2,8 +2,7 @@ import io
 import json
 import os
 import sys
-
-import pytest
+import time
 
 import statusline
 
@@ -71,7 +70,6 @@ def test_a_missing_status_folder_is_not_an_error(tmp_path):
 def test_slow_or_failing_fallback_prints_nothing(tmp_path):
     assert run(tmp_path, ["--fallback", "exit 3"])[1] == ""
     slow = f"{sys.executable} -c \"import time; time.sleep(10)\""
-    import time
     started = time.monotonic()
     assert run(tmp_path, ["--fallback", slow])[1] == ""
     assert time.monotonic() - started < 5
@@ -80,3 +78,46 @@ def test_slow_or_failing_fallback_prints_nothing(tmp_path):
 def test_pid_alive_for_this_process_and_a_dead_one():
     assert statusline.pid_alive(os.getpid()) is True
     assert statusline.pid_alive(2 ** 22 + 12345) is False
+
+
+def test_malformed_status_never_raises_and_falls_back(tmp_path):
+    for bad in ({"n": 9, "i": None}, {"step_started": "x"}, {"run_started": "x"}, {"total": "x", "done": 1},
+                {"lang": ["ru"]}, {"lang": {"a": 1}}):
+        for f in tmp_path.glob("*.json"):
+            f.unlink()
+        put(tmp_path, 111, **bad)
+        code, out = run(tmp_path, ["--fallback", "echo NORMAL"])
+        assert code == 0
+        assert out.strip() in ("NORMAL", "") or out.startswith("🥾")
+    for f in tmp_path.glob("*.json"):
+        f.unlink()
+    (tmp_path / "9.json").write_text(json.dumps({"pid": 9, "heartbeat": NOW, "n": 9, "step_started": "x"}))
+    assert run(tmp_path, ["--fallback", "echo NORMAL"]) == (0, "NORMAL\n")
+    assert run(tmp_path) == (0, "")
+
+
+def test_non_utf8_stdout_never_raises(tmp_path):
+    put(tmp_path, 111)
+    raw = io.BytesIO()
+    out = io.TextIOWrapper(raw, encoding="ascii")
+    code = statusline.main(["--status-dir", str(tmp_path)], stdin=io.StringIO("{}"), stdout=out,
+                           now=lambda: NOW, alive=lambda pid: True)
+    out.flush()
+    assert code == 0 and raw.getvalue()
+
+    class NoBuffer:
+        encoding = "ascii"
+        text = ""
+
+        def write(self, value):
+            value.encode("ascii")
+            self.text += value
+
+    plain = NoBuffer()
+    assert statusline.main(["--status-dir", str(tmp_path)], stdin=io.StringIO("{}"), stdout=plain,
+                           now=lambda: NOW, alive=lambda pid: True) == 0
+    assert plain.text
+
+
+def test_pid_alive_rejects_non_positive_pids():
+    assert statusline.pid_alive(0) is False and statusline.pid_alive(-1) is False

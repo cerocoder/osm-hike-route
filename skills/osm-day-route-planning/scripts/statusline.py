@@ -9,6 +9,7 @@ A run counts as live when its pid exists and its heartbeat is younger than 30 s.
 """
 import argparse
 import json
+import math
 import os
 import signal
 import subprocess
@@ -26,6 +27,8 @@ FALLBACK_TIMEOUT_S = 2.0
 
 def pid_alive(pid) -> bool:
     try:
+        if int(pid) <= 0:
+            return False
         os.kill(int(pid), 0)
     except ProcessLookupError:
         return False
@@ -45,9 +48,10 @@ def pick_status(status_dir, now, alive=pid_alive):
         try:
             status = json.loads(path.read_text(encoding="utf-8"))
             heartbeat = float(status["heartbeat"])
-            if not isinstance(status, dict) or now - heartbeat >= STALE_AFTER_S or not alive(status["pid"]):
+            if (not isinstance(status, dict) or not math.isfinite(heartbeat) or now - heartbeat >= STALE_AFTER_S
+                    or not alive(status["pid"])):
                 continue
-        except (OSError, ValueError, KeyError, TypeError):
+        except Exception:  # noqa: BLE001
             continue
         if best is None or heartbeat > float(best["heartbeat"]):
             best = status
@@ -60,8 +64,9 @@ def _clock(seconds) -> str:
 
 
 def render(status, now) -> str:
-    lang = status.get("lang") if status.get("lang") in MESSAGES["status_total"] else "en"
-    counter = f"[{status['i']}/{status['n']}]" if status.get("n") else f"[{status.get('i') or 1}]"
+    lang = status.get("lang")
+    lang = lang if isinstance(lang, str) and lang in MESSAGES["status_total"] else "en"
+    counter = f"[{status.get('i') or 1}/{status['n']}]" if status.get("n") else f"[{status.get('i') or 1}]"
     line = f"🥾 {counter} {status.get('step_title') or ''}".rstrip()
     if status.get("total"):
         line += f" {status.get('done') or 0}/{status['total']}"
@@ -75,24 +80,37 @@ def render(status, now) -> str:
 def _fallback(command, stdin_text) -> str:
     try:
         process = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                   stderr=subprocess.DEVNULL, text=True, start_new_session=True)
+                                   stderr=subprocess.DEVNULL, start_new_session=True)
     except OSError:
         return ""
     try:
-        out, _ = process.communicate(stdin_text, timeout=FALLBACK_TIMEOUT_S)
+        out, _ = process.communicate(stdin_text.encode("utf-8", "replace"), timeout=FALLBACK_TIMEOUT_S)
     except subprocess.TimeoutExpired:
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except OSError:
             pass
-        process.communicate()
+        try:
+            process.communicate(timeout=1.0)
+        except Exception:  # noqa: BLE001
+            pass
         return ""
     except Exception:  # noqa: BLE001
         return ""
-    return out.rstrip("\n") if process.returncode == 0 else ""
+    return out.decode("utf-8", "replace").rstrip("\n") if process.returncode == 0 else ""
 
 
-def main(argv=None, stdin=None, stdout=None, now=time.time, alive=pid_alive) -> int:
+def _write(stdout, line) -> None:
+    buffer = getattr(stdout, "buffer", None)
+    if buffer is not None:
+        buffer.write(line.encode("utf-8", "replace"))
+        buffer.flush()
+    else:
+        encoding = getattr(stdout, "encoding", None) or "utf-8"
+        stdout.write(line.encode(encoding, "replace").decode(encoding, "replace"))
+
+
+def _main(argv, stdin, stdout, now, alive) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fallback", default=None, help="the normal statusline command")
     parser.add_argument("--status-dir", default=None)
@@ -103,13 +121,26 @@ def main(argv=None, stdin=None, stdout=None, now=time.time, alive=pid_alive) -> 
         stdin_text = stdin.read()
     except Exception:  # noqa: BLE001
         stdin_text = ""
-    status = pick_status(args.status_dir or default_status_dir(), now(), alive)
-    if status is not None:
-        line = render(status, now())
-    else:
-        line = _fallback(args.fallback, stdin_text) if args.fallback else ""
+    line = ""
+    try:
+        status = pick_status(args.status_dir or default_status_dir(), now(), alive)
+        if status is not None:
+            line = render(status, now())
+    except Exception:  # noqa: BLE001
+        line = ""
+    if not line and args.fallback:
+        line = _fallback(args.fallback, stdin_text)
     if line:
-        stdout.write(line + "\n")
+        _write(stdout, line + "\n")
+
+
+def main(argv=None, stdin=None, stdout=None, now=time.time, alive=pid_alive) -> int:
+    try:
+        _main(argv, stdin, stdout, now, alive)
+    except SystemExit:
+        raise
+    except Exception:  # noqa: BLE001
+        pass
     return 0
 
 

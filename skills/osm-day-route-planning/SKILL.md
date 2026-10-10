@@ -134,7 +134,8 @@ new preset, no code changes).
    exclude_highway_without_infra=weights["exclude_highway_without_infra"],
    mode=weights["mode"])` returns walkable ways, highways (for avoidance), water, forest, fields,
    plus everything needed for hard exclusion — restricted ways/areas,
-   barrier ways, and barrier nodes — in one query, bucketed by tag. The
+   barrier ways, and barrier nodes — plus surface `railways` and `stations` (station/halt/metro, nodes or
+   ways with a `center`), in one query, bucketed by tag. The
    three preset-driven arguments matter: without them, a mode's own
    routable ways (e.g. bike's `cycleway`) are never fetched at all, and
    `filter_excluded_ways`'s hard-exclusion/infra rules for highway values
@@ -167,11 +168,15 @@ new preset, no code changes).
         data["walkable"], restricted,
         hard_exclude_tags=weights["hard_exclude_tags"],
         exclude_highway_without_infra=weights["exclude_highway_without_infra"],
+        vehicle_tunnel_max_m=weights.get("vehicle_tunnel_max_m"),
     )
     graph, node_coords = route_graph.build_graph(
         walkable, data["barrier_nodes"],
         blocking_barrier_tags=weights["blocking_barrier_tags"],
         respect_oneway=(mode == "bike"),
+    )
+    crossings = route_graph.add_station_crossings(
+        graph, node_coords, data["stations"], data["railways"], data["highways"],
     )
     route_graph.tag_edges(
         graph, node_coords, data["highways"], data["water"],
@@ -180,6 +185,19 @@ new preset, no code changes).
         water_buffer_m=weights["buffers_m"]["water"],
     )
     ```
+    `add_station_crossings` is **always on**: a railway or a motorway/trunk/primary road splits the graph, and a
+    station or halt standing beside it is where it can be crossed (footbridge, underpass, platform crossing, metro
+    concourse), though OSM often maps no footway there. For each such station it adds a two-way link between the
+    nearest graph nodes on the two sides (within 200 m of the station); the router uses it only when it is cheaper. A railway or road running in a tunnel is no obstacle (one can walk over it) and is
+    skipped; a road or track tunnel is passable at any length, except a motorway/trunk one: that stays in the graph only
+    with a pedestrian lane (`foot=yes|designated` or a sidewalk) and at most `vehicle_tunnel_max_m` (15 m, every
+    preset) long; a flooded tunnel is always dropped (`foot=no`/`bicycle=no` ways go by `hard_exclude_tags`); a footway tunnel or underpass is an ordinary routable way, and its `tunnel`/`bridge` tag is kept in the
+    route's way segments.
+    After routing, `route_graph.path_station_crossings(graph, path)` lists the stations the route actually crosses
+    at. **For each of them do a web search** (WebSearch; the browser only as the usual last resort) on how that
+    station is crossed on foot — footbridge or underpass, steps or lift, whether the platform crossing is allowed,
+    opening hours of the concourse — and put the finding into the route notes under that station's name, tier-labelled
+    like any other web claim. If nothing reliable turns up, say so in the notes: the link is an OSM-based guess.
     `respect_oneway` only matters for `bike` — `walk` never respects
     `oneway`. A plain two-way segment with no `oneway` tag stays traversable
     in both directions for **both** modes (Review Focus #5) — `build_graph`
@@ -413,7 +431,7 @@ from overpass_query import query_overpass, haversine        # noqa: F401 (import
 from presets import load_preset, build_weights
 from route_graph import (
     fetch_area_data, build_restricted_polygons, filter_excluded_ways,
-    build_graph, tag_edges, tag_grades, weighted_shortest_path,
+    build_graph, add_station_crossings, tag_edges, tag_grades, weighted_shortest_path,
     route_through_waypoints, path_geometry,
 )
 from waypoints import is_point_restricted, validate_user_waypoint, check_mandatory_budget, select_optional_points
@@ -455,6 +473,7 @@ with RunLog.start(route_dir, "plan", argv=sys.argv) as log:   # <route_dir>/plan
         data["walkable"], restricted,
         hard_exclude_tags=weights["hard_exclude_tags"],
         exclude_highway_without_infra=weights["exclude_highway_without_infra"],
+        vehicle_tunnel_max_m=weights.get("vehicle_tunnel_max_m"),
     )
     with progress.step("graph"):
         graph, node_coords = build_graph(
@@ -462,6 +481,7 @@ with RunLog.start(route_dir, "plan", argv=sys.argv) as log:   # <route_dir>/plan
             blocking_barrier_tags=weights["blocking_barrier_tags"],
             respect_oneway=(mode == "bike"),
         )
+        add_station_crossings(graph, node_coords, data["stations"], data["railways"], data["highways"])
         progress.detail("graph_done", nodes=len(graph), edges=sum(len(e) for e in graph.values()))
     with progress.step("tag_edges"):
         tag_edges(graph, node_coords, data["highways"], data["water"], data["forest"], data["fields"],

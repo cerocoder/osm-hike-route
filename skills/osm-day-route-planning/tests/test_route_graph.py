@@ -764,3 +764,117 @@ def test_route_through_waypoints_ticks_once_per_leg():
     assert path == [1, 2, 3] and error is None
     assert recorder.ticks == [(1, 2, "route_leg"), (2, 2, "route_leg")]
     assert route_graph.route_through_waypoints(graph, [3, 1], {})[2] == "no path between 3 and 1"
+
+
+# ---- station crossings over railways and heavy roads --------------------------------------------------------------
+
+def _two_banks_with_railway():
+    """A footpath on each side of a north-south railway at lon 37.0, a halt on the railway; no path joins the banks."""
+    west = {"id": 1, "nodes": [1, 2], "tags": {"highway": "path"},
+            "geometry": _pts((55.0000, 36.9990), (55.0010, 36.9990))}
+    east = {"id": 2, "nodes": [3, 4], "tags": {"highway": "path"},
+            "geometry": _pts((55.0000, 37.0010), (55.0010, 37.0010))}
+    railway = {"id": 9, "tags": {"railway": "rail"}, "geometry": _pts((54.999, 37.0), (55.002, 37.0))}
+    halt = {"type": "node", "id": 50, "lat": 55.0005, "lon": 37.0, "tags": {"railway": "halt", "name": "Halt"}}
+    return west, east, railway, halt
+
+
+def test_fetch_area_data_buckets_railways_and_stations():
+    elements = [
+        {"type": "way", "id": 1, "tags": {"railway": "rail"}},
+        {"type": "way", "id": 2, "tags": {"railway": "abandoned"}},
+        {"type": "node", "id": 3, "lat": 55.0, "lon": 37.0, "tags": {"railway": "station"}},
+        {"type": "way", "id": 4, "center": {"lat": 55.0, "lon": 37.0}, "tags": {"railway": "halt"}},
+        {"type": "node", "id": 5, "lat": 55.0, "lon": 37.0, "tags": {"public_transport": "station", "subway": "yes"}},
+    ]
+    with patch.object(route_graph, "query_overpass", return_value={"elements": elements}):
+        buckets = fetch_area_data(55.0, 37.0)
+    assert [w["id"] for w in buckets["railways"]] == [1]
+    assert [s["id"] for s in buckets["stations"]] == [3, 4, 5]
+
+
+def test_station_crossing_joins_the_two_sides_of_a_railway():
+    west, east, railway, halt = _two_banks_with_railway()
+    graph, coords = build_graph([west, east])
+    assert route_graph.weighted_shortest_path(graph, 1, 3, {})[0] is None
+
+    linked = route_graph.add_station_crossings(graph, coords, [halt], [railway], [])
+
+    assert [s["id"] for s in linked] == [50]
+    path, _ = route_graph.weighted_shortest_path(graph, 1, 3, {})
+    assert path is not None and path[0] == 1 and path[-1] == 3
+    crossings = route_graph.path_station_crossings(graph, path)
+    assert [c["station"] for c in crossings] == ["Halt"]
+
+
+def test_station_far_from_any_line_adds_no_link():
+    west, east, railway, halt = _two_banks_with_railway()
+    halt["lon"] = 37.01                                           # ~640 m from the railway
+    graph, coords = build_graph([west, east])
+    assert route_graph.add_station_crossings(graph, coords, [halt], [railway], []) == []
+    assert route_graph.weighted_shortest_path(graph, 1, 3, {})[0] is None
+
+
+def test_station_crossing_works_for_a_way_station_with_a_center_and_a_heavy_road():
+    west, east, _, halt = _two_banks_with_railway()
+    trunk = {"id": 8, "tags": {"highway": "trunk"}, "geometry": _pts((54.999, 37.0), (55.002, 37.0))}
+    station = {"type": "way", "id": 60, "center": {"lat": 55.0005, "lon": 37.0}, "tags": {"railway": "station"}}
+    graph, coords = build_graph([west, east])
+    linked = route_graph.add_station_crossings(graph, coords, [station], [], [trunk])
+    assert [s["id"] for s in linked] == [60]
+
+
+def test_station_with_nodes_on_one_side_only_adds_no_link():
+    west, _, railway, halt = _two_banks_with_railway()
+    graph, coords = build_graph([west])
+    assert route_graph.add_station_crossings(graph, coords, [halt], [railway], []) == []
+
+
+def test_tunnel_railway_is_no_obstacle_so_a_station_beside_it_adds_no_link():
+    west, east, railway, halt = _two_banks_with_railway()
+    railway["tags"]["tunnel"] = "yes"
+    graph, coords = build_graph([west, east])
+    assert route_graph.add_station_crossings(graph, coords, [halt], [railway], []) == []
+
+
+def test_pedestrian_tunnel_is_routable_and_reported_in_the_way_segments():
+    west, east, _, _ = _two_banks_with_railway()
+    tunnel = {"id": 3, "nodes": [2, 4], "tags": {"highway": "footway", "tunnel": "yes", "layer": "-1"},
+              "geometry": _pts((55.0010, 36.9990), (55.0010, 37.0010))}
+    graph, coords = build_graph([west, east, tunnel])
+    path, _ = route_graph.weighted_shortest_path(graph, 1, 3, {})
+    assert path == [1, 2, 4, 3]
+    assert [r.get("tunnel") for r in route_graph.path_way_segments(graph, path)] == [None, "yes", None]
+
+
+def _tunnel_way(way_id, tags, metres):
+    """A north-south way of the given length with the given tags."""
+    return {"id": way_id, "tags": tags, "nodes": [way_id * 10, way_id * 10 + 1],
+            "geometry": _pts((55.0, 37.0), (55.0 + metres / 111195.0, 37.0))}
+
+
+def test_road_tunnels_are_passable_except_motorway_and_trunk_without_a_short_pedestrian_lane():
+    ways = [
+        _tunnel_way(1, {"highway": "tertiary", "tunnel": "yes"}, 500),                      # any length: kept
+        _tunnel_way(2, {"highway": "track", "tunnel": "yes"}, 300),                         # kept
+        _tunnel_way(3, {"highway": "footway", "tunnel": "yes"}, 300),                       # underpass: kept
+        _tunnel_way(4, {"highway": "residential", "tunnel": "building_passage"}, 50),       # kept
+        _tunnel_way(5, {"highway": "footway", "tunnel": "flooded"}, 5),                     # flooded: dropped
+        _tunnel_way(6, {"highway": "trunk", "tunnel": "yes"}, 10),                          # no pedestrian lane: dropped
+        _tunnel_way(7, {"highway": "trunk", "tunnel": "yes", "sidewalk": "both"}, 10),      # lane, short: kept
+        _tunnel_way(8, {"highway": "motorway", "tunnel": "yes", "foot": "designated"}, 40), # lane, long: dropped
+        _tunnel_way(9, {"highway": "motorway", "tunnel": "yes", "sidewalk": "no"}, 10),     # sidewalk=no: dropped
+    ]
+    kept = route_graph.filter_excluded_ways(ways, [], vehicle_tunnel_max_m=15)
+    assert [w["id"] for w in kept] == [1, 2, 3, 4, 7]
+
+
+def test_vehicle_tunnels_are_kept_when_the_preset_does_not_ask_for_the_rule():
+    ways = [_tunnel_way(1, {"highway": "trunk", "tunnel": "yes"}, 500)]
+    assert len(route_graph.filter_excluded_ways(ways, [])) == 1
+
+
+def test_every_preset_limits_vehicle_tunnels_to_15_m():
+    from presets import load_preset
+    for preset in (load_preset("walk"), load_preset("bike", "leisure"), load_preset("bike", "sport")):
+        assert preset.get("vehicle_tunnel_max_m") == 15

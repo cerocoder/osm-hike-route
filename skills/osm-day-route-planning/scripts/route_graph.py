@@ -40,6 +40,14 @@ RESTRICTED_ACCESS = ("private", "no", "military")
 DEFAULT_ROUTABLE_HIGHWAY = ("path", "footway", "track", "residential", "living_street")
 AVOIDANCE_HIGHWAY = ("motorway", "trunk", "primary", "secondary")
 
+# Long line objects that cut the graph in two and cannot be crossed on foot between two crossings: surface railways and
+# the heavy roads. A station or halt beside such a line is taken as a place where it can be crossed (a footbridge, an
+# underpass, a platform crossing, a metro concourse).
+OBSTACLE_RAILWAY = ("rail", "light_rail", "narrow_gauge")
+OBSTACLE_HIGHWAY = ("motorway", "trunk", "primary")
+STATION_CROSSING = "station_crossing"           # the "highway" value of a synthetic station link in the way segments
+STATION_RADIUS_M = 200                          # how far from the station point the two ends of its link are looked for
+
 
 def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
                      routable_highway=None, hard_exclude_highway=None,
@@ -49,7 +57,8 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
     exclusion need: walkable ways, highways (for avoidance), water,
     forest, fields, plus access-restricted ways, military land, barrier
     ways (fence/wall — used to detect enclosed private zones), and
-    barrier nodes (gates etc. sitting on a path).
+    barrier nodes (gates etc. sitting on a path), surface railway lines and stations/halts (see
+    add_station_crossings).
     Radius-limited on purpose — see reference.md on Overpass timeouts.
 
     routable_highway/hard_exclude_highway/exclude_highway_without_infra
@@ -122,6 +131,15 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
     (
       node["barrier"](around:{radius_m},{lat},{lon});
     )->.barriernodes;
+    (
+      way["railway"~"^(rail|light_rail|narrow_gauge)$"](around:{radius_m},{lat},{lon});
+    )->.railways;
+    (
+      node["railway"~"^(station|halt)$"](around:{radius_m},{lat},{lon});
+      way["railway"~"^(station|halt)$"](around:{radius_m},{lat},{lon});
+      node["public_transport"="station"]["subway"="yes"](around:{radius_m},{lat},{lon});
+      node["public_transport"="station"]["train"="yes"](around:{radius_m},{lat},{lon});
+    )->.stations;
     .walkable out geom;
     .highways out geom;
     .water out geom;
@@ -130,6 +148,8 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
     .restricted out geom;
     .barrierways out geom;
     .barriernodes out;
+    .railways out geom;
+    .stations out center;
     """
     options = {}
     if cache_dir is not None:
@@ -146,11 +166,18 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
     buckets = {
         "walkable": [], "highways": [], "water": [], "forest": [], "fields": [],
         "restricted": [], "barrier_ways": [], "barrier_nodes": [],
+        "railways": [], "stations": [],
     }
     for el in elements:
         tags = el.get("tags", {})
         if el["type"] == "node" and "barrier" in tags:
             buckets["barrier_nodes"].append(el)
+            continue
+        if tags.get("railway") in OBSTACLE_RAILWAY:
+            buckets["railways"].append(el)
+            continue
+        if tags.get("railway") in ("station", "halt") or tags.get("public_transport") == "station":
+            buckets["stations"].append(el)
             continue
         # A dedicated path explicitly opened to bikes OR pedestrians through
         # an otherwise access-restricted area (e.g. access=no +
@@ -333,13 +360,44 @@ def _lacks_required_cycle_infra(tags: dict, exclude_highway_without_infra: list)
     return not _has_cycle_infra(tags)
 
 
+def _way_length_m(way: dict) -> float:
+    geom = way.get("geometry") or []
+    return sum(haversine(p["lat"], p["lon"], q["lat"], q["lon"]) for p, q in zip(geom, geom[1:]))
+
+
+def _has_pedestrian_lane(tags: dict) -> bool:
+    if tags.get("foot") in ("yes", "designated"):
+        return True
+    return any(tags.get(k) not in (None, "no", "none")
+               for k in ("sidewalk", "sidewalk:left", "sidewalk:right", "sidewalk:both"))
+
+
+def _is_unsafe_vehicle_tunnel(way: dict, max_length_m: float) -> bool:
+    """A flooded tunnel is unsafe on foot. A motorway/trunk tunnel is passable only when it has a pedestrian lane
+    (foot=yes|designated or a sidewalk) AND is no longer than `max_length_m`. Every other road/track tunnel is
+    passable at any length. A pedestrian/cycle way in a tunnel (an underpass) and a building passage are fine. OSM
+    asks mappers to split a way where a tunnel starts and ends, so the way's length is the tunnel's."""
+    tags = way.get("tags", {})
+    tunnel = tags.get("tunnel")
+    if tunnel in (None, "no", "building_passage"):
+        return False
+    if tunnel == "flooded":
+        return True
+    if tags.get("highway") in ("motorway", "trunk"):
+        return not _has_pedestrian_lane(tags) or _way_length_m(way) > max_length_m
+    return False
+
+
 def filter_excluded_ways(walkable_ways, restricted_polygons,
                           hard_exclude_tags: dict | None = None,
-                          exclude_highway_without_infra: list | None = None):
+                          exclude_highway_without_infra: list | None = None,
+                          vehicle_tunnel_max_m: float | None = None):
     """Hard-excludes a way whose midpoint falls inside a restricted polygon
     (unchanged from the walk-only version), OR whose tags match this mode's
     preset-supplied hard-exclusion rules (spec §3.6) — never a weighted
-    penalty, a full drop, same as the restricted-zone case."""
+    penalty, a full drop, same as the restricted-zone case. vehicle_tunnel_max_m (preset key, 15 for every preset; None = no rule) also drops
+    a motorway/trunk tunnel unless it has a pedestrian lane (foot=yes|designated or a sidewalk) and is at most that long,
+    and any flooded tunnel. Other road/track tunnels stay at any length; underpasses stay."""
     hard_exclude_tags = hard_exclude_tags or {}
     exclude_highway_without_infra = exclude_highway_without_infra or []
     kept = []
@@ -352,6 +410,8 @@ def filter_excluded_ways(walkable_ways, restricted_polygons,
             continue
         if _lacks_required_cycle_infra(tags, exclude_highway_without_infra):
             continue
+        if vehicle_tunnel_max_m is not None and _is_unsafe_vehicle_tunnel(way, vehicle_tunnel_max_m):
+            continue
         mid = geom[len(geom) // 2]
         if any(point_in_ring(mid["lat"], mid["lon"], ring) for ring in restricted_polygons):
             continue
@@ -363,7 +423,7 @@ def filter_excluded_ways(walkable_ways, restricted_polygons,
 # archive can say what each part of the route runs on (route.geojson "segments").
 WAY_TAG_KEYS = (
     "highway", "surface", "smoothness", "tracktype", "sac_scale", "mtb:scale", "trail_visibility",
-    "bicycle", "foot", "winter_service", "snowplowing",
+    "bicycle", "foot", "winter_service", "snowplowing", "tunnel", "bridge",
 )
 
 
@@ -582,6 +642,107 @@ def path_way_segments(graph, node_path):
         else:
             runs.append({"from": i, "to": i + 1, **description})
     return runs
+
+
+def _station_point(station):
+    """(lat, lon) of a station element: a node's own point, a way's Overpass `center`; None when it has neither."""
+    if "lat" in station and "lon" in station:
+        return station["lat"], station["lon"]
+    center = station.get("center")
+    return (center["lat"], center["lon"]) if center else None
+
+
+def _is_tunnel(way):
+    """A line that runs underground (or through a building) does not stop anyone walking over it."""
+    return way.get("tags", {}).get("tunnel") not in (None, "no")
+
+
+def _obstacle_lines(railway_ways, highway_ways):
+    """Polylines [(lat, lon), ...] of the long line objects a station can help to cross. Tunnel sections are left
+    out: the ground above them is free to walk on, so they are no obstacle."""
+    lines = [w["geometry"] for w in railway_ways if w.get("geometry") and not _is_tunnel(w)]
+    lines += [w["geometry"] for w in highway_ways
+              if w.get("geometry") and not _is_tunnel(w)
+              and w.get("tags", {}).get("highway") in OBSTACLE_HIGHWAY]
+    return [[(p["lat"], p["lon"]) for p in line] for line in lines if len(line) >= 2]
+
+
+def _side_of_nearest_line(lat, lon, lines, ref_lat, ref_lon):
+    """Which side of the nearest obstacle line a point lies on: (distance_m, line index, +1 or -1), or None without
+    lines. Flat local metres around (ref_lat, ref_lon), fine at the scale of a station."""
+    kx = 111320.0 * math.cos(math.radians(ref_lat))
+    ky = 110540.0
+
+    def xy(la, lo):
+        return (lo - ref_lon) * kx, (la - ref_lat) * ky
+
+    px, py = xy(lat, lon)
+    best = None
+    for index, line in enumerate(lines):
+        for (la1, lo1), (la2, lo2) in zip(line, line[1:]):
+            ax, ay = xy(la1, lo1)
+            bx, by = xy(la2, lo2)
+            dx, dy = bx - ax, by - ay
+            length2 = dx * dx + dy * dy
+            t = 0.0 if length2 == 0 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / length2))
+            dist = math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+            if best is None or dist < best[0]:
+                cross = dx * (py - ay) - dy * (px - ax)
+                best = (dist, index, 1 if cross >= 0 else -1)
+    return best
+
+
+def add_station_crossings(graph, node_coords, stations, railway_ways, highway_ways, radius_m=STATION_RADIUS_M):
+    """Mutates graph in place: for every station/halt that stands beside a railway or heavy road (motorway, trunk,
+    primary), adds a two-way link between the nearest graph node on one side of that line and the nearest on the
+    other, both within `radius_m` of the station — the footbridge, underpass or platform crossing that OSM often does
+    not map as a path. The link carries tags {"way": {"way_id": <station id>, "highway": "station_crossing",
+    "station": <name>}}, so path_way_segments and path_station_crossings can tell where a route uses one. Call it after
+    build_graph and before tag_edges. Always on: a link is added even where another crossing exists, the router picks
+    the cheaper. Returns the list of stations that got a link: [{"id", "name", "lat", "lon", "length_m"}]."""
+    lines = _obstacle_lines(railway_ways, highway_ways)
+    if not lines or not stations:
+        return []
+    linked = []
+    for station in stations:
+        point = _station_point(station)
+        if point is None:
+            continue
+        lat, lon = point
+        nearest = _side_of_nearest_line(lat, lon, lines, lat, lon)
+        if nearest is None or nearest[0] > radius_m:
+            continue
+        line = lines[nearest[1]]
+        closest = {1: None, -1: None}
+        for node_id, (nlat, nlon) in node_coords.items():
+            if node_id not in graph:
+                continue
+            distance = haversine(lat, lon, nlat, nlon)
+            if distance > radius_m:
+                continue
+            side = _side_of_nearest_line(nlat, nlon, [line], lat, lon)[2]
+            if closest[side] is None or distance < closest[side][0]:
+                closest[side] = (distance, node_id)
+        if closest[1] is None or closest[-1] is None:
+            continue
+        a, b = closest[1][1], closest[-1][1]
+        length = haversine(*node_coords[a], *node_coords[b])
+        name = station.get("tags", {}).get("name")
+        description = {"way_id": station.get("id"), "highway": STATION_CROSSING}
+        if name:
+            description["station"] = name
+        graph[a].append([b, length, {"way": dict(description)}])
+        graph[b].append([a, length, {"way": dict(description)}])
+        linked.append({"id": station.get("id"), "name": name, "lat": lat, "lon": lon, "length_m": length})
+    return linked
+
+
+def path_station_crossings(graph, node_path):
+    """The stations a node path crosses an obstacle line at: [{"station": name or None, "station_id": ..., "from": i,
+    "to": j}, ...] (indices as in path_way_segments), in route order. The agent looks each one up on the Internet
+    (footbridge or underpass, step-free access, hours) and puts the finding into the route notes."""
+    return [{"station": run.get("station"), "station_id": run.get("way_id"), "from": run["from"], "to": run["to"]}
+            for run in path_way_segments(graph, node_path) if run.get("highway") == STATION_CROSSING]
 
 
 def path_geometry(graph, node_path, node_coords, node_elevations):

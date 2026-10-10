@@ -17,3 +17,8 @@
 6. [done] In the plan detail data the "wheather by hours" topic is presented. Use pictograms with a rain (tree levels) or show (tree levels), 
    in the column named "Осадки" (in Russian).
    Done: 💧 (rain) or ❄️ (snow, by weather code) repeated 1-3 times for light / moderate / heavy, before the mm value.
+
+7. [done] Railway stations, metro stations may be used for crossing long line obects like railways, highload roads and so on.
+   However, additionaly looking for details of implementation a given station on the Internet is a good idea.
+   Done: route_graph.add_station_crossings links the two sides of a railway / motorway-trunk-primary road at each
+   station or halt (always on); the SKILL asks for a web search on every station the route crosses at.

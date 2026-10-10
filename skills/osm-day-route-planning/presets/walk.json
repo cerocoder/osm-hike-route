@@ -3,6 +3,7 @@
   "routable_highway": ["path", "footway", "track", "pedestrian", "steps", "residential", "living_street", "unclassified", "service", "tertiary"],
   "hard_exclude_tags": { "foot": ["no"] },
   "exclude_highway_without_infra": [],
+  "vehicle_tunnel_max_m": 15,
   "blocking_barrier_tags": [],
   "buffers_m": { "highway": 50, "water": 30 },
   "preferences": {

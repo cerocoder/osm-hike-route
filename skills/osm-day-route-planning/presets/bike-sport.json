@@ -4,6 +4,7 @@
   "routable_highway": ["path", "footway", "track", "cycleway", "residential", "living_street", "secondary"],
   "hard_exclude_tags": { "bicycle": ["no", "dismount"], "highway": ["steps"] },
   "exclude_highway_without_infra": ["trunk", "primary"],
+  "vehicle_tunnel_max_m": 15,
   "blocking_barrier_tags": ["cycle_barrier", "turnstile"],
   "buffers_m": { "highway": 30, "water": 20 },
   "preferences": {

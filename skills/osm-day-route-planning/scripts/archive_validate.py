@@ -68,6 +68,9 @@ def validate_archive(route_dir) -> None:
     if isinstance(weights, dict) and "mode" not in weights:
         problems.append("weights.json не содержит 'mode'")
 
+    if isinstance(weights, dict) and geojson is not None:
+        problems.extend(_validate_minimum(geojson, weights))
+
     if problems:
         details = "\n".join(f"  - {p}" for p in problems)
         raise ArchiveIncompleteError(
@@ -138,6 +141,22 @@ def _validate_geojson(geojson: dict) -> list[str]:
     if "curated_source" in props:
         problems.extend(_validate_curated_source(props["curated_source"]))
 
+    return problems
+
+
+def _validate_minimum(geojson: dict, weights: dict) -> list[str]:
+    """The route must not be shorter than the minimum the planner stored in weights.json (absent in old archives)."""
+    lines = [f for f in geojson.get("features") or [] if f.get("geometry", {}).get("type") == "LineString"]
+    if len(lines) != 1:
+        return []
+    props = lines[0].get("properties", {})
+    problems = []
+    for weight_key, prop_key, unit in (("min_distance_km", "distance_km", "км"),
+                                       ("min_duration_hours", "duration_estimate_hours", "ч")):
+        minimum, value = weights.get(weight_key), props.get(prop_key)
+        if isinstance(minimum, (int, float)) and isinstance(value, (int, float)) and value < minimum:
+            problems.append(f"{prop_key}={value} {unit} меньше {weight_key}={minimum} {unit} из weights.json — "
+                            "маршрут короче минимума, его нельзя сохранять")
     return problems
 
 

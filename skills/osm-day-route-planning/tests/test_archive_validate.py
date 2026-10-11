@@ -221,3 +221,28 @@ def test_a_malformed_curated_source_is_reported(tmp_path, source, fragment):
     with pytest.raises(ArchiveIncompleteError) as exc_info:
         validate_archive(tmp_path)
     assert fragment in str(exc_info.value)
+
+
+def _set_weights(route_dir, **extra):
+    (route_dir / "weights.json").write_text(json.dumps({"mode": "walk", **extra}), encoding="utf-8")
+
+
+def test_route_shorter_than_minimum_is_rejected(tmp_path):
+    _write_complete_archive(tmp_path)
+    _set_weights(tmp_path, min_distance_km=15.0)           # distance_km is 5.2
+    with pytest.raises(ArchiveIncompleteError) as e:
+        validate_archive(tmp_path)
+    assert "min_distance_km" in str(e.value)
+
+
+def test_route_shorter_than_minimum_duration_is_rejected(tmp_path):
+    _write_complete_archive(tmp_path)
+    _set_weights(tmp_path, min_duration_hours=3.0)         # duration is 1.5
+    with pytest.raises(ArchiveIncompleteError):
+        validate_archive(tmp_path)
+
+
+def test_route_at_minimum_passes_and_null_minimum_is_ignored(tmp_path):
+    _write_complete_archive(tmp_path)
+    _set_weights(tmp_path, min_distance_km=5.2, min_duration_hours=None)
+    validate_archive(tmp_path)

@@ -196,7 +196,7 @@ def _walkable_clause_values(ql: str) -> set:
     fetch_area_data was actually asked to fetch as walkable."""
     match = re.search(r'way\["highway"~"([^"]+)"\]', ql)
     assert match, f"no walkable highway clause found in query: {ql!r}"
-    return set(match.group(1).split("|"))
+    return set(match.group(1).removeprefix("^(").removesuffix(")$").split("|"))
 
 
 def test_fetch_area_data_no_args_uses_walk_default_tags_in_query():
@@ -878,3 +878,76 @@ def test_every_preset_limits_vehicle_tunnels_to_15_m():
     from presets import load_preset
     for preset in (load_preset("walk"), load_preset("bike", "leisure"), load_preset("bike", "sport")):
         assert preset.get("vehicle_tunnel_max_m") == 15
+
+
+# --- fallback ways, steps, explicit bicycle tag (TODO 9) ---
+
+def _edge_tags(graph, a, b):
+    return next(e[2] for e in graph[a] if e[0] == b)
+
+
+def test_fallback_highway_marks_edge_and_description():
+    graph, _ = build_graph(_two_node_way(tags={"highway": "service"}), fallback_highway=("service", "road"))
+    tags = _edge_tags(graph, 1, 2)
+    assert tags["fallback"] is True
+    assert tags["way"]["fallback"] is True
+
+
+def test_other_highway_is_not_fallback():
+    graph, _ = build_graph(_two_node_way(tags={"highway": "track"}), fallback_highway=("service",))
+    assert _edge_tags(graph, 1, 2)["fallback"] is False
+    assert "fallback" not in _edge_tags(graph, 1, 2)["way"]
+
+
+@pytest.mark.parametrize("bicycle,fallback", [("yes", False), ("designated", False), (None, True), ("permissive", True)])
+def test_footway_needs_explicit_bicycle_tag(bicycle, fallback):
+    tags = {"highway": "footway"}
+    if bicycle:
+        tags["bicycle"] = bicycle
+    graph, _ = build_graph(_two_node_way(tags=tags), bicycle_explicit_highway=("footway", "pedestrian"))
+    assert _edge_tags(graph, 1, 2)["fallback"] is fallback
+
+
+def test_router_takes_the_normal_way_over_a_shorter_fallback_way():
+    graph = {1: [[2, 100.0, {"fallback": True}], [3, 75.0, {}]], 2: [], 3: [[2, 75.0, {}]]}
+    path, _ = weighted_shortest_path(graph, 1, 2, {"fallback_way_cost": 1000})
+    assert path == [1, 3, 2]
+
+
+def test_router_uses_a_fallback_way_when_it_is_the_only_link():
+    graph = {1: [[2, 100.0, {"fallback": True}]], 2: []}
+    path, _ = weighted_shortest_path(graph, 1, 2, {"fallback_way_cost": 1000})
+    assert path == [1, 2]
+
+
+def test_steps_cost_factor_applies_only_to_steps():
+    prefs = {"steps_cost": 5.0}
+    assert _edge_cost(10.0, {"way": {"highway": "steps"}}, prefs) == 50.0
+    assert _edge_cost(10.0, {"way": {"highway": "path"}}, prefs) == 10.0
+
+
+def test_bike_steps_with_dismount_stay_but_bicycle_no_is_dropped():
+    exclude = {"bicycle": ["no", "dismount"]}
+    ways = [_way_with_tags({"highway": "steps", "bicycle": "dismount"}, way_id=1),
+            _way_with_tags({"highway": "steps", "bicycle": "no"}, way_id=2),
+            _way_with_tags({"highway": "path", "bicycle": "dismount"}, way_id=3)]
+    kept = filter_excluded_ways(ways, [], hard_exclude_tags=exclude)
+    assert [w["id"] for w in kept] == [1]
+
+
+def test_special_segments_lists_steps_and_fallback_runs():
+    segments = [{"from": 0, "to": 1, "highway": "track"},
+                {"from": 1, "to": 2, "highway": "steps"},
+                {"from": 2, "to": 3, "highway": "service", "fallback": True}]
+    found = route_graph.special_segments(segments)
+    assert found["steps"] == [segments[1]]
+    assert found["fallback"] == [segments[2]]
+
+
+def test_walkable_pattern_is_anchored_so_link_values_stay_out():
+    captured = []
+    with patch.object(route_graph, "query_overpass", side_effect=_capture_ql(captured)):
+        fetch_area_data(55.0, 37.0, routable_highway=["tertiary", "primary"])
+    match = re.search(r'way\["highway"~"([^"]+)"\]', captured[0])
+    assert match.group(1).startswith("^(") and match.group(1).endswith(")$")
+    assert "tertiary_link" not in _walkable_clause_values(captured[0])

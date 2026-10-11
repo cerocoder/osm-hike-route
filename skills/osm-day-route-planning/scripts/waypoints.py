@@ -42,6 +42,42 @@ def check_mandatory_budget(mandatory_cost_km: float, max_distance_km: float | No
         )
 
 
+class RouteTooShortError(Exception):
+    pass
+
+
+def check_minimum_length(distance_km, min_distance_km, duration_hours=None, min_duration_hours=None) -> None:
+    """Raises when the route is shorter than the minimum. The route must not be saved then."""
+    if min_distance_km is not None and distance_km < min_distance_km:
+        raise RouteTooShortError(
+            f"Маршрут получился {distance_km:.1f} км, а минимум — {min_distance_km:.1f} км. "
+            "Не сохраняйте его. Спросите пользователя, что изменить: диапазон длины, точку старта, "
+            "радиус района или режим.")
+    if min_duration_hours is not None and duration_hours is not None and duration_hours < min_duration_hours:
+        raise RouteTooShortError(
+            f"Маршрут займёт {duration_hours:.1f} ч, а минимум — {min_duration_hours:.1f} ч. "
+            "Не сохраняйте его. Спросите пользователя, что изменить: диапазон времени, точку старта, "
+            "радиус района или режим.")
+
+
+class NotEnoughPointsError(Exception):
+    pass
+
+
+NON_INTEREST_KINDS = ("start", "access", "shop", "supermarket", "convenience")
+
+
+def check_enough_points(points: list[dict], minimum: int = 2) -> None:
+    """Raises when fewer than `minimum` points are real points of interest (not the start, an access point or a
+    shop). The planner then asks the user what kind of places they like or which places they know."""
+    real = [p for p in points if p.get("kind") not in NON_INTEREST_KINDS]
+    if len(real) < minimum:
+        raise NotEnoughPointsError(
+            f"Найдено мало мест для маршрута: {len(real)} из {minimum} нужных. "
+            "Спросите пользователя, какие места он любит или какие знает. "
+            "Не заполняйте маршрут только стартом или магазином.")
+
+
 def _cheapest_insertion_cost_km(path: list[int], candidate_node: int, costs_from: dict, costs_from_candidate: dict):
     """Cost (km) of visiting candidate_node via the cheapest detour between any two consecutive nodes already in
     `path`, or None when it cannot be reached. `costs_from[a][x]` is the cost a -> x (a on the path, x on the path

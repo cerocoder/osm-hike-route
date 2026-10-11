@@ -18,7 +18,9 @@ Typical flow:
     walkable = filter_excluded_ways(data['walkable'], restricted,
                                      hard_exclude_tags=weights.get('hard_exclude_tags'),
                                      exclude_highway_without_infra=weights.get('exclude_highway_without_infra'))
-    graph, node_coords = build_graph(walkable, data['barrier_nodes'])
+    graph, node_coords = build_graph(walkable, data['barrier_nodes'],
+                                     fallback_highway=weights.get('fallback_highway', ()),
+                                     bicycle_explicit_highway=weights.get('bicycle_explicit_highway', ()))
     tag_edges(graph, node_coords, data['highways'], data['water'],
               data['forest'], data['fields'])
     path, cost = weighted_shortest_path(graph, start_id, end_id, preferences)
@@ -90,7 +92,7 @@ def fetch_area_data(lat: float, lon: float, radius_m: int = 2000,
     walkable_highway_values = sorted(
         set(routable_highway) | set(hard_exclude_highway) | set(exclude_highway_without_infra)
     )
-    walkable_pattern = "|".join(walkable_highway_values)
+    walkable_pattern = "^(" + "|".join(walkable_highway_values) + ")$"   # anchored: tertiary must not fetch tertiary_link
     ql = f"""
     [out:json][timeout:80];
     (
@@ -341,6 +343,22 @@ def _has_hard_excluded_tag(tags: dict, hard_exclude_tags: dict) -> bool:
     return any(tags.get(key) in values for key, values in hard_exclude_tags.items())
 
 
+def _is_hard_excluded(tags: dict, hard_exclude_tags: dict) -> bool:
+    """steps with bicycle=dismount stay: a rider pushes the bicycle up the steps. bicycle=no on steps still drops them."""
+    if tags.get("highway") == "steps" and tags.get("bicycle") == "dismount":
+        tags = {k: v for k, v in tags.items() if k != "bicycle"}
+    return _has_hard_excluded_tag(tags, hard_exclude_tags)
+
+
+def _is_fallback_way(tags: dict, fallback_highway, bicycle_explicit_highway) -> bool:
+    """A way the router may use only to restore connectivity: a highway type the preset lists as fallback, or a
+    footway/pedestrian way without an explicit bicycle=yes|designated."""
+    highway = tags.get("highway")
+    if highway in fallback_highway:
+        return True
+    return highway in bicycle_explicit_highway and tags.get("bicycle") not in ("yes", "designated")
+
+
 _NO_CYCLE_INFRA_VALUES = ("no", "none", "separate")
 
 
@@ -406,7 +424,7 @@ def filter_excluded_ways(walkable_ways, restricted_polygons,
         if not geom:
             continue
         tags = way.get("tags", {})
-        if _has_hard_excluded_tag(tags, hard_exclude_tags):
+        if _is_hard_excluded(tags, hard_exclude_tags):
             continue
         if _lacks_required_cycle_infra(tags, exclude_highway_without_infra):
             continue
@@ -435,14 +453,17 @@ def _way_description(way: dict) -> dict:
     return description
 
 
-def build_graph(walkable_ways, barrier_nodes=None, blocking_barrier_tags=None, respect_oneway=False):
+def build_graph(walkable_ways, barrier_nodes=None, blocking_barrier_tags=None, respect_oneway=False,
+                fallback_highway=(), bicycle_explicit_highway=()):
     """Returns (graph, node_coords). graph: {node_id: [[neighbor_id, length_m, tags_dict], ...]}
     Directed: each physical segment gets its own forward/reverse entries so
     oneway restrictions (bike) and asymmetric uphill/downhill cost (any mode,
     once elevation is tagged) can differ per direction — see spec §3.7.
     barrier_nodes: list of Overpass node elements with a 'barrier' tag — an
     edge touching one whose tag is in `blocking_barrier_tags`, or that
-    independently fails the existing hardcoded lock check, is dropped."""
+    independently fails the existing hardcoded lock check, is dropped.
+    fallback_highway / bicycle_explicit_highway (preset keys): edges of such ways get tags["fallback"] = True, and the
+    way description gets "fallback": True; _edge_cost then multiplies their cost by preferences["fallback_way_cost"]."""
     blocking_ids = {
         n["id"] for n in (barrier_nodes or [])
         if _blocks_passage(n.get("tags", {}), blocking_barrier_tags or [])
@@ -460,6 +481,9 @@ def build_graph(walkable_ways, barrier_nodes=None, blocking_barrier_tags=None, r
 
         forward_allowed, reverse_allowed = _direction_allowed(tags, respect_oneway)
         description = _way_description(way)
+        fallback = _is_fallback_way(tags, fallback_highway, bicycle_explicit_highway)
+        if fallback:
+            description["fallback"] = True
 
         for i in range(len(ids) - 1):
             a, b = ids[i], ids[i + 1]
@@ -472,9 +496,9 @@ def build_graph(walkable_ways, barrier_nodes=None, blocking_barrier_tags=None, r
             graph.setdefault(b, [])
             # one dict per directed edge: tag_grades writes a different grade_pct into each direction
             if forward_allowed:
-                graph[a].append([b, length, {"way": description}])
+                graph[a].append([b, length, {"way": description, "fallback": fallback}])
             if reverse_allowed:
-                graph[b].append([a, length, {"way": description}])
+                graph[b].append([a, length, {"way": description, "fallback": fallback}])
     return graph, node_coords
 
 
@@ -622,6 +646,10 @@ def _edge_cost(length_m, tags, preferences):
     threshold = preferences.get("gradient_threshold_pct", 8)
     if grade_pct > threshold:
         cost *= preferences.get("avoid_steep_gradient", 1.0)
+    if tags.get("fallback"):
+        cost *= preferences.get("fallback_way_cost", 1.0)
+    if tags.get("way", {}).get("highway") == "steps":
+        cost *= preferences.get("steps_cost", 1.0)
     return cost
 
 
@@ -642,6 +670,12 @@ def path_way_segments(graph, node_path):
         else:
             runs.append({"from": i, "to": i + 1, **description})
     return runs
+
+
+def special_segments(way_segments):
+    """Runs of a route that need a note: steps (a rider pushes the bicycle) and fallback ways."""
+    return {"steps": [s for s in way_segments if s.get("highway") == "steps"],
+            "fallback": [s for s in way_segments if s.get("fallback")]}
 
 
 def _station_point(station):

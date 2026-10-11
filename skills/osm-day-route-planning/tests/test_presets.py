@@ -1,7 +1,8 @@
 import copy
 
 import pytest
-from presets import load_preset, build_weights, revise_weights, PresetNotFoundError
+from presets import (load_preset, build_weights, revise_weights, PresetNotFoundError,
+                     resolve_length_range, LengthRequiredError)
 
 REQUIRED_KEYS = {
     "mode", "routable_highway", "hard_exclude_tags",
@@ -88,3 +89,56 @@ def test_revise_weights_does_not_mutate_existing_argument():
     revise_weights(existing, {"max_distance_km": 5.0})
 
     assert existing == frozen_copy
+
+
+@pytest.mark.parametrize("style", ["leisure", "sport"])
+def test_bike_presets_allow_the_extra_highway_types(style):
+    preset = load_preset("bike", style=style)
+    for value in ("tertiary", "unclassified", "service", "road", "steps", "corridor",
+                  "footway", "pedestrian", "bridleway"):
+        assert value in preset["routable_highway"], value
+    assert "steps" not in preset["hard_exclude_tags"].get("highway", [])
+    assert set(preset["fallback_highway"]) == {"service", "road"}
+    assert set(preset["bicycle_explicit_highway"]) == {"footway", "pedestrian"}
+    assert preset["preferences"]["fallback_way_cost"] >= 100
+    assert preset["preferences"]["steps_cost"] > 1
+
+
+def test_walk_preset_allows_bridleway():
+    assert "bridleway" in load_preset("walk")["routable_highway"]
+
+
+def test_only_a_maximum_gives_half_of_it_as_the_minimum():
+    r = resolve_length_range(max_km=30)
+    assert (r["min_distance_km"], r["max_distance_km"]) == (15, 30)
+    assert r["min_duration_hours"] is None and r["max_duration_hours"] is None
+
+
+def test_only_a_time_gives_half_of_it_as_the_minimum():
+    r = resolve_length_range(max_h=4)
+    assert (r["min_duration_hours"], r["max_duration_hours"]) == (2, 4)
+    assert r["min_distance_km"] is None
+
+
+def test_explicit_minimum_is_kept():
+    assert resolve_length_range(min_km=10, max_km=30)["min_distance_km"] == 10
+
+
+def test_no_length_raises():
+    with pytest.raises(LengthRequiredError):
+        resolve_length_range()
+
+
+def test_a_minimum_without_a_maximum_raises():
+    with pytest.raises(LengthRequiredError):
+        resolve_length_range(min_km=10)
+
+
+def test_minimum_above_maximum_raises_value_error():
+    with pytest.raises(ValueError):
+        resolve_length_range(min_km=40, max_km=30)
+
+
+def test_build_weights_stores_the_minimums():
+    w = build_weights(load_preset("walk"), max_distance_km=30, min_distance_km=15)
+    assert w["min_distance_km"] == 15 and w["min_duration_hours"] is None

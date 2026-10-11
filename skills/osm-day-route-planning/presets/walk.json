@@ -1,6 +1,6 @@
 {
   "mode": "walk",
-  "routable_highway": ["path", "footway", "track", "pedestrian", "steps", "residential", "living_street", "unclassified", "service", "tertiary"],
+  "routable_highway": ["path", "footway", "track", "pedestrian", "steps", "residential", "living_street", "unclassified", "service", "tertiary", "bridleway"],
   "hard_exclude_tags": { "foot": ["no"] },
   "exclude_highway_without_infra": [],
   "vehicle_tunnel_max_m": 15,

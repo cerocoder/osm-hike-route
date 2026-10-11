@@ -1,7 +1,8 @@
 import pytest
 from waypoints import (
     is_point_restricted, validate_user_waypoint, RestrictedWaypointError,
-    BudgetExceededError, check_mandatory_budget, select_optional_points
+    BudgetExceededError, check_mandatory_budget, select_optional_points,
+    RouteTooShortError, check_minimum_length, NotEnoughPointsError, check_enough_points
 )
 
 _SQUARE_RING = [(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)]
@@ -258,3 +259,31 @@ def test_select_optional_points_ticks_once_per_search():
     select_optional_points(graph, [1, 2, 1], 1.0, candidates, PREFS, None, progress=recorder)
     assert recorder.ticks == [(1, 5, "optional_run"), (2, 5, "optional_run"), (3, 5, "optional_run"),
                               (4, 5, "optional_run"), (5, 5, "optional_run")]       # 2 distinct path nodes + 3 candidates
+
+
+def test_route_below_minimum_distance_raises():
+    with pytest.raises(RouteTooShortError) as e:
+        check_minimum_length(0.16, 15.0)
+    assert "0.2" in str(e.value)
+
+
+def test_route_at_or_above_minimum_passes():
+    check_minimum_length(15.0, 15.0)
+    check_minimum_length(1.0, None)
+
+
+def test_route_below_minimum_duration_raises():
+    with pytest.raises(RouteTooShortError):
+        check_minimum_length(20.0, 15.0, duration_hours=1.0, min_duration_hours=2.0)
+
+
+def test_points_without_real_interest_raise():
+    with pytest.raises(NotEnoughPointsError):
+        check_enough_points([{"name": "A", "kind": "start"}])
+    with pytest.raises(NotEnoughPointsError):
+        check_enough_points([{"name": "A", "kind": "start"}, {"name": "Магазин", "kind": "shop"}])
+
+
+def test_enough_interest_points_pass():
+    check_enough_points([{"name": "A", "kind": "start"}, {"name": "Вершина", "kind": "peak"},
+                         {"name": "Родник", "kind": "water"}])

@@ -62,3 +62,16 @@
        with a route that has only the start point or only a shop.
     Also: add a check in `archive_validate` (the route is shorter than the minimum -> error), add tests, and update
     the SKILL files and the spec.
+
+11. If a route is shorter than the minimum length and the planner cannot lengthen it through more points of interest,
+    do not add length with empty spurs or trips to an arbitrary point without the permission of the user (source: the
+    route makarovskoe-vdkhr-bike-2026-10-11, where a 1.26 km dead-end spur to a random node was added to reach the
+    minimum, and notes.md called it a spur to a picnic site). Tell the user and offer these options:
+    a) reduce the minimum length;
+    b) give new information, so that the planner can review the points of interest;
+    c) try another order of the chosen points of interest to get a longer route;
+    d) allow the planner to add arbitrary segments that do not lead to any point of interest.
+    The planner uses option d) only after the user chooses it, and then says in notes.md that the length was added
+    by such segments (not as a visit to a place). Also: a route with a large share of repeated segments (for
+    example more than 30 %) must not be called a loop without saying how much is repeated; add a check and tests,
+    and update the SKILL files and the spec.

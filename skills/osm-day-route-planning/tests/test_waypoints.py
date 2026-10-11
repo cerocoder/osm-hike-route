@@ -287,3 +287,19 @@ def test_points_without_real_interest_raise():
 def test_enough_interest_points_pass():
     check_enough_points([{"name": "A", "kind": "start"}, {"name": "Вершина", "kind": "peak"},
                          {"name": "Родник", "kind": "water"}])
+
+
+def test_too_short_message_offers_four_options_and_forbids_silent_padding():
+    with pytest.raises(RouteTooShortError) as e:
+        check_minimum_length(1.0, 15.0)
+    text = str(e.value)
+    for marker in ("а)", "б)", "в)", "г)", "без разрешения"):
+        assert marker in text
+
+
+def test_repeat_statement_only_for_loop_above_limit():
+    from waypoints import repeat_statement
+    assert "42 %" in repeat_statement(0.42, True)
+    assert repeat_statement(0.30, True) is None
+    assert repeat_statement(0.9, False) is None
+    assert repeat_statement(None, True) is None

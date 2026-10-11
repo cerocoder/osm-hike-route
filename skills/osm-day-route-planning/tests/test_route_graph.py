@@ -951,3 +951,10 @@ def test_walkable_pattern_is_anchored_so_link_values_stay_out():
     match = re.search(r'way\["highway"~"([^"]+)"\]', captured[0])
     assert match.group(1).startswith("^(") and match.group(1).endswith(")$")
     assert "tertiary_link" not in _walkable_clause_values(captured[0])
+
+
+def test_repeated_share_counts_second_pass_of_a_spur():
+    g = {1: [(2, 1000.0, {}), (3, 500.0, {})], 2: [(1, 1000.0, {})], 3: [(1, 500.0, {})]}
+    assert route_graph.repeated_share(g, [1, 2, 1, 3]) == pytest.approx(1000 / 2500)
+    assert route_graph.repeated_share(g, [1, 2]) == 0.0
+    assert route_graph.repeated_share(g, [1]) == 0.0

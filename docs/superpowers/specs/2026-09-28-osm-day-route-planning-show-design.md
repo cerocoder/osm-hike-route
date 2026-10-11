@@ -288,6 +288,14 @@ start point, area radius, mode). `waypoints.check_enough_points` raises `NotEnou
 real points of interest exist (start, access points and shops do not count); the planner asks the user about
 liked or known places. `archive_validate` reports a route shorter than the minimum in `weights.json`.
 
+The planner never makes a short route longer with empty spurs or trips to an arbitrary point without the user's
+permission. It tells the user and offers: reduce the minimum, give new information, try another order of the chosen
+points, or allow arbitrary segments (only the user's choice). After that choice `weights.json` has
+`padding_allowed: true` and `padding_km`, and `notes.md` says that the length was added by such segments;
+`archive_validate` rejects `padding_km` > 0 without `padding_allowed`. `route_graph.repeated_share` gives the share
+of the length on already travelled edges; it is saved as `repeated_share` in `route.geojson`. A loop with a share
+above 30 % must state it ("NN %") in `notes.md`; `archive_validate` checks this.
+
 ### 3.6 Веса и правила проходимости — вынесены из кода в данные
 
 Два уровня:

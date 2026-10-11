@@ -46,18 +46,41 @@ class RouteTooShortError(Exception):
     pass
 
 
+SHORT_ROUTE_OPTIONS = (
+    "Не добавляйте длину пустыми ответвлениями или поездкой в случайную точку без разрешения пользователя. "
+    "Не сохраняйте маршрут. Расскажите пользователю и предложите: "
+    "а) уменьшить минимальную длину; "
+    "б) дать новую информацию, чтобы планировщик пересмотрел места интереса; "
+    "в) попробовать другой порядок выбранных мест, чтобы маршрут стал длиннее; "
+    "г) разрешить планировщику добавить произвольные отрезки, не ведущие к местам интереса. "
+    "Вариант г) — только если пользователь выбрал его сам.")
+
+
 def check_minimum_length(distance_km, min_distance_km, duration_hours=None, min_duration_hours=None) -> None:
-    """Raises when the route is shorter than the minimum. The route must not be saved then."""
+    """Raises when the route is shorter than the minimum. The route must not be saved then, and must not be
+    lengthened with empty spurs unless the user allowed it (SHORT_ROUTE_OPTIONS)."""
     if min_distance_km is not None and distance_km < min_distance_km:
         raise RouteTooShortError(
-            f"Маршрут получился {distance_km:.1f} км, а минимум — {min_distance_km:.1f} км. "
-            "Не сохраняйте его. Спросите пользователя, что изменить: диапазон длины, точку старта, "
-            "радиус района или режим.")
+            f"Маршрут получился {distance_km:.1f} км, а минимум — {min_distance_km:.1f} км. " + SHORT_ROUTE_OPTIONS)
     if min_duration_hours is not None and duration_hours is not None and duration_hours < min_duration_hours:
         raise RouteTooShortError(
-            f"Маршрут займёт {duration_hours:.1f} ч, а минимум — {min_duration_hours:.1f} ч. "
-            "Не сохраняйте его. Спросите пользователя, что изменить: диапазон времени, точку старта, "
-            "радиус района или режим.")
+            f"Маршрут займёт {duration_hours:.1f} ч, а минимум — {min_duration_hours:.1f} ч. " + SHORT_ROUTE_OPTIONS)
+
+
+REPEAT_LIMIT = 0.30       # a loop with a larger repeated share needs a statement of the share
+
+
+def repeat_percent(share) -> int:
+    return round(share * 100)
+
+
+def repeat_statement(share, is_loop) -> str | None:
+    """None when nothing must be said. Otherwise the sentence for the summary and notes.md: a loop whose repeated
+    share is above REPEAT_LIMIT must not be called a loop without saying how much of it is repeated."""
+    if is_loop and share is not None and share > REPEAT_LIMIT:
+        return (f"Это петля, но {repeat_percent(share)} % её длины идёт по уже пройденным отрезкам "
+                "(туда и обратно). Скажите об этом пользователю и запишите в notes.md.")
+    return None
 
 
 class NotEnoughPointsError(Exception):

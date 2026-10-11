@@ -246,3 +246,41 @@ def test_route_at_minimum_passes_and_null_minimum_is_ignored(tmp_path):
     _write_complete_archive(tmp_path)
     _set_weights(tmp_path, min_distance_km=5.2, min_duration_hours=None)
     validate_archive(tmp_path)
+
+
+def _make_loop(route_dir, share, notes_extra=""):
+    geojson = _write_complete_archive(route_dir)
+    geojson["features"][0]["properties"]["repeated_share"] = share
+    (route_dir / "route.geojson").write_text(json.dumps(geojson), encoding="utf-8")
+    (route_dir / "notes.md").write_text(FULL_NOTES + notes_extra, encoding="utf-8")
+
+
+def test_loop_with_large_repeated_share_must_state_it_in_notes(tmp_path):
+    _make_loop(tmp_path, 0.42)
+    with pytest.raises(ArchiveIncompleteError) as e:
+        validate_archive(tmp_path)
+    assert "42 %" in str(e.value)
+
+
+def test_loop_with_large_repeated_share_passes_when_notes_state_it(tmp_path):
+    _make_loop(tmp_path, 0.42, "Повторяется 42 % длины.\n")
+    validate_archive(tmp_path)
+
+
+def test_small_repeated_share_needs_no_statement(tmp_path):
+    _make_loop(tmp_path, 0.30)
+    validate_archive(tmp_path)
+
+
+def test_padding_without_permission_is_rejected(tmp_path):
+    _write_complete_archive(tmp_path)
+    _set_weights(tmp_path, padding_km=1.26)
+    with pytest.raises(ArchiveIncompleteError) as e:
+        validate_archive(tmp_path)
+    assert "padding_allowed" in str(e.value)
+
+
+def test_padding_with_permission_passes(tmp_path):
+    _write_complete_archive(tmp_path)
+    _set_weights(tmp_path, padding_km=1.26, padding_allowed=True)
+    validate_archive(tmp_path)

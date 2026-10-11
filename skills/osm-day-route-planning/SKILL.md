@@ -259,6 +259,17 @@ new preset, no code changes).
     weights["min_duration_hours"])`. On `RouteTooShortError` **do not save** the route. Tell the user why it is too
     short and ask what to change: the range, the start point, the area radius or the mode. `archive_validate`
     repeats this check.
+    **Never make a short route longer with empty spurs or trips to an arbitrary point without the user's
+    permission.** First try to lengthen it with more points of interest. If that fails, tell the user and offer:
+    (a) reduce the minimum length; (b) give new information, so that you can review the points of interest;
+    (c) try another order of the chosen points to get a longer route; (d) allow arbitrary segments that lead to no
+    point of interest. Use (d) only after the user chose it. Then set `weights["padding_allowed"] = True` and
+    `weights["padding_km"]` to the added length, and say in `notes.md` that this length was added by such segments
+    (not as a visit to a place). `archive_validate` rejects `padding_km` > 0 without `padding_allowed`.
+    **Repeated segments:** compute `route_graph.repeated_share(graph, path)` and pass it to `build_geojson(...,
+    repeated_share=...)`. `waypoints.repeat_statement(share, is_loop)` returns a sentence when a loop repeats more
+    than 30 % of its length: do not call the route a loop without saying that share (in the summary and in
+    `notes.md`, as "NN %"). `archive_validate` checks that `notes.md` contains the percent.
 16. **Count curated routes nearby** (informational only, spec §3.10):
     `overpass_query.count_curated_routes(overpass_query.query_overpass(
     overpass_query.build_curated_routes_query(lat, lon, radius_m,

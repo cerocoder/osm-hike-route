@@ -672,6 +672,23 @@ def path_way_segments(graph, node_path):
     return runs
 
 
+def repeated_share(graph, node_path):
+    """Share (0..1) of the path length that runs on a ground edge already travelled earlier on the same path
+    (a there-and-back spur counts its second pass). 0.0 for a path of fewer than two nodes."""
+    seen, total, repeated = set(), 0.0, 0.0
+    for a, b in zip(node_path, node_path[1:]):
+        candidates = [e for e in graph.get(a, []) if e[0] == b]
+        if not candidates:
+            raise ValueError(f"the path is not connected in the graph between {a} and {b}")
+        length = min(e[1] for e in candidates)
+        total += length
+        key = frozenset((a, b))
+        if key in seen:
+            repeated += length
+        seen.add(key)
+    return repeated / total if total else 0.0
+
+
 def special_segments(way_segments):
     """Runs of a route that need a note: steps (a rider pushes the bicycle) and fallback ways."""
     return {"steps": [s for s in way_segments if s.get("highway") == "steps"],

@@ -125,3 +125,8 @@ def test_curated_source_is_written_only_when_given():
     source = {"relation_id": 42, "name": "Ruta", "fidelity": 0.95}
     line = next(f for f in _sample_call(curated_source=source)["features"] if f["geometry"]["type"] == "LineString")
     assert line["properties"]["curated_source"] == source
+
+
+def test_repeated_share_is_stored_only_when_given():
+    import inspect
+    assert "repeated_share" in inspect.signature(build_geojson).parameters

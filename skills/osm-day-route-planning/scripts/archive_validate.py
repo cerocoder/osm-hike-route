@@ -21,10 +21,12 @@ Or import:
     from archive_validate import validate_archive, ArchiveIncompleteError
 """
 import json
+import re
 import sys
 from pathlib import Path
 
 from notes_headings import HEADINGS, missing_sections
+from waypoints import REPEAT_LIMIT
 
 REQUIRED_ARCHIVE_FILES = ("route.geojson", "weights.json", "requests.md", "notes.md")
 
@@ -70,6 +72,10 @@ def validate_archive(route_dir) -> None:
 
     if isinstance(weights, dict) and geojson is not None:
         problems.extend(_validate_minimum(geojson, weights))
+        problems.extend(_validate_padding(weights))
+        notes_file = route_dir / "notes.md"
+        notes_text = notes_file.read_text(encoding="utf-8") if notes_file.exists() else ""
+        problems.extend(_validate_repeats(geojson, notes_text))
 
     if problems:
         details = "\n".join(f"  - {p}" for p in problems)
@@ -158,6 +164,30 @@ def _validate_minimum(geojson: dict, weights: dict) -> list[str]:
             problems.append(f"{prop_key}={value} {unit} меньше {weight_key}={minimum} {unit} из weights.json — "
                             "маршрут короче минимума, его нельзя сохранять")
     return problems
+
+
+def _validate_padding(weights: dict) -> list[str]:
+    """Length added by segments that lead to no point of interest needs the user's permission (padding_allowed)."""
+    padding = weights.get("padding_km")
+    if isinstance(padding, (int, float)) and padding > 0 and weights.get("padding_allowed") is not True:
+        return [f"padding_km={padding} км добавлено пустыми отрезками, но в weights.json нет padding_allowed=true — "
+                "пользователь не разрешил такие отрезки"]
+    return []
+
+
+def _validate_repeats(geojson: dict, notes: str) -> list[str]:
+    """A loop with more than 30 % repeated length must say the share in notes.md."""
+    lines = [f for f in geojson.get("features") or [] if f.get("geometry", {}).get("type") == "LineString"]
+    if len(lines) != 1:
+        return []
+    props = lines[0].get("properties", {})
+    share = props.get("repeated_share")
+    if props.get("is_loop") is True and isinstance(share, (int, float)) and share > REPEAT_LIMIT:
+        percent = round(share * 100)
+        if not re.search(rf"(?<!\d){percent}\s?%", notes):
+            return [f"repeated_share={share}: петля идёт {percent} % длины по уже пройденным отрезкам, "
+                    f"но в notes.md нет «{percent} %»"]
+    return []
 
 
 def _validate_curated_source(source) -> list[str]:

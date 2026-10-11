@@ -142,3 +142,23 @@ def test_minimum_above_maximum_raises_value_error():
 def test_build_weights_stores_the_minimums():
     w = build_weights(load_preset("walk"), max_distance_km=30, min_distance_km=15)
     assert w["min_distance_km"] == 15 and w["min_duration_hours"] is None
+
+
+def test_allow_main_roads_makes_trunk_and_primary_a_fallback_and_keeps_the_rest():
+    from presets import allow_main_roads
+    preset = load_preset("bike", "leisure")
+    allowed = allow_main_roads(preset)
+    for key in ("routable_highway", "fallback_highway"):
+        assert {"trunk", "primary"} <= set(allowed[key])
+    assert set(preset["fallback_highway"]) <= set(allowed["fallback_highway"])
+    assert "primary" not in allowed["exclude_highway_without_infra"]
+    assert allowed["main_roads_allowed"] is True
+    assert "primary" not in preset["fallback_highway"]            # the preset itself is not changed
+    assert allow_main_roads(allowed)["fallback_highway"] == allowed["fallback_highway"]   # no duplicates
+
+
+def test_default_presets_do_not_allow_main_roads():
+    for style in ("leisure", "sport"):
+        preset = load_preset("bike", style)
+        assert not {"trunk", "primary"} & set(preset["fallback_highway"])
+        assert "primary" in preset["exclude_highway_without_infra"]

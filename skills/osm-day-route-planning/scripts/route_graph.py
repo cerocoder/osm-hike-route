@@ -689,6 +689,20 @@ def repeated_share(graph, node_path):
     return repeated / total if total else 0.0
 
 
+def main_road_length_km(graph, node_path, main_roads=("trunk", "primary")):
+    """Length (km) of the path that runs on trunk or primary ways, counted for every pass. Used to tell the user how
+    much of the route needs the permission to ride a main road."""
+    total_m = 0.0
+    for a, b in zip(node_path, node_path[1:]):
+        candidates = [e for e in graph.get(a, []) if e[0] == b]
+        if not candidates:
+            raise ValueError(f"the path is not connected in the graph between {a} and {b}")
+        edge = min(candidates, key=lambda e: e[1])
+        if (edge[2].get("way") or {}).get("highway") in main_roads:
+            total_m += edge[1]
+    return total_m / 1000.0
+
+
 def special_segments(way_segments):
     """Runs of a route that need a note: steps (a rider pushes the bicycle) and fallback ways."""
     return {"steps": [s for s in way_segments if s.get("highway") == "steps"],

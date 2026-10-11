@@ -958,3 +958,21 @@ def test_repeated_share_counts_second_pass_of_a_spur():
     assert route_graph.repeated_share(g, [1, 2, 1, 3]) == pytest.approx(1000 / 2500)
     assert route_graph.repeated_share(g, [1, 2]) == 0.0
     assert route_graph.repeated_share(g, [1]) == 0.0
+
+
+def test_main_road_length_counts_only_trunk_and_primary_edges():
+    primary, path_way = {"way": {"highway": "primary"}}, {"way": {"highway": "path"}}
+    g = {1: [(2, 400.0, path_way)], 2: [(1, 400.0, path_way), (3, 1500.0, primary)], 3: [(2, 1500.0, primary)]}
+    assert route_graph.main_road_length_km(g, [1, 2, 3]) == pytest.approx(1.5)
+    assert route_graph.main_road_length_km(g, [1, 2]) == 0.0
+
+
+def test_primary_without_cycle_infra_is_reachable_once_main_roads_are_allowed():
+    from presets import allow_main_roads, load_preset
+    preset = allow_main_roads(load_preset("bike", "leisure"))
+    ways = [_way_with_tags({"highway": "primary"}, way_id=1)]
+    assert filter_excluded_ways(ways, [], exclude_highway_without_infra=["primary"]) == []
+    kept = filter_excluded_ways(ways, [], exclude_highway_without_infra=preset["exclude_highway_without_infra"])
+    graph, _ = build_graph(kept if kept else _two_node_way(tags={"highway": "primary"}),
+                           fallback_highway=preset["fallback_highway"])
+    assert _edge_tags(graph, 1, 2)["fallback"] is True

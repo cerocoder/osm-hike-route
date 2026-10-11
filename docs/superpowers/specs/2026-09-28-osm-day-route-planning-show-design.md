@@ -296,6 +296,14 @@ points, or allow arbitrary segments (only the user's choice). After that choice 
 of the length on already travelled edges; it is saved as `repeated_share` in `route.geojson`. A loop with a share
 above 30 % must state it ("NN %") in `notes.md`; `archive_validate` checks this.
 
+#### 3.5.2 Main roads (added 2026-10-12)
+
+`trunk` and `primary` ways without cycle infrastructure stay out of the graph in every preset. When points are
+unreachable without them, the planner probes with `presets.allow_main_roads(weights)`, measures the main-road part
+with `route_graph.main_road_length_km`, and asks the user, giving the road and the length. Only after a yes it routes
+with the allowed weights (`main_roads_allowed: true` in `weights.json`; the edges are fallback ways, cost x1000).
+A revision keeps the override (`revise_weights`).
+
 ### 3.6 Веса и правила проходимости — вынесены из кода в данные
 
 Два уровня:

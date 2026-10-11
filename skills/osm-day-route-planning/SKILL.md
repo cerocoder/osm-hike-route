@@ -218,6 +218,18 @@ new preset, no code changes).
     `bicycle=dismount` on steps does not drop them (a rider pushes the bicycle; `bicycle=no` still drops them).
     `tertiary`, `unclassified`, `corridor` and `bridleway` are ordinary routable ways; `bridleway` is also
     routable for `walk`. The Overpass pattern is anchored, so `tertiary` does not fetch `tertiary_link`.
+    **Main roads (TODO 12).** By default `trunk` and `primary` ways without cycle infrastructure are not in the graph
+    (`exclude_highway_without_infra`), for every preset. Never allow them silently. When a chosen point of interest,
+    or the whole route, is unreachable without them: build a probe graph from `presets.allow_main_roads(weights)`
+    (it adds `trunk` and `primary` to `routable_highway` and `fallback_highway`, empties their exclusion, and sets
+    `main_roads_allowed`), route to the unreachable points, and measure the main-road part with
+    `route_graph.main_road_length_km(graph, path)`. Ask the user, with the numbers: "Point X is reachable only along
+    the road <ref> (about N km, no cycle lane or shoulder in OSM). Allow it as a last resort?" Only after a yes, use
+    the allowed weights for the real route and save them in `weights.json`; after a no, drop those points and say so
+    in the notes. The main-road edges are fallback ways: the router takes them only when no other link exists. List
+    the main-road runs in "Route reasoning" with the length. When you rebuild the weights (a revision), keep the
+    user's overrides, `main_roads_allowed` included: rebuild with `presets.revise_weights(existing, changes)`, not from
+    the bare preset.
     `respect_oneway` only matters for `bike` — `walk` never respects
     `oneway`. A plain two-way segment with no `oneway` tag stays traversable
     in both directions for **both** modes (Review Focus #5) — `build_graph`

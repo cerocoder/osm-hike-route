@@ -77,3 +77,10 @@
     and update the SKILL files and the spec.
     Done (0.4.0): waypoints.SHORT_ROUTE_OPTIONS (in RouteTooShortError), route_graph.repeated_share,
     waypoints.repeat_statement, weights padding_allowed / padding_km, archive_validate checks, SKILL step 15, spec 3.5.1.
+
+12. [done] Trunk and primary roads without cycle infrastructure are excluded for cyclists by default, and the planner
+    gave no way to use them (source: road 65К-4105000, where the user's override was lost at a rebuild of the weights).
+    Do not allow them by default. When points are unreachable without such a road, probe with it, tell the user the
+    road and the length, and ask. Use the road only after the user agrees, as a last-resort (fallback) way.
+    Done (0.5.0): presets.allow_main_roads, route_graph.main_road_length_km, SKILL (bike presets rules), spec 3.5.2,
+    tests; overrides are kept at a revision (revise_weights).

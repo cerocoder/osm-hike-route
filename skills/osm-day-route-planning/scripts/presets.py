@@ -66,3 +66,20 @@ def revise_weights(existing: dict, changes: dict) -> dict:
         else:
             revised[key] = value
     return revised
+
+
+MAIN_ROADS = ("trunk", "primary")
+
+
+def allow_main_roads(weights: dict) -> dict:
+    """Weights that let the route use trunk and primary roads without cycle infrastructure, as a last resort
+    (fallback ways cost `fallback_way_cost` times more). Call it only after the user agreed (TODO 12). It keeps the
+    other fields, and the user's own additions to the lists."""
+    allowed = copy.deepcopy(weights)
+    for key in ("routable_highway", "fallback_highway"):
+        allowed[key] = list(allowed.get(key) or [])
+        allowed[key] += [h for h in MAIN_ROADS if h not in allowed[key]]
+    allowed["exclude_highway_without_infra"] = [
+        h for h in allowed.get("exclude_highway_without_infra") or [] if h not in MAIN_ROADS]
+    allowed["main_roads_allowed"] = True
+    return allowed

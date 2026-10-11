@@ -27,3 +27,36 @@
    plan a day hike, it should be complete enough and be a good example for users. Add it right after "## What it does",
    to be visible from the document's beginning.
 
+
+9. [done] Change which highway types the cyclist presets (`bike-leisure` and `bike-sport`) and the walk preset can use.
+   Background: docs/research/2026-10-11-highway-types-and-access.md.
+   Done (0.3.0): bike presets got the new types; `fallback_highway` (service, road) and `bicycle_explicit_highway`
+   (footway, pedestrian) edges cost x1000; steps cost x5 with a note; Overpass regex anchored (no `*_link`).
+   a) Cyclists (sport and leisure): permit `tertiary`, `unclassified`, `service` and `road`. Use `service` in full
+      (all `service=*` subtypes), but only as a fallback to restore connectivity: the router uses a `service` way
+      only when the graph has no other link. Do the same for `road` if it is also a fallback (decide while implementing).
+   b) Cyclists (sport and leisure): permit `steps`. Remove `steps` from `hard_exclude_tags` in the bike presets.
+      (A cyclist pushes the bicycle on steps: add a cost penalty and a note in the route notes.)
+   c) Cyclists (sport and leisure): permit `corridor` (a passage inside a building).
+   d) Cyclists (sport and leisure): `footway` and `pedestrian` need an explicit `bicycle=yes` or `bicycle=designated`.
+      Without it, use them only as a fallback to restore connectivity.
+   e) Pedestrians and cyclists (sport and leisure): permit `bridleway`.
+   Also: add a test for each rule, check the unanchored Overpass regex for `*_link` values (see the research
+   document), and update the SKILL files, README and spec for the changed presets.
+
+10. [done] Enforce a minimum route length. Today the distance budget is only an upper limit (`select_optional_points`
+    adds points under the limit and nothing adds length). A route of 0.16 km was saved for a 30 km request and no
+    check stopped it. Source: feedback/01_osm-test.
+    a) The user can give both a minimum and a maximum length (or time). Then use these two values.
+       If the user gives only one length (or time), it is the maximum, and the minimum is 1/2 of it. The planner sets
+       this default minimum by itself and does not ask the user for it. The planner must not save a route shorter
+       than the minimum.
+    b) If the user gives neither a length nor a time, ask the user for one of them.
+    c) If the range [minimum length, maximum length] gives no route, do not save a route. Tell the user why and ask
+       what to change (the range, the start point, the area radius or the mode).
+    d) If there is not much information to choose points of interest, ask the user (for example: what kind of places
+       the user likes, or which places the user knows).
+    e) If the points of interest that the planner found are not enough, ask the user. Do not fill the route silently
+       with a route that has only the start point or only a shop.
+    Also: add a check in `archive_validate` (the route is shorter than the minimum -> error), add tests, and update
+    the SKILL files and the spec.

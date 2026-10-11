@@ -1,3 +1,5 @@
+0.3.0	Bike presets: tertiary, unclassified, service/road (fallback), steps (cost), corridor, bridleway, footway/pedestrian need bicycle=yes; anchored Overpass regex; minimum route length (default 1/2 of the maximum), checks and questions to the user, archive_validate minimum check
+
 0.2.1	README: short end-to-end example (route, map, day plan)
 
 

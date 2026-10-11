@@ -277,6 +277,17 @@ no-data) — фоновое знание модели само по себе н�
 4. В итоговой сводке — какие из предложенных скиллом точек интереса вошли
    в маршрут, а какие не поместились в бюджет и были опущены.
 
+#### 3.5.1 Minimum length (added 2026-10-11)
+
+The budget is a range. `presets.resolve_length_range` takes a minimum and a maximum. If the user gives one value,
+it is the maximum and the minimum is 1/2 of it; the planner sets it and does not ask. If the user gives no length
+and no time, the planner asks for one. `weights.json` keeps `min_distance_km`, `max_distance_km`,
+`min_duration_hours` and `max_duration_hours`. After the duration estimate, `waypoints.check_minimum_length` raises
+`RouteTooShortError` for a shorter route; the planner does not save it and asks the user what to change (range,
+start point, area radius, mode). `waypoints.check_enough_points` raises `NotEnoughPointsError` when fewer than 2
+real points of interest exist (start, access points and shops do not count); the planner asks the user about
+liked or known places. `archive_validate` reports a route shorter than the minimum in `weights.json`.
+
 ### 3.6 Веса и правила проходимости — вынесены из кода в данные
 
 Два уровня:
@@ -348,6 +359,17 @@ no-data) — фоновое знание модели само по себе н�
 соответствующий режиму/стилю, как отправную точку ("вот дефолтные веса для
 ..., менять что-то?"), сливает правки в копию, сохраняет как `weights.json`
 маршрута. Сами пресеты не модифицируются.
+
+#### 3.6.1 Highway types by preset (added 2026-10-11)
+
+Source: `docs/research/2026-10-11-highway-types-and-access.md`. Bike presets (leisure and sport) also route on
+`tertiary`, `unclassified`, `corridor`, `bridleway`, `service`, `road`, `steps`, `footway` and `pedestrian`. Preset
+key `fallback_highway` (`service`, `road`) and key `bicycle_explicit_highway` (`footway`, `pedestrian`, normal only
+with `bicycle=yes|designated`) mark fallback edges. Their cost is multiplied by `preferences.fallback_way_cost`
+(1000), so the router uses them only when no other link exists. `steps` are no longer hard-excluded; their cost is
+multiplied by `preferences.steps_cost` (5), `bicycle=dismount` on steps does not drop them, and the route notes name
+each steps run. The walk preset also routes on `bridleway`. The walkable Overpass regex is anchored (`^(...)$`),
+so `*_link` values are no longer fetched by accident.
 
 ### 3.7 Направленный граф + рельеф
 

@@ -128,6 +128,11 @@ new preset, no code changes).
    model knowledge may suggest candidates to go check, but never substitutes
    for a tier label — every claim shown to the user still goes through the
    Interest-Layer Confidence Tiers below (spec §3.4).
+   If the request and the research give little to choose points from, **ask the user** what kind of places they
+   like, or which places they know. Give each point a `kind` (`peak`, `viewpoint`, `water`, `shop`, `start`, ...).
+   Before step 13 call `waypoints.check_enough_points(points)` with the user's points and the candidates: it
+   raises `NotEnoughPointsError` when fewer than 2 are real points of interest (the start, access points and shops
+   do not count). Then ask the user for more places; never fill the route with only the start or only a shop.
 7. **Fetch area data via Overpass**: `route_graph.fetch_area_data(lat, lon,
    radius_m, routable_highway=weights["routable_highway"],
    hard_exclude_highway=weights["hard_exclude_tags"].get("highway", []),
@@ -161,6 +166,12 @@ new preset, no code changes).
 10. **Ask for the distance/duration budget if not stated** — `max_distance_km`
     and/or `max_duration_hours` (spec §3.5). Same rule as mode/style/loop:
     ask explicitly, never assume a number. (Step 4a asks it earlier; here only what is still missing.)
+    Then call `presets.resolve_length_range(min_km, max_km, min_h, max_h)`. The user may give a minimum and a
+    maximum; pass both. If the user gives one value, it is the maximum, and the minimum is **1/2 of it** — set by the
+    planner, never asked. If the user gives neither a length nor a time, `LengthRequiredError` is raised: ask for one
+    of them. Pass the four values to `build_weights`; they are saved in `weights.json` as `min_distance_km`,
+    `max_distance_km`, `min_duration_hours`, `max_duration_hours`. A route shorter than the minimum is never saved
+    (step 15).
 11. **Exclude closed/restricted zones, then build the directed, mode-aware
     graph** over what's left:
     ```python
@@ -174,6 +185,8 @@ new preset, no code changes).
         walkable, data["barrier_nodes"],
         blocking_barrier_tags=weights["blocking_barrier_tags"],
         respect_oneway=(mode == "bike"),
+        fallback_highway=weights.get("fallback_highway", ()),
+        bicycle_explicit_highway=weights.get("bicycle_explicit_highway", ()),
     )
     crossings = route_graph.add_station_crossings(
         graph, node_coords, data["stations"], data["railways"], data["highways"],
@@ -198,6 +211,13 @@ new preset, no code changes).
     station is crossed on foot — footbridge or underpass, steps or lift, whether the platform crossing is allowed,
     opening hours of the concourse — and put the finding into the route notes under that station's name, tier-labelled
     like any other web claim. If nothing reliable turns up, say so in the notes: the link is an OSM-based guess.
+    Bike presets add three rules (TODO 9). (a) `fallback_highway` (`service`, `road`): the edges are marked
+    `fallback` and cost `fallback_way_cost` (1000) times more, so the router takes them only when no other link
+    exists; (b) `bicycle_explicit_highway` (`footway`, `pedestrian`): a way without `bicycle=yes|designated` is a
+    fallback way, with it a normal way; (c) `steps` are routable, cost `steps_cost` (5) times more, and
+    `bicycle=dismount` on steps does not drop them (a rider pushes the bicycle; `bicycle=no` still drops them).
+    `tertiary`, `unclassified`, `corridor` and `bridleway` are ordinary routable ways; `bridleway` is also
+    routable for `walk`. The Overpass pattern is anchored, so `tertiary` does not fetch `tertiary_link`.
     `respect_oneway` only matters for `bike` — `walk` never respects
     `oneway`. A plain two-way segment with no `oneway` tag stays traversable
     in both directions for **both** modes (Review Focus #5) — `build_graph`
@@ -235,6 +255,10 @@ new preset, no code changes).
     `duration.duration_warning(estimated_hours, duration_warning_hours)`
     for the soft daylight-fit warning (never blocks route construction,
     unlike the hard budget check in step 13/14).
+    Then check the minimum: `waypoints.check_minimum_length(distance_km, weights["min_distance_km"], hours,
+    weights["min_duration_hours"])`. On `RouteTooShortError` **do not save** the route. Tell the user why it is too
+    short and ask what to change: the range, the start point, the area radius or the mode. `archive_validate`
+    repeats this check.
 16. **Count curated routes nearby** (informational only, spec §3.10):
     `overpass_query.count_curated_routes(overpass_query.query_overpass(
     overpass_query.build_curated_routes_query(lat, lon, radius_m,
@@ -251,7 +275,10 @@ new preset, no code changes).
     each part of the route runs on, as inclusive index ranges into those
     coordinates — cannot drift apart). The day-plan skill reads `segments` to
     judge how passable the trails and roads are in winter; a route saved
-    without them gets no such assessment and must be re-planned. Then:
+    without them gets no such assessment and must be re-planned. Call `route_graph.special_segments(way_segments)`:
+    for each `steps` run write a note under "Route reasoning" (the rider pushes the bicycle; give the place), and
+    list the `fallback` runs (service roads, footways without `bicycle=yes`) as ways used only to keep the route
+    connected. Then:
     `weights_io.save_weights(route_dir, weights)` (the merged preset +
     overrides + budget — see spec §3.6/§3.11: this is where **inputs** live),
     `route_output.build_geojson(..., way_segments[, curated_source=...])` (this is where **computed
@@ -390,7 +417,7 @@ all in `scripts/route_graph.py`:
 2. **Hard-excluded tags per preset** (`filter_excluded_ways` via
    `hard_exclude_tags`/`exclude_highway_without_infra`): mode-specific, not
    hardcoded — `walk` hard-excludes `foot=no`; `bike` hard-excludes
-   `bicycle=no|dismount`, `highway=steps`, and (`exclude_highway_without_infra`)
+   `bicycle=no|dismount` (not for `steps` with `dismount`), and (`exclude_highway_without_infra`)
    any `trunk`/`primary` way with no positive cycle-infra tag (`cycleway`,
    `cycleway:left|right|both` — values `no`/`none`/`separate` do **not**
    count as infra). `sport`-style bike
@@ -428,7 +455,7 @@ import sys
 from pathlib import Path
 
 from overpass_query import query_overpass, haversine        # noqa: F401 (imported by route_graph)
-from presets import load_preset, build_weights
+from presets import load_preset, build_weights, resolve_length_range
 from route_graph import (
     fetch_area_data, build_restricted_polygons, filter_excluded_ways,
     build_graph, add_station_crossings, tag_edges, tag_grades, weighted_shortest_path,
@@ -455,7 +482,9 @@ with RunLog.start(route_dir, "plan", argv=sys.argv) as log:   # <route_dir>/plan
     progress = Progress(total_steps=5, lang=user_lang, runlog=log)   # user_lang: the language of the conversation / notes.md
 
     preset = load_preset(mode, style)                 # e.g. load_preset("bike", "leisure")
-    weights = build_weights(preset, preference_overrides, max_distance_km, max_duration_hours)
+    length = resolve_length_range(min_km, max_km, min_h, max_h)   # LengthRequiredError: ask the user (step 10)
+    weights = build_weights(preset, preference_overrides, length["max_distance_km"], length["max_duration_hours"],
+                            length["min_distance_km"], length["min_duration_hours"])
 
     with progress.step("overpass"):
         data = fetch_area_data(
@@ -480,6 +509,8 @@ with RunLog.start(route_dir, "plan", argv=sys.argv) as log:   # <route_dir>/plan
             walkable, data["barrier_nodes"],
             blocking_barrier_tags=weights["blocking_barrier_tags"],
             respect_oneway=(mode == "bike"),
+            fallback_highway=weights.get("fallback_highway", ()),
+            bicycle_explicit_highway=weights.get("bicycle_explicit_highway", ()),
         )
         add_station_crossings(graph, node_coords, data["stations"], data["railways"], data["highways"])
         progress.detail("graph_done", nodes=len(graph), edges=sum(len(e) for e in graph.values()))
@@ -768,8 +799,8 @@ discard a field already in hand," not an extra query.
 | Constraint | Overpass filter / preset field |
 |---|---|
 | Walkable paths (`walk`) | `highway=path\|footway\|track\|pedestrian\|steps\|residential\|living_street\|unclassified\|service\|tertiary` — preset `routable_highway` |
-| Routable ways (`bike`) | preset's `routable_highway` — adds `cycleway`, and `secondary` for `bike-sport` — passed to `fetch_area_data`'s `routable_highway` argument, or those ways are never fetched at all |
-| Bike hard-exclude | `bicycle=no\|dismount`, `highway=steps` — preset `hard_exclude_tags` |
+| Routable ways (`bike`) | preset's `routable_highway` — adds `cycleway`, `tertiary`, `unclassified`, `service`, `road`, `steps`, `corridor`, `pedestrian`, `bridleway`, and `secondary` for `bike-sport` (`service`/`road`, and `footway`/`pedestrian` without `bicycle=yes\|designated`, are fallback ways) — passed to `fetch_area_data`'s `routable_highway` argument, or those ways are never fetched at all |
+| Bike hard-exclude | `bicycle=no\|dismount` (`dismount` is kept on `steps`) — preset `hard_exclude_tags` |
 | Highway needs cycle infra (bike) | `trunk\|primary` with no positive `cycleway`/`cycleway:left\|right\|both` value (`no`/`none`/`separate` = no infra) — preset `exclude_highway_without_infra` |
 | Oneway respected (bike only) | `oneway=yes`, reopened by `oneway:bicycle=no` or `cycleway=opposite*` |
 | Blocking barrier (mode-specific) | preset `blocking_barrier_tags`, e.g. `cycle_barrier`, `turnstile` for bike |

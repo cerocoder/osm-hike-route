@@ -10,7 +10,7 @@ Directory structure:
   or that has already been applied
 - feedback - feedback, examples, advice, errors (not in the repository)
 - init-raw-source - old skills used as a basis; we no longer look at them
-- TODO - small tasks and fixes of inaccuracies that are easy to fix/implement
+- TODO - tasks and fixes of inaccuracies
 - .claude-plugin/plugin.json - file that contains the version of the skill set
 
 We must increase the version (only the minor part for bug/typo fixes and
@@ -22,3 +22,7 @@ in the Changelog and that the version is updated.
 
 We try to replace the Anthropic status line to show progress,
 but if the model cannot display it, this must not be a problem.
+
+When I ask you to implement TODO you should look each undone TODO record
+and decide: to use superpowers skills, or just to correct in a simple way.
+

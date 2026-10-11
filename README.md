@@ -62,12 +62,13 @@ What you can ask for:
 - **Terrain preferences:** avoid main roads, prefer forest, avoid open fields, avoid water, avoid steep climbs.
 - **Required stops:** a shop, a drinking fountain, a museum, or anything you care about, including things OSM doesn't tag (a viewpoint, good radio reception, foraging).
 - **An access point:** a station, bus stop, or car park to start from. Claude suggests how to get there from where you are.
-- **A budget:** maximum distance and/or hours. Claude asks if you don't say.
+- **A budget:** maximum distance and/or hours, and optionally a minimum. Claude asks if you give neither. If you give only a maximum, the minimum is half of it. Claude does not save a route shorter than the minimum; it asks what to change.
 
 What it does with that:
 - Finds routable paths and the surrounding terrain from OpenStreetMap, and excludes closed areas (military zones, private land, nature reserves, locked gates). It tells you plainly if a point you asked for falls inside one.
 - Weights the route by your preferences, respects one-way rules and bike-blocking barriers for cycling, and accounts for climbs using elevation data.
-- Adds optional points of interest only while there is budget left, and lists any it skipped.
+- Adds optional points of interest only while there is budget left, and lists any it skipped. If it finds too few places of interest, it asks you which places you like or know.
+- For cyclists it also uses tertiary and unclassified roads, bridleways and corridors. It uses service roads, and footways without an explicit `bicycle=yes`, only when no other link exists. Steps cost extra, and the notes say where you push the bicycle.
 - Estimates duration and warns if the day may not fit in daylight.
 - Labels every claim about a place by how sure it is: `tag-backed` (OSM says so), `web-sourced` (found online, unverified in person), `derived` (an estimate), `no-data` (nothing found). It does not invent answers.
 - Checks the saved archive is complete before showing you the result.

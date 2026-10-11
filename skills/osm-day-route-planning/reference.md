@@ -185,7 +185,7 @@ these are per-way/per-node tag checks on already-fetched elements):
 
 | Concern | Tag(s) | Where checked |
 |---|---|---|
-| Bike hard-exclude | `bicycle=no\|dismount`, `highway=steps` | `filter_excluded_ways` via preset `hard_exclude_tags` |
+| Bike hard-exclude | `bicycle=no\|dismount` (`dismount` is kept on `steps`) | `filter_excluded_ways` via preset `hard_exclude_tags` |
 | Highway needs cycle infra | `trunk\|primary` without a positive `cycleway`/`cycleway:left\|right\|both` value (`no`/`none`/`separate` don't count) | `filter_excluded_ways` via preset `exclude_highway_without_infra` |
 | Oneway (bike only) | `oneway=yes`, reopened by `oneway:bicycle=no` or `cycleway=opposite*` | `build_graph` → `_direction_allowed` (only when `respect_oneway=True`) |
 | Blocking barrier (bike only) | `barrier=cycle_barrier\|turnstile` | `build_graph` → `_blocks_passage` via preset `blocking_barrier_tags` |

@@ -11,6 +11,27 @@ You describe the day you want ("a loop in Casa de Campo, mostly trees, no big ro
 
 The project is a Claude Code plugin made of three skills: two that work as a pair (plan a route, show it), and a third that briefs you on a specific day for a saved route.
 
+## Example: from request to day plan
+
+Three short messages in Claude Code are enough. Claude asks for anything you leave out (mode, loop or one-way, budget).
+
+1. **Create the route** (skill `osm-day-route-planning`):
+   > Plan a walking loop in Casa de Campo, Madrid. Start at Lago metro station. I prefer forest, no big roads, maximum 15 km and 5 hours. I want a drinking fountain on the way.
+
+   Claude lists nearby public routes that fit, or builds its own, and saves it in `routes/casa-de-campo-<date>/`.
+
+2. **Build the map** (skill `osm-day-route-show`):
+   > Show this route on a map.
+
+   You get `map.html` (open it in your browser) and an embedded GPX file for Wikiloc or a Garmin device.
+
+3. **Plan the day** (skill `osm-day-route-day-plan`):
+   > Make a day plan for this route for next Saturday.
+
+   You get sunrise and sunset, weather by hour, how to reach the start, and a check that the points of interest are open. The plan is also added to the map.
+
+Later you can say "swap the fountain for a café" and Claude updates the same route folder.
+
 ## Architecture at a glance
 
 ```

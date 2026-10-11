@@ -22,3 +22,8 @@
    However, additionaly looking for details of implementation a given station on the Internet is a good idea.
    Done: route_graph.add_station_crossings links the two sides of a railway / motorway-trunk-primary road at each
    station or halt (always on); the SKILL asks for a web search on every station the route crosses at.
+
+8. [done] Add to README.md the one short and comprehensive example how to ask skills to create a route, build a map and
+   plan a day hike, it should be complete enough and be a good example for users. Add it right after "## What it does",
+   to be visible from the document's beginning.
+

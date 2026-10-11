@@ -83,3 +83,12 @@ def allow_main_roads(weights: dict) -> dict:
         h for h in allowed.get("exclude_highway_without_infra") or [] if h not in MAIN_ROADS]
     allowed["main_roads_allowed"] = True
     return allowed
+
+
+def allow_protected_zones(weights: dict) -> dict:
+    """Weights that record the user's permission to cross nature reserves and protected areas (TODO 13). The planner
+    then leaves those zones out of the restricted polygons (route_graph.split_protected). Military zones, private
+    areas and fences stay closed. Call it only after the user agreed."""
+    allowed = copy.deepcopy(weights)
+    allowed["protected_zones_allowed"] = True
+    return allowed

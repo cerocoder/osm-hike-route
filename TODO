@@ -84,3 +84,9 @@
     road and the length, and ask. Use the road only after the user agrees, as a last-resort (fallback) way.
     Done (0.5.0): presets.allow_main_roads, route_graph.main_road_length_km, SKILL (bike presets rules), spec 3.5.2,
     tests; overrides are kept at a revision (revise_weights).
+
+13. [done] Protected zones (nature reserves, protected areas) are closed always. Military zones stay closed always.
+    For the other protected zones: if a point of interest cannot be reached, or the route cannot be built, without
+    crossing one, probe, tell the user the zone and the length, and ask. Cross it only after the user agrees.
+    Done (0.6.0): route_graph.is_protected_only / split_protected / protected_zones_crossed,
+    presets.allow_protected_zones, SKILL step 8, spec 3.5.3, tests.

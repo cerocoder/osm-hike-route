@@ -976,3 +976,47 @@ def test_primary_without_cycle_infra_is_reachable_once_main_roads_are_allowed():
     graph, _ = build_graph(kept if kept else _two_node_way(tags={"highway": "primary"}),
                            fallback_highway=preset["fallback_highway"])
     assert _edge_tags(graph, 1, 2)["fallback"] is True
+
+
+# --- protected zones the user may allow (TODO 13) -------------------------
+
+def _zone(tags, zone_id=901):
+    return {"type": "relation", "id": zone_id, "tags": tags,
+            "members": [_member([_SW, _SE, _NE], ref=1), _member([_NE, _NW, _SW], ref=2)]}
+
+
+@pytest.mark.parametrize("tags,protected", [
+    ({"leisure": "nature_reserve"}, True),
+    ({"boundary": "protected_area", "protect_class": "4"}, True),
+    ({"leisure": "nature_reserve", "access": "no"}, False),
+    ({"boundary": "protected_area", "landuse": "military"}, False),
+    ({"boundary": "protected_area", "military": "range"}, False),
+    ({"landuse": "military"}, False),
+    ({"access": "private"}, False),
+])
+def test_only_a_plain_protected_zone_can_be_allowed(tags, protected):
+    assert route_graph.is_protected_only({"tags": tags}) is protected
+
+
+def test_split_protected_keeps_military_in_the_hard_list():
+    reserve, military = _zone({"leisure": "nature_reserve"}), _zone({"landuse": "military"}, 902)
+    hard, protected = route_graph.split_protected([reserve, military])
+    assert hard == [military] and protected == [reserve]
+
+
+def test_protected_zones_crossed_reports_name_and_length():
+    reserve = _zone({"leisure": "nature_reserve", "name": "Заказник"})
+    graph = {1: [(2, 1500.0, {})], 2: [(1, 1500.0, {}), (3, 700.0, {})], 3: [(2, 700.0, {})]}
+    coords = {1: _INSIDE, 2: (_INSIDE[0] + 0.0001, _INSIDE[1]), 3: _OUTSIDE}
+    found = route_graph.protected_zones_crossed(graph, [1, 2, 3], coords, [reserve])
+    assert found == [{"id": 901, "name": "Заказник", "km": pytest.approx(1.5)}]
+    assert route_graph.protected_zones_crossed(graph, [2, 3], {2: _OUTSIDE, 3: (55.02, 37.02)}, [reserve]) == []
+
+
+def test_allowed_protected_zone_does_not_close_the_way_but_military_still_does():
+    reserve, military = _zone({"leisure": "nature_reserve"}), _zone({"landuse": "military"}, 902)
+    way = _way_with_tags({"highway": "path"}, way_id=1)           # midpoint is inside both squares
+    hard, _ = route_graph.split_protected([reserve])
+    assert [w["id"] for w in filter_excluded_ways([way], build_restricted_polygons(hard, []))] == [1]
+    hard, _ = route_graph.split_protected([reserve, military])
+    assert filter_excluded_ways([way], build_restricted_polygons(hard, [])) == []

@@ -304,6 +304,16 @@ with `route_graph.main_road_length_km`, and asks the user, giving the road and t
 with the allowed weights (`main_roads_allowed: true` in `weights.json`; the edges are fallback ways, cost x1000).
 A revision keeps the override (`revise_weights`).
 
+#### 3.5.3 Protected zones (added 2026-10-12)
+
+A nature reserve or protected area with no other closure tag (`route_graph.is_protected_only`) is closed by default
+like any restricted zone. Military zones, `access=private|no` areas and fences are closed always. When points are
+unreachable with the protected zones closed, the planner probes without them (`split_protected`), measures the
+crossing with `route_graph.protected_zones_crossed`, and asks the user, giving the zone name and the length. After
+a yes, `presets.allow_protected_zones` sets `protected_zones_allowed: true` in `weights.json` and the polygons are
+built from the hard list only. The notes name each crossed zone and ask to check its rules. If a hard zone closes
+the way, the planner offers no crossing.
+
 ### 3.6 Веса и правила проходимости — вынесены из кода в данные
 
 Два уровня:

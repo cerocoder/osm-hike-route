@@ -310,6 +310,47 @@ def build_restricted_polygons(restricted_ways, barrier_ways):
     return polygons
 
 
+def is_protected_only(element: dict) -> bool:
+    """A nature reserve or protected area with no other closure tag. Such a zone may be crossed when the user agrees
+    (TODO 13). Military zones (landuse=military, military=*, access=military) and access=private|no stay closed
+    always."""
+    tags = element.get("tags", {})
+    if not (tags.get("leisure") == "nature_reserve" or tags.get("boundary") == "protected_area"):
+        return False
+    return not (tags.get("access") in RESTRICTED_ACCESS or tags.get("landuse") == "military" or "military" in tags)
+
+
+def split_protected(restricted: list) -> tuple[list, list]:
+    """(hard, protected): the restricted elements that stay closed always, and the protected-only zones."""
+    protected = [e for e in restricted if is_protected_only(e)]
+    hard = [e for e in restricted if not is_protected_only(e)]
+    return hard, protected
+
+
+def protected_zones_crossed(graph, node_path, node_coords, protected_elements) -> list[dict]:
+    """The protected zones a path runs through: [{"id", "name", "km"}], the longest first. An edge belongs to a zone
+    when its midpoint is inside (the same rule filter_excluded_ways uses). Tell the user these zones and lengths."""
+    zones = []
+    for element in protected_elements:
+        rings = build_restricted_polygons([element], [])
+        if rings:
+            tags = element.get("tags", {})
+            zones.append({"id": element.get("id"), "name": tags.get("name") or tags.get("ref") or "без названия",
+                          "rings": rings, "m": 0.0})
+    for a, b in zip(node_path, node_path[1:]):
+        candidates = [e for e in graph.get(a, []) if e[0] == b]
+        if not candidates:
+            raise ValueError(f"the path is not connected in the graph between {a} and {b}")
+        length = min(e[1] for e in candidates)
+        lat = (node_coords[a][0] + node_coords[b][0]) / 2
+        lon = (node_coords[a][1] + node_coords[b][1]) / 2
+        for zone in zones:
+            if any(point_in_ring(lat, lon, ring) for ring in zone["rings"]):
+                zone["m"] += length
+    found = [{"id": z["id"], "name": z["name"], "km": z["m"] / 1000.0} for z in zones if z["m"] > 0]
+    return sorted(found, key=lambda z: -z["km"])
+
+
 def _blocks_passage(tags: dict, blocking_barrier_tags: list[str]) -> bool:
     """A barrier node blocks routing through it if it's actually locked
     (existing conservative rule), or if this mode's preset explicitly

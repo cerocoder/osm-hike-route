@@ -162,3 +162,12 @@ def test_default_presets_do_not_allow_main_roads():
         preset = load_preset("bike", style)
         assert not {"trunk", "primary"} & set(preset["fallback_highway"])
         assert "primary" in preset["exclude_highway_without_infra"]
+
+
+def test_allow_protected_zones_records_the_permission_and_changes_nothing_else():
+    from presets import allow_protected_zones
+    preset = load_preset("bike", "leisure")
+    allowed = allow_protected_zones(preset)
+    assert allowed["protected_zones_allowed"] is True
+    assert "protected_zones_allowed" not in preset
+    assert {k: v for k, v in allowed.items() if k != "protected_zones_allowed"} == preset

@@ -151,6 +151,21 @@ new preset, no code changes).
    `route_graph.build_restricted_polygons(data["restricted"],
    data["barrier_ways"])`. This must happen **before** waypoint validation
    (step 9) and before graph building — it is the shared input both rely on.
+   **Protected zones (TODO 13).** `route_graph.split_protected(data["restricted"])` returns `(hard, protected)`.
+   `protected` holds the nature reserves and protected areas (`leisure=nature_reserve`, `boundary=protected_area`)
+   that have no other closure tag. Military zones (`landuse=military`, `military=*`, `access=military`), `access=private|no`
+   areas and fences are in `hard` and stay closed always, whatever the user says. By default build the polygons from
+   all of `data["restricted"]`, as above. If `weights.get("protected_zones_allowed")` is true (the user agreed
+   earlier, or this is a revision), build them from `hard` only.
+   **When a chosen point of interest, or the whole route, is unreachable with the protected zones closed:** build
+   a probe from `hard` only, route to the unreachable points, and call `route_graph.protected_zones_crossed(graph,
+   path, node_coords, protected)`. Ask the user, with the numbers: "Point X is reachable only through the protected
+   area <name> (about N km). Allow the route to cross it?" Only after a yes: `presets.allow_protected_zones(weights)`,
+   use `hard` only, and save the weights. After a no, drop those points and say so in the notes. If even the `hard`
+   polygons close the way (a military zone), say that, and do not offer a crossing. A point of interest inside
+   a protected zone is the same case: ask, do not refuse at once. In "Route reasoning" name each crossed zone and the
+   length, and mention that the rules of the zone (entry permit, fee, ban on bicycles, closed season) must be checked:
+   search the web for them and put the result in the notes, tier-labelled.
 9. **Validate every waypoint against restricted zones before building the
    graph** (spec §3.4, Review Focus #1) — never let this surface later as a
    silent "no path found" from the router:
@@ -956,7 +971,8 @@ Full query templates (with the header workaround Overpass needs) are in
   `access=private/no/military`, `leisure=nature_reserve`,
   `boundary=protected_area`, and enclosed fenced areas are a hard drop
   before the graph is even built, not a high `avoid_*` penalty the router
-  could still cross if nothing else exists.
+  could still cross if nothing else exists. The one exception is a plain nature reserve / protected area that the
+  user allowed after your question (`protected_zones_allowed`); military, private and fenced zones are never allowed.
 - **Blocking every gate on a trail** — only a locked/private/plain-wall
   barrier node, or one tagged in the mode's `blocking_barrier_tags`, blocks;
   an ordinary gate or stile has no negative access tag and must stay

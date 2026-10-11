@@ -47,6 +47,8 @@
 10. [done] Enforce a minimum route length. Today the distance budget is only an upper limit (`select_optional_points`
     adds points under the limit and nothing adds length). A route of 0.16 km was saved for a 30 km request and no
     check stopped it. Source: feedback/01_osm-test.
+    Done (0.3.0): presets.resolve_length_range, waypoints.check_minimum_length / check_enough_points,
+    archive_validate minimum check, SKILL steps 6, 10, 15.
     a) The user can give both a minimum and a maximum length (or time). Then use these two values.
        If the user gives only one length (or time), it is the maximum, and the minimum is 1/2 of it. The planner sets
        this default minimum by itself and does not ask the user for it. The planner must not save a route shorter

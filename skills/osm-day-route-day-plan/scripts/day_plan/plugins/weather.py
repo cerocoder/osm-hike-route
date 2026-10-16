@@ -281,11 +281,38 @@ def _num(value, digits=0) -> str:
     return text[1:] if text.startswith("-") and float(text) == 0 else text
 
 
-def _wind_cell(row: dict, lang: str) -> str:
+def _wind_cell(row: dict, lang: str, windy: tuple | None = None) -> str:
     if row["wind"] is None:
         return "–"
     label = compass(row["wdir"], lang) if row["wdir"] is not None else ""
-    return f"{row['wind']:.1f} {label} ({row['wdir']:.0f}°)" if label else f"{row['wind']:.1f}"
+    text = f"{row['wind']:.1f} {label} ({row['wdir']:.0f}°)" if label else f"{row['wind']:.1f}"
+    if windy is not None:
+        text += f" [...]({windy_link(row, *windy)})"
+    return text
+
+
+WINDY_URL = "https://www.windy.com/?{stamp},{lat:.4f},{lon:.4f},{zoom}"
+WINDY_VIEW_PX = 700            # width of the map view the zoom is chosen for
+WINDY_MIN_ZOOM, WINDY_MAX_ZOOM = 3, 13
+
+
+def windy_zoom(coords: list) -> int:
+    """Largest Windy zoom at which the whole route (coords: [(lon, lat, ...)]) fits a view of WINDY_VIEW_PX pixels."""
+    if not coords:
+        return WINDY_MAX_ZOOM
+    lons, lats = [c[0] for c in coords], [c[1] for c in coords]
+    mid = math.radians((min(lats) + max(lats)) / 2)
+    span = max((max(lons) - min(lons)) * math.cos(mid), max(lats) - min(lats), 1e-6) * 1.2   # 20 % margin
+    zoom = math.floor(math.log2(360.0 * WINDY_VIEW_PX / 256.0 / span))
+    return max(WINDY_MIN_ZOOM, min(WINDY_MAX_ZOOM, zoom))
+
+
+def windy_link(row: dict, date: datetime.date, offset_seconds: float | None, lat: float, lon: float, zoom: int) -> str:
+    """Windy map for the hour of the row on the planned date (the time in the link is UTC), centred on the route."""
+    offset = (offset_seconds if offset_seconds is not None else round(lon / 15.0 * 2) / 2 * 3600)
+    local = datetime.datetime.combine(date + datetime.timedelta(days=row.get("day", 0)), datetime.time(row["hour"]))
+    utc = local - datetime.timedelta(seconds=offset)
+    return WINDY_URL.format(stamp=utc.strftime("%Y-%m-%d-%H"), lat=lat, lon=lon, zoom=zoom)
 
 
 _SNOW_CODES = (71, 73, 75, 77, 85, 86)
@@ -315,7 +342,8 @@ def _precip_cell(row: dict) -> str:
     return f"{icon} {text}" if icon else text
 
 
-def render_table(rows: list[dict], lang: str) -> str:
+def render_table(rows: list[dict], lang: str, windy: tuple | None = None) -> str:
+    """`windy` = (date, utc_offset_seconds, lat, lon, zoom): adds a "..." link to Windy after the wind data of each hour."""
     keys = ("w_time", "w_temp", "w_feels", "w_precip", "w_cloud", "w_vis", "w_wind", "w_gust", "w_snow", "w_sky")
     marked = any(r.get("after") for r in rows)
     header = [tr(k, lang) for k in keys] + ([tr("w_after", lang)] if marked else [])
@@ -327,7 +355,7 @@ def render_table(rows: list[dict], lang: str) -> str:
         if "night" in r:
             hour = ("🌙 " if r["night"] else "☀️ ") + hour
         cells = [hour, _num(r["temp"], 0), _num(r["feels"], 0), _precip_cell(r),
-                 _num(r["cloud"], 0), _num(vis_km, 1), _wind_cell(r, lang), _num(r["gust"], 1),
+                 _num(r["cloud"], 0), _num(vis_km, 1), _wind_cell(r, lang, windy), _num(r["gust"], 1),
                  _num(snow_cm, 0), tr(_sky_key(r["code"]), lang)]
         if marked:
             cells.append("•" if r.get("after") else "")
@@ -414,7 +442,7 @@ class WeatherPlugin(SectionPlugin):
                         else "w_start_user", ctx.lang)
             start_line = tr("w_start_line", ctx.lang, start=f"{start_min // 60:02d}:{start_min % 60:02d}",
                             source=origin, finish=finish_text) + "\n\n"
-        markdown = start_line + render_table(shown, ctx.lang) + "\n\n*" + note + "*"
+        markdown = start_line + render_table(shown, ctx.lang, (ctx.date, offset, lat, lon, windy_zoom(ctx.coords))) + "\n\n*" + note + "*"
         warnings = warnings_for(trip, ctx.lang, source)
         seen = {w.text for w in warnings}
         for w in warnings_for(post, ctx.lang, "forecast"):

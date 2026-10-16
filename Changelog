@@ -1,3 +1,5 @@
+0.7.0	Weather table: "..." link to windy.com after the wind data of each hour (planned date and hour, centred on the route, zoom keeps the route in view)
+
 0.6.0	Protected zones (nature reserves, protected areas): the planner asks the user, with the zone and the length, before it crosses one; military, private and fenced zones stay closed always
 
 0.5.0	Main roads (trunk, primary) without cycle infrastructure: the planner asks the user, with the road and the length, before it uses them as a last resort; presets.allow_main_roads, route_graph.main_road_length_km

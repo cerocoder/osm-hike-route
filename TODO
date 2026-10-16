@@ -90,3 +90,12 @@
     crossing one, probe, tell the user the zone and the length, and ask. Cross it only after the user agrees.
     Done (0.6.0): route_graph.is_protected_only / split_protected / protected_zones_crossed,
     presets.allow_protected_zones, SKILL step 8, spec 3.5.3, tests.
+
+14. [done] In the detail plan view, the weather table should contain the "..." hyperlink in the Wind column after the wind data.
+   It should point to windy.com to see the situation in the location for a given hour on the planned date.
+   The zoom should be taken to keep all your route in the view. Here are details:
+   "Yes, you can generate a direct web link that opens the Windy.com map at specific coordinates, with a selected weather
+    layer and for a specific date/time. No API is required for this. The link structure is as follows:
+    https://www.windy.com/?[DATE-TIME],[LATITUDE],[LONGITUDE],[ZOOM]
+    Use this code with caution."
+   Done (0.7.0): weather.windy_link / windy_zoom, link in the Wind column (time in UTC, zoom fits the route bbox), tests.

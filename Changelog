@@ -1,4 +1,4 @@
-0.7.0	Weather table: "..." link to windy.com after the wind data of each hour (planned date and hour, centred on the route, zoom keeps the route in view)
+0.7.0	Weather table: "..." link to windy.com after the wind data of each hour (planned date and hour, UTC rounded to the 3-hour step of Windy, centred on the route, zoom keeps the route in view)
 
 0.6.0	Protected zones (nature reserves, protected areas): the planner asks the user, with the zone and the length, before it crosses one; military, private and fenced zones stay closed always
 

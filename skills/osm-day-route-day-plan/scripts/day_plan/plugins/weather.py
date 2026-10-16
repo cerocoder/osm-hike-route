@@ -308,10 +308,11 @@ def windy_zoom(coords: list) -> int:
 
 
 def windy_link(row: dict, date: datetime.date, offset_seconds: float | None, lat: float, lon: float, zoom: int) -> str:
-    """Windy map for the hour of the row on the planned date (the time in the link is UTC), centred on the route."""
+    """Windy map for the hour of the row on the planned date (the time in the link is UTC, rounded to the nearest 3-hour step: 07 -> 06, 14 -> 15), centred on the route."""
     offset = (offset_seconds if offset_seconds is not None else round(lon / 15.0 * 2) / 2 * 3600)
     local = datetime.datetime.combine(date + datetime.timedelta(days=row.get("day", 0)), datetime.time(row["hour"]))
     utc = local - datetime.timedelta(seconds=offset)
+    utc = utc.replace(hour=0) + datetime.timedelta(hours=(utc.hour + 1) // 3 * 3)   # Windy shows a 3-hour grid: the nearest step
     return WINDY_URL.format(stamp=utc.strftime("%Y-%m-%d-%H"), lat=lat, lon=lon, zoom=zoom)
 
 

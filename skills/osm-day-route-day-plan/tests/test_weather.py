@@ -416,12 +416,22 @@ def test_wind_cell_has_a_windy_link_for_the_hour_in_utc_when_asked(weather_respo
     date = datetime.date(2026, 6, 21)
     assert "windy.com" not in render_table(rows[10:11], "en")
     table = render_table(rows[10:11], "en", (date, 7200, 50.0, 14.0, 11))
-    assert "4.2" in table and "[...](https://www.windy.com/?2026-06-21-08,50.0000,14.0000,11)" in table
+    assert "4.2" in table and "[...](https://www.windy.com/?2026-06-21-09,50.0000,14.0000,11)" in table
 
 
 def test_windy_link_crosses_midnight_for_the_next_day_rows():
     row = {"hour": 1, "day": 1}
-    assert "?2026-06-21-23," in windy_link(row, datetime.date(2026, 6, 21), 7200, 50.0, 14.0, 9)
+    assert "?2026-06-22-00," in windy_link(row, datetime.date(2026, 6, 21), 7200, 50.0, 14.0, 9)
+
+
+def test_windy_link_rounds_the_utc_hour_to_the_nearest_3_hour_step():
+    date = datetime.date(2026, 6, 21)
+    def stamp(hour, offset=0):
+        return windy_link({"hour": hour}, date, offset, 50.0, 14.0, 9).split("?")[1].split(",")[0]
+    assert [stamp(h) for h in (6, 7, 8, 13, 14, 15)] == ["2026-06-21-06", "2026-06-21-06", "2026-06-21-09",
+                                                         "2026-06-21-12", "2026-06-21-15", "2026-06-21-15"]
+    assert stamp(23) == "2026-06-22-00"          # rounds up across midnight
+    assert stamp(16, 7200) == "2026-06-21-15"    # local 16:00 at UTC+2 = 14 UTC -> 15
 
 
 def test_windy_zoom_keeps_the_whole_route_in_view():

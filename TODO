@@ -98,4 +98,4 @@
     layer and for a specific date/time. No API is required for this. The link structure is as follows:
     https://www.windy.com/?[DATE-TIME],[LATITUDE],[LONGITUDE],[ZOOM]
     Use this code with caution."
-   Done (0.7.0): weather.windy_link / windy_zoom, link in the Wind column (time in UTC, zoom fits the route bbox), tests.
+   Done (0.7.0): weather.windy_link / windy_zoom, link in the Wind column (time in UTC rounded to the 3-hour grid Windy shows, checked in Chrome; zoom fits the route bbox), tests.
